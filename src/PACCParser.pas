@@ -19,7 +19,7 @@ type TPACCParser=class
 
 implementation
 
-uses PACCSort,PACCInstance;
+uses PACCSort,PACCInstance, PACCTarget;
 
 var StaticCounter:TPasMPInt32=0;
     TempVariableCounter:TPasMPInt32=0;
@@ -89,6 +89,9 @@ var CurrentState:TState;
     CurrentFunctionType:PPACCType;
     BreakLabel:TPACCAbstractSyntaxTreeNodeLabel;
     ContinueLabel:TPACCAbstractSyntaxTreeNodeLabel;
+    PragmaPack:TPACCInt32;
+    PragmaPackStack:array of TPACCInt32;
+    PragmaPackStackPointer:TPACCInt32;
  procedure AddError(const s:TPUCUUTF8String;const SourceLocation:PPACCSourceLocation=nil;const DoAbort:boolean=false);
  begin
   TPACCInstance(Instance).AddError(s,SourceLocation,DoAbort);
@@ -97,9 +100,170 @@ var CurrentState:TState;
  begin
   TPACCInstance(Instance).AddWarning(s,SourceLocation);
  end;
- procedure ParsePragma(const PragmaString:TPUCUUTF8String;const RelevantSourceLocation:TPACCSourceLocation);
+ procedure ParsePragma(const PragmaString:TPACCRawByteString;const RelevantSourceLocation:TPACCSourceLocation);
+ var CurrentChar:ansichar;
+     CurrentPosition:TPACCInt32;
+     AtEOI:boolean;
+  function NextChar:ansichar;
+  begin
+   if CurrentPosition<=length(PragmaString) then begin
+    result:=PragmaString[CurrentPosition];
+    inc(CurrentPosition);
+   end else begin
+    result:=#0;
+    AtEOI:=true;
+   end;
+   CurrentChar:=result;
+  end;
+  procedure SkipWhiteSpace;
+  begin
+   while CurrentChar in [#1..#32] do begin
+    NextChar;
+   end;
+  end;
+ var PragmaCommand,Temp:TPACCRawByteString;
  begin
-  // TODO
+  AtEOI:=false;
+  CurrentPosition:=1;
+
+  NextChar;
+
+  while not AtEOI do begin
+
+   SkipWhiteSpace;
+
+   if CurrentChar in ['a'..'z','A'..'Z','_'] then begin
+
+    PragmaCommand:='';
+    while CurrentChar in ['a'..'z','A'..'Z','_'] do begin
+     PragmaCommand:=PragmaCommand+CurrentChar;
+     NextChar;
+    end;
+
+    SkipWhiteSpace;
+
+    if (PragmaCommand='STDC') or (PragmaCommand='stdc') then begin
+
+     // Silence ignoring without any warning, until implemented
+     break;
+
+    end else if PragmaCommand='pack' then begin
+
+     if CurrentChar='(' then begin
+      NextChar;
+
+      SkipWhiteSpace;
+
+      if CurrentChar=')' then begin
+
+       // #pragma pack()
+
+       NextChar;
+       PragmaPack:=-1;
+
+      end else begin
+
+       if CurrentChar in ['a'..'z','A'..'Z','_'] then begin
+
+        // #pragma pack(push[,n])
+        // #pragma pack(pop[,n])
+
+        Temp:='';
+        while CurrentChar in ['a'..'z','A'..'Z','_'] do begin
+         Temp:=Temp+CurrentChar;
+         NextChar;
+        end;
+        if Temp='push' then begin
+         if length(PragmaPackStack)<=PragmaPackStackPointer then begin
+          SetLength(PragmaPackStack,(PragmaPackStackPointer+1)*2);
+         end;
+         PragmaPackStack[PragmaPackStackPointer]:=PragmaPack;
+         inc(PragmaPackStackPointer);
+        end else if Temp='pop' then begin
+         if PragmaPackStackPointer>0 then begin
+          dec(PragmaPackStackPointer);
+          PragmaPack:=PragmaPackStack[PragmaPackStackPointer];
+         end else begin
+          AddWarning('Pragma pack stack underflow',@RelevantSourceLocation);
+         end;
+        end else begin
+         AddWarning('"push" or "pop" expected',@RelevantSourceLocation);
+        end;
+
+        SkipWhiteSpace;
+
+        case CurrentChar of
+         ',':begin
+          NextChar;
+          SkipWhiteSpace;
+         end;
+         ')':begin
+          NextChar;
+          SkipWhiteSpace;
+          if CurrentChar=',' then begin
+           NextChar;
+           continue;
+          end else begin
+           AddWarning('Pragma syntax error',@RelevantSourceLocation);
+           break;
+          end;
+          continue;
+         end;
+         else begin
+          AddWarning('Pragma syntax error',@RelevantSourceLocation);
+         end;
+        end;
+
+       end;
+
+       if CurrentChar in ['0'..'9'] then begin
+        Temp:='';
+        while CurrentChar in ['0'..'9'] do begin
+         Temp:=Temp+CurrentChar;
+         NextChar;
+        end;
+        PragmaPack:=StrToIntDef(Temp,-1);
+        if (PragmaPack>0) and ((PragmaPack and (PragmaPack-1))<>0) then begin
+         AddError('Pragma pack be power of 2, but got '+IntToStr(PragmaPack),@RelevantSourceLocation,false);
+         break;
+        end else if PragmaPack<0 then begin
+         AddError('Invalud pragma pack',@RelevantSourceLocation,false);
+         break;
+        end else if PragmaPack=0 then begin
+         PragmaPack:=-1;
+        end;
+       end;
+
+       if CurrentChar=')' then begin
+        NextChar;
+       end;
+      end;
+
+     end;
+
+    end else begin
+
+     AddWarning('Unknown pragma command "'+PragmaCommand+'", aborting pragma parsing, and ignoring the rest of pragma string',@RelevantSourceLocation);
+     break;
+
+    end;
+
+    SkipWhiteSpace;
+
+    if CurrentChar=',' then begin
+     NextChar;
+     continue;
+    end else begin
+     AddWarning('Pragma syntax error',@RelevantSourceLocation);
+     break;
+    end;
+
+   end else begin
+    AddWarning('Pragma syntax error',@RelevantSourceLocation);
+    break;
+   end;
+
+  end;
  end;
  function NextToken:PPACCLexerToken;
  begin
@@ -2557,7 +2721,7 @@ var CurrentState:TState;
     inc(Fields[Index].Type_.Offset,Offset);
    end;
   end;
-  function UpdateStructOffsets(var Size:TPACCInt64;var Alignment:TPACCInt;const Fields:TPACCStructFields;const IsPacked:boolean):TPACCStructFields;
+  function UpdateStructOffsets(var Size:TPACCInt64;var Alignment:TPACCInt;const Fields:TPACCStructFields;const MaxAlignment:TPACCInt32):TPACCStructFields;
   var InputIndex,Index,Count:TPACCInt;
       MaxSize,Offset,BitOffset,Bit,Room:TPACCInt64;
       FieldName:TPACCRawByteString;
@@ -2583,18 +2747,18 @@ var CurrentState:TState;
       // As a result the entire struct is aligned to the largest among its members.
       // Unnamed fields will never be accessed, so they shouldn't be taken into account
       // when calculating alignment.
-      Alignment:=max(Alignment,IfThen(IsPacked,1,FieldType^.Alignment));
+      Alignment:=max(Alignment,Min(MaxAlignment,FieldType^.Alignment));
      end;
      if (length(FieldName)=0) and (FieldType^.Kind=tkSTRUCT) then begin
       // C11 6.7.2.1p13: Anonymous struct
       FinishBitfield;
-      inc(Offset,ComputePadding(Offset,IfThen(IsPacked,1,FieldType^.Alignment)));
+      inc(Offset,ComputePadding(Offset,Min(MaxAlignment,FieldType^.Alignment)));
       SquashUnnamedStruct(result,Count,FieldType,Offset);
       inc(Offset,FieldType^.Size);
      end else if FieldType^.BitSize=0 then begin
       // C11 6.7.2.1p12: The zero-Size bit-field indicates the end of the current run of the bit-fields.
       FinishBitfield;
-      inc(Offset,ComputePadding(Offset,IfThen(IsPacked,1,FieldType^.Alignment)));
+      inc(Offset,ComputePadding(Offset,Min(MaxAlignment,FieldType^.Alignment)));
       BitOffset:=0;
      end else begin
       if FieldType^.BitSize>0 then begin
@@ -2605,14 +2769,14 @@ var CurrentState:TState;
         FieldType^.BitOffset:=BitOffset;
        end else begin
         FinishBitfield;
-        inc(Offset,ComputePadding(Offset,IfThen(IsPacked,1,FieldType^.Alignment)));
+        inc(Offset,ComputePadding(Offset,Min(MaxAlignment,FieldType^.Alignment)));
         FieldType^.Offset:=Offset;
         FieldType^.BitOffset:=0;
        end;
        inc(BitOffset,FieldType^.BitSize);
       end else begin
        FinishBitfield;
-       inc(Offset,ComputePadding(Offset,IfThen(IsPacked,1,FieldType^.Alignment)));
+       inc(Offset,ComputePadding(Offset,Min(MaxAlignment,FieldType^.Alignment)));
        FieldType^.Offset:=Offset;
        inc(Offset,FieldType^.Size);
       end;
@@ -2633,7 +2797,7 @@ var CurrentState:TState;
     SetLength(result,Count);
    end;
   end;
-  function UpdateUnionOffsets(var Size:TPACCInt64;var Alignment:TPACCInt;const Fields:TPACCStructFields;const IsPacked:boolean):TPACCStructFields;
+  function UpdateUnionOffsets(var Size:TPACCInt64;var Alignment:TPACCInt;const Fields:TPACCStructFields;const MaxAlignment:TPACCInt32):TPACCStructFields;
   var InputIndex,Index,Count:TPACCInt;
       MaxSize:TPACCInt64;
       FieldName:TPACCRawByteString;
@@ -2648,7 +2812,7 @@ var CurrentState:TState;
      FieldName:=Fields[InputIndex].Name;
      FieldType:=Fields[InputIndex].Type_;
      MaxSize:=max(MaxSize,FieldType^.Size);
-     Alignment:=max(Alignment,IfThen(IsPacked,1,FieldType^.Alignment));
+     Alignment:=max(Alignment,Min(MaxAlignment,FieldType^.Alignment));
      if (length(FieldName)=0) and (FieldType^.Kind=tkSTRUCT) then begin
       SquashUnnamedStruct(result,Count,FieldType,0);
      end else begin
@@ -2784,15 +2948,23 @@ var CurrentState:TState;
   end;
   procedure FinalizeStructUnion(const Type_:PPACCType;const StructFields:TPACCStructFields);
   var Alignment:TPACCInt;
+      MaxAlignment:TPACCInt32;
       Size:TPACCInt64;
       FinalizedFields:TPACCStructFields;
   begin
    Size:=0;
    Alignment:=1;
-   if tfStruct in Type_^.Flags then begin
-    FinalizedFields:=UpdateStructOffsets(Size,Alignment,StructFields,tfPacked in Type_^.Flags);
+   if tfPacked in Type_^.Flags then begin
+    MaxAlignment:=1;
+   end else if PragmaPack>0 then begin
+    MaxAlignment:=PragmaPack;
    end else begin
-    FinalizedFields:=UpdateUnionOffsets(Size,Alignment,StructFields,tfPacked in Type_^.Flags);
+    MaxAlignment:=TPACCInstance(Instance).Target.MaximumAlignment;
+   end;
+   if tfStruct in Type_^.Flags then begin
+    FinalizedFields:=UpdateStructOffsets(Size,Alignment,StructFields,MaxAlignment);
+   end else begin
+    FinalizedFields:=UpdateUnionOffsets(Size,Alignment,StructFields,MaxAlignment);
    end;
    Type_^.Alignment:=Alignment;
    if length(FinalizedFields)>0 then begin
@@ -3651,6 +3823,9 @@ begin
   CurrentFunctionType:=nil;
   BreakLabel:=nil;
   ContinueLabel:=nil;
+  PragmaPack:=-1;
+  PragmaPackStack:=nil;
+  PragmaPackStackPointer:=0;
   try
    CurrentState.IsEOF:=false;
    CurrentState.TokenIndex:=-1;
@@ -3664,6 +3839,7 @@ begin
     raise;
    end;
   finally
+   PragmaPackStack:=nil;
    LabelScope.Free;
    TagScope.Free;
    LocalScope.Free;

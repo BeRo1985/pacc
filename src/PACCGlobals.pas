@@ -3,9 +3,9 @@ unit PACCGlobals;
 
 interface
 
-uses SysUtils,Classes,Math,PUCU,PasMP,PACCTypes,PACCRawByteStringHashMap;
+uses {$if defined(Win32) or defined(Win64)}Windows,{$ifend}SysUtils,Classes,Math,PUCU,PasMP,PACCTypes,PACCRawByteStringHashMap;
 
-const PACCVersionString='2017.01.09.17.22.0000';
+const PACCVersionString='2017.01.09.23.51.0000';
       PACCCopyrightString='Copyright (C) 2009-2017, Benjamin ''BeRo'' Rosseaux';
 
 type PPACCEncoding=^TPACCEncoding;
@@ -147,6 +147,8 @@ const PACCDefaultOptions:TPACCOptions=
         HandleUTF8:false;
        );
 
+procedure DebuggerWaitEnterKey;
+
 function SARcint(Value,Shift:TPACCInt):TPACCInt;
 function SARcint8(Value,Shift:TPACCInt8):TPACCInt8;
 function SARcint16(Value,Shift:TPACCInt16):TPACCInt16;
@@ -154,6 +156,17 @@ function SARcint32(Value,Shift:TPACCInt32):TPACCInt32;
 function SARcint64(Value,Shift:TPACCInt64):TPACCInt64;
 
 implementation
+
+{$warnings off}
+procedure DebuggerWaitEnterKey;
+begin
+{$if defined(Win32) or defined(Win64)}
+ if DebugHook<>0 then begin
+  readln;
+ end;
+{$ifend}
+end;
+{$warnings on}
 
 function SARcint(Value,Shift:TPACCInt):TPACCInt;
 begin
@@ -206,3 +219,5 @@ begin
 end;
 
 end.
+
+

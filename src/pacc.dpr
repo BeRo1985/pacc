@@ -1,13 +1,12 @@
 program pacc;
 {$i PACC.inc}
 {$if defined(Win32) or defined(Win64)}
-{$apptype console}
+ {$apptype console}
 {$ifend}
 
+{%File 'PACC.inc'}
+
 uses
-{$if defined(Win32) or defined(Win64)}
-  Windows,
-{$ifend}
   SysUtils,
   Classes,
   PasMP in 'PasMP.pas',
@@ -457,11 +456,7 @@ begin
 
  end;
 
-{$if defined(Win32) or defined(Win64)}
- if DebugHook<>0 then begin
-  readln;
- end;
-{$ifend}
+ DebuggerWaitEnterKey;
 
  if HasErrors then begin
   halt(1);
