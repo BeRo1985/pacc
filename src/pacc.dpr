@@ -1,9 +1,13 @@
 program pacc;
 {$i PACC.inc}
+{$if defined(Win32) or defined(Win64)}
 {$apptype console}
+{$ifend}
 
 uses
+{$if defined(Win32) or defined(Win64)}
   Windows,
+{$ifend}
   SysUtils,
   Classes,
   PasMP in 'PasMP.pas',

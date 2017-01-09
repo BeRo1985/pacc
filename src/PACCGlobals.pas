@@ -5,7 +5,7 @@ interface
 
 uses SysUtils,Classes,Math,PUCU,PasMP,PACCTypes,PACCRawByteStringHashMap;
 
-const PACCVersionString='2017.01.09.17.03.0000';
+const PACCVersionString='2017.01.09.17.22.0000';
       PACCCopyrightString='Copyright (C) 2009-2017, Benjamin ''BeRo'' Rosseaux';
 
 type PPACCEncoding=^TPACCEncoding;

@@ -321,58 +321,6 @@ var CurrentState:TState;
    NextToken;
   end;
  end;
- function IsFunctionDefinition:boolean;
- var SavedState:TState;
- begin
-  result:=false;
-  SavedState:=CurrentState;
-  try
-   repeat
-    case CurrentState.Token^.TokenType of
-     TOK_EOF:begin
-      AddError('Premature end of input',@CurrentState.Token^.SourceLocation,true);
-     end;
-     TOK_SEMICOLON:begin
-      break;
-     end;
-     else begin
-      if IsType(CurrentState.Token) then begin
-       NextToken;
-       continue;
-      end else begin
-       if CurrentState.Token^.TokenType=TOK_LPAR then begin
-        SkipParentheses;
-        if CurrentState.Token^.TokenType=TOK_LPAR then begin
-         SkipParentheses;
-         result:=(CurrentState.Token^.TokenType=TOK_LBRA) or IsType(CurrentState.Token);
-         break;
-        end else begin
-         continue;
-        end;
-       end else begin
-        if CurrentState.Token^.TokenType<>TOK_IDENT then begin
-         NextToken;
-         continue;
-        end else begin
-         NextToken;
-         if CurrentState.Token^.TokenType=TOK_LPAR then begin
-          SkipParentheses;
-          result:=(CurrentState.Token^.TokenType=TOK_LBRA) or IsType(CurrentState.Token);
-          break;
-         end else begin
-          continue;
-         end;
-        end;
-       end;
-      end;
-     end;
-    end;
-   until false;
-  finally
-   CurrentState:=SavedState;
-   TPACCInstance(Instance).SourceLocation:=CurrentState.Token^.SourceLocation;
-  end;
- end;
  function TypeConversion(const Node:TPACCAbstractSyntaxTreeNode):TPACCAbstractSyntaxTreeNode;
  var Type_:PPACCType;
  begin
@@ -3678,10 +3626,6 @@ var CurrentState:TState;
       result.Children.Add(ParseAssemblerStatement(true));
      end;
      else begin
-{     if IsFunctionDefinition then begin
-       result.Children.Add(ParseFunctionDefinition);
-      end else begin
-      end;}
       ParseDeclaration(result.Children,true,true);
      end;
     end;
