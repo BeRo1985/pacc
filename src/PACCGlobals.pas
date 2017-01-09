@@ -5,7 +5,7 @@ interface
 
 uses {$if defined(Win32) or defined(Win64)}Windows,{$ifend}SysUtils,Classes,Math,PUCU,PasMP,PACCTypes,PACCRawByteStringHashMap;
 
-const PACCVersionString='2017.01.10.00.16.0000';
+const PACCVersionString='2017.01.10.00.21.0000';
       PACCCopyrightString='Copyright (C) 2009-2017, Benjamin ''BeRo'' Rosseaux';
 
 type PPACCEncoding=^TPACCEncoding;
@@ -158,10 +158,15 @@ function SARcint64(Value,Shift:TPACCInt64):TPACCInt64;
 implementation
 
 {$warnings off}
+
+{$if defined(Win32) or defined(Win64)}
+function IsDebuggerPresent:boolean; stdcall; external 'kernel32.dll' name 'IsDebuggerPresent';
+{$endif}
+
 procedure DebuggerWaitEnterKey;
 begin
 {$if defined(Win32) or defined(Win64)}
- if DebugHook<>0 then begin
+ if {$ifdef fpc}IsDebuggerPresent{$else}DebugHook<>0{$endif} then begin
   readln;
  end;
 {$ifend}
