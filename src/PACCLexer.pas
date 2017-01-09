@@ -314,7 +314,7 @@ end;
 
 procedure TPACCLexer.Process;
 var CurrentPosition,PosInfoIndex,PragmaInfoIndex:TPACCInt32;
-    CurrentChar,CurrentNextChar,TerminateChar,c:TPUCUUTF32Char;
+    CurrentChar,CurrentNextChar{,TerminateChar,c}:TPUCUUTF32Char;
     WeAreAtEOF:boolean;
     TokenSourceLocation:TPACCSourceLocation;
  function RoundUpToPowerOfTwo(x:TPACCPtrUInt):TPACCPtrUInt;
@@ -645,11 +645,11 @@ var CurrentPosition,PosInfoIndex,PragmaInfoIndex:TPACCInt32;
  end;
  procedure ParseNumber(c:TPUCUUTF32Char);
  type tbn=array[0..1] of TPACCUInt32;
- var Last:TPUCUUTF32Char;
+ var //Last:TPUCUUTF32Char;
      i,b,fb,fbi,sign,lc,uc:TPACCInt32;
      l,l1,lv,ev:TPACCInt64;
      bn:tbn;
-     s:TPUCUUTF8String;
+     //s:TPUCUUTF8String;
      sv:TPasDblStrUtilsRawByteString;
      fv:double;
      t:TPACCLexerTokenType;
@@ -1154,7 +1154,7 @@ begin
    end else begin
     StringHashMapEntity:=LexerKeywordStringHashMap.Get(s,false);
     if assigned(StringHashMapEntity) then begin
-     AddSimpleToken(TPACCLexerTokenType(TPACCInt32(TPACCPtrInt(StringHashMapEntity^.Value))));
+     AddSimpleToken(TPACCLexerTokenType(TPACCInt32(TPACCPtrInt(TPACCPtrUInt(StringHashMapEntity^.Value)))));
     end else begin
      AddIdentToken(s);
     end;

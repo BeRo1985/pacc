@@ -395,6 +395,9 @@ var FunctionUsedVariablesHashMap:TPACCPointerHashMap;
       Scan(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Then_);
       OtherFunctionInitializedVariables:=copy(FunctionInitializedVariables);
       OtherFunctionUninitializedAccessVariables:=copy(FunctionUninitializedAccessVariables);
+      if length(OtherFunctionUninitializedAccessVariables)>0 then begin
+       // Unused warning suppression
+      end;
      finally
       FunctionInitializedVariables:=copy(LastFunctionInitializedVariables);
       FunctionUninitializedAccessVariables:=copy(LastFunctionUninitializedAccessVariables);

@@ -736,7 +736,7 @@ var InputStack:TInputStack;
  end;
  function LookUpEx(const Name:TPUCUUTF8String):TPACCInt;
  begin
-  result:=TPACCPtrInt(MacroStringHashMap.Values[Name])-1;
+  result:=TPACCPtrInt(TPACCPtrUInt(MacroStringHashMap.Values[Name]))-1;
  end;
  function LookUp(const Name:TPUCUUTF8String):TPACCInt;
  begin
@@ -3336,8 +3336,8 @@ var InputStack:TInputStack;
  end;
  function Eval:boolean;
  var s,mn:TPUCUUTF8String;
-     i,l,k,h,OldStringMode,OldNumberMode:TPACCInt;
-     j:uint64;
+     {i,}l,{k,h,}OldStringMode,OldNumberMode:TPACCInt;
+     //j:uint64;
      OldInEval:boolean;
  begin
   s:='';

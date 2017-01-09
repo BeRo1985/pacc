@@ -76,7 +76,20 @@ type PState=^TState;
       Count:TPACCInt;
       DefaultCaseLabel:TPACCAbstractSyntaxTreeNodeLabel;
      end;
-const TokenEOF:TPACCLexerToken=(TokenType:TOK_EOF);
+const TokenEOF:TPACCLexerToken=(TokenType:TOK_EOF;
+                                SourceLocation:(
+                                 Source:0;
+                                 Line:0;
+                                 Column:0
+                                );
+                                Index:0;
+                                PragmaString:'';
+                                Constant:(
+                                 StringValue:'';
+                                 Encoding:ENCODING_NONE;
+                                 SignedIntegerValue:0
+                                );
+                               );
 var CurrentState:TState;
     GlobalScope:TPACCRawByteStringHashMap;
     LocalScope:TPACCRawByteStringHashMap;
@@ -1231,7 +1244,6 @@ var CurrentState:TState;
   end;
   procedure SortInitializerList(const List:TPACCAbstractSyntaxTreeNodeList);
   var Index,Count:TPACCInt;
-      NodeA,NodeB:TPACCAbstractSyntaxTreeNode;
   begin
    Index:=0;
    Count:=List.Count;
@@ -1521,7 +1533,6 @@ var CurrentState:TState;
   until false;
  end;
  function ParseAdditiveExpression:TPACCAbstractSyntaxTreeNode;
- var Op:TPACCAbstractSyntaxTreeNodeKind;
  begin
   result:=ParseMultiplicativeExpression;
   repeat
@@ -1864,7 +1875,6 @@ var CurrentState:TState;
     end;
     procedure ParseDeclaratorParametersOldStyle(const ParameterVariables:TPACCAbstractSyntaxTreeNodeList);
     var Name:TPACCRawByteString;
-        CurrentType:PPACCType;
     begin
      repeat
       if CurrentState.Token^.TokenType=TOK_IDENT then begin
@@ -2125,7 +2135,7 @@ var CurrentState:TState;
        break;
       end;
      end else begin
-      AddError('String constant expected',@CurrentState.Token^.SourceLocation,true);
+      AddError('String constant expected',@RelevantSourceLocation,true);
      end;
     until false;
    end;
@@ -2232,7 +2242,6 @@ var CurrentState:TState;
  var LoopBreakLabel,LoopContinueLabel,OldBreakLabel,OldContinueLabel:TPACCAbstractSyntaxTreeNodeLabel;
      OriginalLocalScope:TPACCRawByteStringHashMap;
      InitializationNode,ConditionNode,StepNode,BodyNode:TPACCAbstractSyntaxTreeNode;
-     NodeList:TPACCAbstractSyntaxTreeNodeList;
      RelevantSourceLocation:TPACCSourceLocation;
  begin
   RelevantSourceLocation:=CurrentState.Token^.SourceLocation;
@@ -2287,7 +2296,6 @@ var CurrentState:TState;
  var LoopBreakLabel,LoopContinueLabel,OldBreakLabel,OldContinueLabel:TPACCAbstractSyntaxTreeNodeLabel;
      OriginalLocalScope:TPACCRawByteStringHashMap;
      ConditionNode,BodyNode:TPACCAbstractSyntaxTreeNode;
-     NodeList:TPACCAbstractSyntaxTreeNodeList;
      RelevantSourceLocation:TPACCSourceLocation;
  begin
   RelevantSourceLocation:=CurrentState.Token^.SourceLocation;
@@ -2321,7 +2329,6 @@ var CurrentState:TState;
  var LoopBreakLabel,LoopContinueLabel,OldBreakLabel,OldContinueLabel:TPACCAbstractSyntaxTreeNodeLabel;
      OriginalLocalScope:TPACCRawByteStringHashMap;
      ConditionNode,BodyNode:TPACCAbstractSyntaxTreeNode;
-     NodeList:TPACCAbstractSyntaxTreeNodeList;
      RelevantSourceLocation:TPACCSourceLocation;
  begin
   RelevantSourceLocation:=CurrentState.Token^.SourceLocation;
@@ -2375,7 +2382,6 @@ var CurrentState:TState;
      CurrentCase:PCase;
      SwitchCases:TPACCAbstractSyntaxTreeNodeSWITCHStatementCases;
      SwitchCase:PPACCAbstractSyntaxTreeNodeSWITCHStatementCase;
-     SwitchNode:TPACCAbstractSyntaxTreeNodeSWITCHStatement;
      OldBreakLabel,SwitchBreakLabel:TPACCAbstractSyntaxTreeNodeLabel;
      RelevantSourceLocation:TPACCSourceLocation;
  begin
@@ -2723,7 +2729,7 @@ var CurrentState:TState;
   end;
   function UpdateStructOffsets(var Size:TPACCInt64;var Alignment:TPACCInt;const Fields:TPACCStructFields;const MaxAlignment:TPACCInt32):TPACCStructFields;
   var InputIndex,Index,Count:TPACCInt;
-      MaxSize,Offset,BitOffset,Bit,Room:TPACCInt64;
+      Offset,BitOffset,Bit,Room:TPACCInt64;
       FieldName:TPACCRawByteString;
       FieldType:PPACCType;
    procedure FinishBitfield;
@@ -2733,7 +2739,6 @@ var CurrentState:TState;
    end;
   begin
    result:=nil;
-   MaxSize:=0;
    Offset:=0;
    BitOffset:=0;
    Index:=0;
@@ -3575,7 +3580,6 @@ var CurrentState:TState;
   procedure BackfillLabels;
   var Index:longint;
       Node,LabelNode:TPACCAbstractSyntaxTreeNode;
-      Src,Dst:TPACCAbstractSyntaxTreeNode;
   begin
    for Index:=0 to UnresolvedLabelUsedNodes.Count-1 do begin
     Node:=UnresolvedLabelUsedNodes[Index];
