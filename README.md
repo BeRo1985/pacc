@@ -11,8 +11,8 @@ PACC (PAscal C Compiler) is an work-in-progress C compiler, which is implemented
 
 # License
 
-zlib, otherwise see beginning comment of src\pacc.inc
+zlib, otherwise see beginning comment of https://github.com/BeRo1985/pacc/blob/master/src/PACC.inc
 
 # General guidelines for code contributors
 
-See beginning comment of src\pacc.inc
+See beginning comment of https://github.com/BeRo1985/pacc/blob/master/src/PACC.inc
