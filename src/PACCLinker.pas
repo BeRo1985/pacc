@@ -12,6 +12,7 @@ type TPACCLinker=class;
        fLinker:TPACCLinker;
        fName:TPACCRawByteString;
        fStream:TMemoryStream;
+       fAlignment:TPACCInt32;
       public
        constructor Create(const ALinker:TPACCLinker;const AName:TPACCRawByteString); reintroduce;
        destructor Destroy; override;
@@ -19,6 +20,7 @@ type TPACCLinker=class;
        property Linker:TPACCLinker read fLinker;
        property Name:TPACCRawByteString read fName;
        property Stream:TMemoryStream read fStream;
+       property Alignment:TPACCInt32 read fAlignment write fAlignment;
      end;
 
      TPACCLinkerSectionList=class(TList)
@@ -186,6 +188,8 @@ const MZEXEHeaderSize=128;
       IMAGE_SCN_ALIGN_2048BYTES=$00c00000;
       IMAGE_SCN_ALIGN_4096BYTES=$00d00000;
       IMAGE_SCN_ALIGN_8192BYTES=$00e00000;
+      IMAGE_SCN_ALIGN_MASK=$00f00000;
+      IMAGE_SCN_ALIGN_SHIFT=20;
       IMAGE_SCN_LNK_NRELOC_OVFL=$01000000;
       IMAGE_SCN_MEM_DISCARDABLE=$02000000;
       IMAGE_SCN_MEM_NOT_CACHED=$04000000;
@@ -932,6 +936,7 @@ begin
  fLinker:=ALinker;
  fName:=AName;
  fStream:=TMemoryStream.Create;
+ fAlignment:=1;
 end;
 
 destructor TPACCLinkerSection.Destroy;
@@ -1033,7 +1038,8 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
        RelocationType:TPACCUInt16;
       end;
       TCOFFRelocations=array of TCOFFRelocation;
- var SectionIndex,RelocationIndex:TPACCInt32;
+ var SectionIndex,RelocationIndex,NumberOfRelocations:TPACCInt32;
+     RelocationOffset:TPACCUInt32;
      COFFFileHeader:TCOFFFileHeader;
      COFFSectionHeaders:TCOFFSectionHeaders;
      COFFSectionHeader:PCOFFSectionHeader;
@@ -1090,15 +1096,20 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
     if COFFSectionHeader^.VirtualSize>0 then begin
      Section:=TPACCLinkerSection.Create(self,COFFSectionHeader^.Name);
      Sections.Add(Section);
-     if COFFSectionHeader^.SizeOfRawData>0 then begin
-      if COFFSectionHeader^.SizeOfRawData>COFFSectionHeader^.VirtualSize then begin
-       TPACCInstance(Instance).AddError('SizeOfRawData is larger than VirtualSize at section "'+Section.Name+'"',nil,true);
-      end;
-      if AObjectStream.Seek(COFFSectionHeader^.PointerToRawData,soBeginning)<>COFFSectionHeader^.PointerToRawData then begin
-       TPACCInstance(Instance).AddError('Stream seek error',nil,true);
-      end;
-      if Section.Stream.CopyFrom(AObjectStream,COFFSectionHeader^.SizeOfRawData)<>COFFSectionHeader^.SizeOfRawData then begin
-       TPACCInstance(Instance).AddError('Stream read error',nil,true);
+     if (COFFSectionHeader^.Characteristics and IMAGE_SCN_ALIGN_MASK)<>0 then begin
+      Section.Alignment:=1 shl (((COFFSectionHeader^.Characteristics and IMAGE_SCN_ALIGN_MASK) shr IMAGE_SCN_ALIGN_SHIFT)-1);
+     end;
+     if (COFFSectionHeader^.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)=0 then begin
+      if COFFSectionHeader^.SizeOfRawData>0 then begin
+       if COFFSectionHeader^.SizeOfRawData>COFFSectionHeader^.VirtualSize then begin
+        TPACCInstance(Instance).AddError('SizeOfRawData is larger than VirtualSize at section "'+Section.Name+'"',nil,true);
+       end;
+       if AObjectStream.Seek(COFFSectionHeader^.PointerToRawData,soBeginning)<>COFFSectionHeader^.PointerToRawData then begin
+        TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+       end;
+       if Section.Stream.CopyFrom(AObjectStream,COFFSectionHeader^.SizeOfRawData)<>COFFSectionHeader^.SizeOfRawData then begin
+        TPACCInstance(Instance).AddError('Stream read error',nil,true);
+       end;
       end;
      end;
      if Section.Stream.Size<COFFSectionHeader^.VirtualSize then begin
@@ -1109,21 +1120,41 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
       end;
       FillChar(PAnsiChar(Section.Stream.Memory)[OldSize],COFFSectionHeader^.VirtualSize-OldSize,#0);
      end;
-     if (COFFSectionHeader^.PointerToRelocations>0) and (COFFSectionHeader^.NumberOfRelocations>0) then begin
-      COFFRelocations:=nil;
-      try
-       SetLength(COFFRelocations,COFFSectionHeader^.NumberOfRelocations);
-       if AObjectStream.Seek(COFFSectionHeader^.PointerToRelocations,soBeginning)<>COFFSectionHeader^.PointerToRelocations then begin
-        TPACCInstance(Instance).AddError('Stream seek error',nil,true);
-       end;
-       AObjectStream.ReadBuffer(COFFRelocations[0],COFFSectionHeader^.NumberOfRelocations*SizeOf(TCOFFRelocation));
-       for RelocationIndex:=0 to COFFSectionHeader^.NumberOfRelocations-1 do begin
-        COFFRelocation:=@COFFRelocations[RelocationIndex];
-        if COFFRelocation^.RelocationType<>0 then begin
-        end; 
-       end;
-      finally
+     if COFFSectionHeader^.PointerToRelocations>0 then begin
+      if (COFFSectionHeader^.NumberOfRelocations=IMAGE_SCN_MAX_RELOC) and
+         ((COFFSectionHeader^.Characteristics and IMAGE_SCN_LNK_NRELOC_OVFL)<>0) then begin
        COFFRelocations:=nil;
+       try
+        SetLength(COFFRelocations,1);
+        if AObjectStream.Seek(COFFSectionHeader^.PointerToRelocations,soBeginning)<>COFFSectionHeader^.PointerToRelocations then begin
+         TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+        end;
+        AObjectStream.ReadBuffer(COFFRelocations[0],SizeOf(TCOFFRelocation));
+        NumberOfRelocations:=COFFRelocations[0].VirtualAddress;
+        RelocationOffset:=SizeOf(TCOFFRelocation);
+       finally
+        COFFRelocations:=nil;
+       end;
+      end else begin
+       NumberOfRelocations:=COFFSectionHeader^.NumberOfRelocations;
+       RelocationOffset:=0;
+      end;
+      if NumberOfRelocations>0 then begin
+       COFFRelocations:=nil;
+       try
+        SetLength(COFFRelocations,NumberOfRelocations);
+        if AObjectStream.Seek(COFFSectionHeader^.PointerToRelocations+RelocationOffset,soBeginning)<>(COFFSectionHeader^.PointerToRelocations+RelocationOffset) then begin
+         TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+        end;
+        AObjectStream.ReadBuffer(COFFRelocations[0],NumberOfRelocations*SizeOf(TCOFFRelocation));
+        for RelocationIndex:=0 to NumberOfRelocations-1 do begin
+         COFFRelocation:=@COFFRelocations[RelocationIndex];
+         if COFFRelocation^.RelocationType<>0 then begin
+         end;
+        end;
+       finally
+        COFFRelocations:=nil;
+       end;
       end;
      end;
     end;
