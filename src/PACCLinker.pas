@@ -1149,7 +1149,85 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
         AObjectStream.ReadBuffer(COFFRelocations[0],NumberOfRelocations*SizeOf(TCOFFRelocation));
         for RelocationIndex:=0 to NumberOfRelocations-1 do begin
          COFFRelocation:=@COFFRelocations[RelocationIndex];
-         if COFFRelocation^.RelocationType<>0 then begin
+         case COFFFileHeader.Machine of
+          IMAGE_FILE_MACHINE_I386:begin
+           case COFFRelocation^.RelocationType of
+            IMAGE_REL_I386_ABSOLUTE:begin
+             // Ignore
+            end;
+            IMAGE_REL_I386_DIR16:begin
+            end;
+            IMAGE_REL_I386_REL16:begin
+            end;
+            IMAGE_REL_I386_DIR32:begin
+             // 32-bit absolute virtual address
+            end;
+            IMAGE_REL_I386_DIR32NB:begin
+             // 32-bit image relative address
+            end;
+            IMAGE_REL_I386_SEG12:begin
+             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
+            end;
+            IMAGE_REL_I386_SECTION:begin
+             // 16-bit section index in file
+            end;
+            IMAGE_REL_I386_SECREL:begin
+             // 32-bit section-relative
+            end;
+            IMAGE_REL_I386_TOKEN:begin
+             // .NET common language runtime token
+             TPACCInstance(Instance).AddError('Unsupported .NET common language runtime token relocation type',nil,true);
+            end;
+            IMAGE_REL_I386_SECREL7:begin
+             // 8-bit section-relative
+            end;
+            IMAGE_REL_I386_REL32:begin
+             // 32-bit self-relative
+             
+            end;
+           end;
+          end;
+          IMAGE_FILE_MACHINE_AMD64:begin
+           case COFFRelocation^.RelocationType of
+            IMAGE_REL_AMD64_ABSOLUTE:begin
+             // Ignore
+            end;
+            IMAGE_REL_AMD64_ADDR64:begin
+            end;
+            IMAGE_REL_AMD64_ADDR32:begin
+            end;
+            IMAGE_REL_AMD64_ADDR32NB:begin
+            end;
+            IMAGE_REL_AMD64_REL32:begin
+            end;
+            IMAGE_REL_AMD64_REL32_1:begin
+            end;
+            IMAGE_REL_AMD64_REL32_2:begin
+            end;
+            IMAGE_REL_AMD64_REL32_3:begin
+            end;
+            IMAGE_REL_AMD64_REL32_4:begin
+            end;
+            IMAGE_REL_AMD64_REL32_5:begin
+            end;
+            IMAGE_REL_AMD64_SECTION:begin
+            end;
+            IMAGE_REL_AMD64_SECREL:begin
+            end;
+            IMAGE_REL_AMD64_SECREL7:begin
+            end;
+            IMAGE_REL_AMD64_TOKEN:begin
+             // .NET common language runtime token
+             TPACCInstance(Instance).AddError('Unsupported .NET common language runtime token relocation type',nil,true);
+            end;
+            IMAGE_REL_AMD64_SREL32:begin
+            end;
+            IMAGE_REL_AMD64_PAIR:begin
+            end;
+            IMAGE_REL_AMD64_SSPAN32:begin
+            end;
+           end;
+          end;
          end;
         end;
        finally
