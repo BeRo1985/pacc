@@ -12,6 +12,8 @@ uses
   PasMP in 'PasMP.pas',
   PasDblStrUtils in 'PasDblStrUtils.pas',
   PUCU in 'PUCU.pas',
+  SASMCore in 'SASMCore.pas',
+  SASMData in 'SASMData.pas',  
   PACCTypes in 'PACCTypes.pas',
   PACCRawByteStringHashMap in 'PACCRawByteStringHashMap.pas',
   PACCPointerHashMap in 'PACCPointerHashMap.pas',

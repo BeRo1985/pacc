@@ -8,6 +8,7 @@ PACC (PAscal C Compiler) is an work-in-progress C11-specification-aiming C compi
 - PasDblStrUtils.pas from https://github.com/BeRo1985/pasdblstrutils for accurate parsing of floating point number literals with 64-bit double-precision accuracy
 - PasMP.pas from https://github.com/BeRo1985/pasmp for parallel processing stuff
 - PUCU.pas from https://github.com/BeRo1985/pucu for unicode handling stuff
+- SASMCore.pas SASMData.pas SASM.inc and SASMData.inc from https://github.com/BeRo1985/sasm for assembling of x86 code
 
 # License
 
