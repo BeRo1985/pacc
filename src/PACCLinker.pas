@@ -1032,12 +1032,15 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
        Symbol:TPACCUInt32;
        RelocationType:TPACCUInt16;
       end;
- var SectionIndex:TPACCInt32;
+      TCOFFRelocations=array of TCOFFRelocation;
+ var SectionIndex,RelocationIndex:TPACCInt32;
      COFFFileHeader:TCOFFFileHeader;
      COFFSectionHeaders:TCOFFSectionHeaders;
      COFFSectionHeader:PCOFFSectionHeader;
      Section:TPACCLinkerSection;
      OldSize:TPACCInt64;
+     COFFRelocations:TCOFFRelocations;
+     COFFRelocation:PCOFFRelocation;
  begin
 
   COFFSectionHeaders:=nil;
@@ -1107,6 +1110,21 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
       FillChar(PAnsiChar(Section.Stream.Memory)[OldSize],COFFSectionHeader^.VirtualSize-OldSize,#0);
      end;
      if (COFFSectionHeader^.PointerToRelocations>0) and (COFFSectionHeader^.NumberOfRelocations>0) then begin
+      COFFRelocations:=nil;
+      try
+       SetLength(COFFRelocations,COFFSectionHeader^.NumberOfRelocations);
+       if AObjectStream.Seek(COFFSectionHeader^.PointerToRelocations,soBeginning)<>COFFSectionHeader^.PointerToRelocations then begin
+        TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+       end;
+       AObjectStream.ReadBuffer(COFFRelocations[0],COFFSectionHeader^.NumberOfRelocations*SizeOf(TCOFFRelocation));
+       for RelocationIndex:=0 to COFFSectionHeader^.NumberOfRelocations-1 do begin
+        COFFRelocation:=@COFFRelocations[RelocationIndex];
+        if COFFRelocation^.RelocationType<>0 then begin
+        end; 
+       end;
+      finally
+       COFFRelocations:=nil;
+      end;
      end;
     end;
    end;
