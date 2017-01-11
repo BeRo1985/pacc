@@ -128,7 +128,7 @@ begin
 
     end;
 
-   end else if Extension='.c' then begin
+   end else if (Extension='.c') or (Extension='.h') then begin
 
     OutputLock.Acquire;
     try
