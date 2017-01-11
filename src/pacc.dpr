@@ -63,105 +63,36 @@ var Instance:TPACCInstance;
     AssemblerCodeStream:TMemoryStream;
     AssembledCodeStream:TMemoryStream;
     StringList:TStringList;
+    Extension:TPUCUUTF8String;
 begin
  Instance:=TPACCInstance.Create(TargetClass,Options);
  try
+
+  Extension:=LowerCase(ExtractFileExt(InputFileName));
 
   Instance.Preprocessor.IncludeDirectories.AddStrings(IncludeDirectories);
   Instance.Preprocessor.PreprocessorDefines.AddStrings(Defines);
   Instance.Preprocessor.PreprocessorUndefines.AddStrings(Undefines);
   try
 
-   OutputLock.Acquire;
-   try
-    writeln('Preprocessing ',ExtractFileName(InputFileName),' . . .');
-   finally
-    OutputLock.Release;
-   end;
-   Instance.Preprocessor.ProcessFile(InputFileName);
+   if (Extension='.asm') or (Extension='.s') then begin
 
-   if OnlyRunPreprocessStep then begin
+    if not OnlyRunPreprocessAndCompilationSteps then begin
 
-    StringList:=TStringList.Create;
-    try
-     StringList.Text:=Instance.Preprocessor.OutputText;
-     StringList.SaveToFile(OutputFileName);
-    finally
-     StringList.Free;
-    end;
-    OutputLock.Acquire;
-    try
-     writeln('Writing ',ExtractFileName(OutputFileName),' . . .');
-    finally
-     OutputLock.Release;
-    end;
-
-   end else begin
-
-    OutputLock.Acquire;
-    try
-     writeln('Lexing ',ExtractFileName(InputFileName),' . . .');
-    finally
-     OutputLock.Release;
-    end;
-    Instance.Lexer.Process;
-
-    OutputLock.Acquire;
-    try
-     writeln('Parsing ',ExtractFileName(InputFileName),' . . .');
-    finally
-     OutputLock.Release;
-    end;
-    Instance.Parser.Process;
-
-    OutputLock.Acquire;
-    try
-     writeln('Analyzing ',ExtractFileName(InputFileName),' . . .');
-    finally
-     OutputLock.Release;
-    end;
-    Instance.Analyzer.Process;
-
-    OutputLock.Acquire;
-    try
-     writeln('High-level optimizing ',ExtractFileName(InputFileName),' . . .');
-    finally
-     OutputLock.Release;
-    end;
-    Instance.HighLevelOptimizer.Process;
-
-    OutputLock.Acquire;
-    try
-     writeln('Generating assembler code for ',ExtractFileName(InputFileName),' . . .');
-    finally
-     OutputLock.Release;
-    end;
-    AssemblerCodeStream:=TMemoryStream.Create;
-    try
-
-     Instance.Target.GenerateCode(Instance.Parser.Root,AssemblerCodeStream);
-
-     if OnlyRunPreprocessAndCompilationSteps then begin
+     AssemblerCodeStream:=TMemoryStream.Create;
+     try
 
       OutputLock.Acquire;
       try
-       writeln('Writing ',ExtractFileName(OutputFileName),' . . .');
+       writeln('Assembling ',ExtractFileName(InputFileName),' . . .');
       finally
        OutputLock.Release;
       end;
-      AssemblerCodeStream.SaveToFile(OutputFileName);
-
-     end else begin
+      AssemblerCodeStream.LoadFromFile(InputFileName);
 
       AssembledCodeStream:=TMemoryStream.Create;
       try
 
-       OutputLock.Acquire;
-       try
-        writeln('Assembling code for ',ExtractFileName(InputFileName),' . . .');
-       finally
-        OutputLock.Release;
-       end;
        Instance.Target.AssembleCode(AssemblerCodeStream,AssembledCodeStream);
 
        if OnlyRunPreprocessAndCompileAndAssembleSteps then begin
@@ -191,13 +122,167 @@ begin
        AssembledCodeStream.Free;
       end;
 
+     finally
+      AssemblerCodeStream.Free;
+     end;
+
+    end;
+
+   end else if Extension='.c' then begin
+
+    OutputLock.Acquire;
+    try
+     writeln('Preprocessing ',ExtractFileName(InputFileName),' . . .');
+    finally
+     OutputLock.Release;
+    end;
+    Instance.Preprocessor.ProcessFile(InputFileName);
+
+    if OnlyRunPreprocessStep then begin
+
+     StringList:=TStringList.Create;
+     try
+      StringList.Text:=Instance.Preprocessor.OutputText;
+      StringList.SaveToFile(OutputFileName);
+     finally
+      StringList.Free;
+     end;
+     OutputLock.Acquire;
+     try
+      writeln('Writing ',ExtractFileName(OutputFileName),' . . .');
+     finally
+      OutputLock.Release;
+     end;
+
+    end else begin
+
+     OutputLock.Acquire;
+     try
+      writeln('Lexing ',ExtractFileName(InputFileName),' . . .');
+     finally
+      OutputLock.Release;
+     end;
+     Instance.Lexer.Process;
+
+     OutputLock.Acquire;
+     try
+      writeln('Parsing ',ExtractFileName(InputFileName),' . . .');
+     finally
+      OutputLock.Release;
+     end;
+     Instance.Parser.Process;
+
+     OutputLock.Acquire;
+     try
+      writeln('Analyzing ',ExtractFileName(InputFileName),' . . .');
+     finally
+      OutputLock.Release;
+     end;
+     Instance.Analyzer.Process;
+
+     OutputLock.Acquire;
+     try
+      writeln('High-level optimizing ',ExtractFileName(InputFileName),' . . .');
+     finally
+      OutputLock.Release;
+     end;
+     Instance.HighLevelOptimizer.Process;
+
+     OutputLock.Acquire;
+     try
+      writeln('Generating assembler code for ',ExtractFileName(InputFileName),' . . .');
+     finally
+      OutputLock.Release;
+     end;
+     AssemblerCodeStream:=TMemoryStream.Create;
+     try
+
+      Instance.Target.GenerateCode(Instance.Parser.Root,AssemblerCodeStream);
+
+      if OnlyRunPreprocessAndCompilationSteps then begin
+
+       OutputLock.Acquire;
+       try
+        writeln('Writing ',ExtractFileName(OutputFileName),' . . .');
+       finally
+        OutputLock.Release;
+       end;
+       AssemblerCodeStream.SaveToFile(OutputFileName);
+
+      end else begin
+
+       AssembledCodeStream:=TMemoryStream.Create;
+       try
+
+        OutputLock.Acquire;
+        try
+         writeln('Assembling code for ',ExtractFileName(InputFileName),' . . .');
+        finally
+         OutputLock.Release;
+        end;
+        Instance.Target.AssembleCode(AssemblerCodeStream,AssembledCodeStream);
+
+        if OnlyRunPreprocessAndCompileAndAssembleSteps then begin
+
+         OutputLock.Acquire;
+         try
+          writeln('Writing ',ExtractFileName(OutputFileName),' . . .');
+         finally
+          OutputLock.Release;
+         end;
+         AssembledCodeStream.SaveToFile(OutputFileName);
+
+        end else begin
+
+         OutputLock.Acquire;
+         try
+          writeln('Storing assembled code for ',ExtractFileName(InputFileName),' for the linking step . . .');
+          AssembledCodeStreams[InputIndex]:=AssembledCodeStream;
+          AssembledCodeStream:=nil;
+         finally
+          OutputLock.Release;
+         end;
+
+        end;
+
+       finally
+        AssembledCodeStream.Free;
+       end;
+
+      end;
+
+     finally
+      AssemblerCodeStream.Free;
+     end;
+
+    end;
+
+   end else if (Extension='.o') or (Extension='.obj') then begin
+
+    AssembledCodeStream:=TMemoryStream.Create;
+    try
+
+     OutputLock.Acquire;
+     try
+      writeln('Loading ',ExtractFileName(OutputFileName),' . . .');
+     finally
+      OutputLock.Release;
+     end;
+     AssembledCodeStream.LoadFromFile(InputFileName);
+     OutputLock.Acquire;
+     try
+      AssembledCodeStreams[InputIndex]:=AssembledCodeStream;
+      AssembledCodeStream:=nil;
+     finally
+      OutputLock.Release;
      end;
 
     finally
-     AssemblerCodeStream.Free;
+     AssembledCodeStream.Free;
     end;
 
    end;
+
   except
 
    on e:EPACCError do begin
@@ -206,7 +291,7 @@ begin
    on e:Exception do begin
     OutputLock.Acquire;
     try
-     writeln('['+e.ClassName+']: internal fatal error: '+e.Message);
+     writeln('['+e.ClassName+']: error: '+e.Message);
      TPasMPInterlocked.Write(HasErrors,true);
     finally
      OutputLock.Release;
