@@ -5,6 +5,8 @@ program pacc;
 {$ifend}
 
 {%File 'PACC.inc'}
+{%File 'SASM.inc'}
+{%File 'SASMDataContent.inc'}
 
 uses
   SysUtils,
@@ -13,7 +15,7 @@ uses
   PasDblStrUtils in 'PasDblStrUtils.pas',
   PUCU in 'PUCU.pas',
   SASMCore in 'SASMCore.pas',
-  SASMData in 'SASMData.pas',  
+  SASMData in 'SASMData.pas',
   PACCTypes in 'PACCTypes.pas',
   PACCRawByteStringHashMap in 'PACCRawByteStringHashMap.pas',
   PACCPointerHashMap in 'PACCPointerHashMap.pas',
@@ -26,6 +28,7 @@ uses
   PACCParser in 'PACCParser.pas',
   PACCAnalyzer in 'PACCAnalyzer.pas',
   PACCHighLevelOptimizer in 'PACCHighLevelOptimizer.pas',
+  PACCLinker in 'PACCLinker.pas',
   PACCInstance in 'PACCInstance.pas',
   PACCTarget_x86_32 in 'PACCTarget_x86_32.pas',
   PACCTarget_x86_64_SystemV in 'PACCTarget_x86_64_SystemV.pas';
