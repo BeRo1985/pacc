@@ -64,15 +64,15 @@ type TPACCLinker=class;
        fLinker:TPACCLinker;
        fName:TPACCRawByteString;
        fSection:TPACCLinkerSection;
-       fPosition:TPACCInt64;
+       fValue:TPACCInt64;
       public
-       constructor Create(const ALinker:TPACCLinker;const AName:TPACCRawByteString;const ASection:TPACCLinkerSection;const APosition:TPACCInt64); reintroduce;
+       constructor Create(const ALinker:TPACCLinker;const AName:TPACCRawByteString;const ASection:TPACCLinkerSection;const AValue:TPACCInt64); reintroduce;
        destructor Destroy; override;
       published
        property Linker:TPACCLinker read fLinker;
        property Name:TPACCRawByteString read fName;
        property Section:TPACCLinkerSection read fSection;
-       property Position:TPACCInt64 read fPosition;
+       property Value:TPACCInt64 read fValue;
      end;
 
      TPACCLinkerSymbolList=class(TList)
@@ -1042,13 +1042,13 @@ begin
  inherited Items[Index]:=pointer(Node);
 end;
 
-constructor TPACCLinkerSymbol.Create(const ALinker:TPACCLinker;const AName:TPACCRawByteString;const ASection:TPACCLinkerSection;const APosition:TPACCInt64);
+constructor TPACCLinkerSymbol.Create(const ALinker:TPACCLinker;const AName:TPACCRawByteString;const ASection:TPACCLinkerSection;const AValue:TPACCInt64);
 begin
  inherited Create;
  fLinker:=ALinker;
  fName:=AName;
  fSection:=ASection;
- fPosition:=APosition;
+ fValue:=AValue;
 end;
 
 destructor TPACCLinkerSymbol.Destroy;
@@ -1138,7 +1138,7 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
       TCOFFSymbolName=packed record
        case TPACCInt32 of
         0:(
-         Name:packed array[0..7] of ansichar
+         Name:packed array[0..7] of ansichar;
         );
         1:(
          Zero:TPACCUInt32;
@@ -1154,6 +1154,7 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
        SymbolClass:TPACCUInt8;
        Aux:TPACCUInt8;
       end;
+      TCOFFSymbols=array of TCOFFSymbol;
       PCOFFRelocation=^TCOFFRelocation;
       TCOFFRelocation=packed record
        VirtualAddress:TPACCUInt32;
@@ -1161,9 +1162,10 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
        RelocationType:TPACCUInt16;
       end;
       TCOFFRelocations=array of TCOFFRelocation;
- var SectionIndex,RelocationIndex,NumberOfRelocations:TPACCInt32;
+ var SectionIndex,RelocationIndex,NumberOfRelocations,SymbolIndex,Index:TPACCInt32;
      RelocationOffset:TPACCUInt32;
      COFFFileHeader:TCOFFFileHeader;
+     LocalSections:TPACCLinkerSectionList;
      COFFSectionHeaders:TCOFFSectionHeaders;
      COFFSectionHeader:PCOFFSectionHeader;
      Section:TPACCLinkerSection;
@@ -1171,6 +1173,11 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
      COFFRelocations:TCOFFRelocations;
      COFFRelocation:PCOFFRelocation;
      Relocation:PPACCLinkerRelocation;
+     COFFSymbols:TCOFFSymbols;
+     COFFSymbol:PCOFFSymbol;
+     Symbol:TPACCLinkerSymbol;
+     Name:TPACCRawByteString;
+     c:ansichar;
  begin
 
   COFFSectionHeaders:=nil;
@@ -1215,199 +1222,310 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
    SetLength(COFFSectionHeaders,COFFFileHeader.NumberOfSections);
    AObjectStream.ReadBuffer(COFFSectionHeaders[0],COFFFileHeader.NumberOfSections*SizeOf(TCOFFSectionHeader));
 
-   for SectionIndex:=0 to COFFFileHeader.NumberOfSections-1 do begin
-    COFFSectionHeader:=@COFFSectionHeaders[SectionIndex];
-    if COFFSectionHeader^.VirtualSize>0 then begin
-     Section:=TPACCLinkerSection.Create(self,COFFSectionHeader^.Name);
-     Sections.Add(Section);
-     if (COFFSectionHeader^.Characteristics and IMAGE_SCN_ALIGN_MASK)<>0 then begin
-      Section.Alignment:=1 shl (((COFFSectionHeader^.Characteristics and IMAGE_SCN_ALIGN_MASK) shr IMAGE_SCN_ALIGN_SHIFT)-1);
-     end;
-     if (COFFSectionHeader^.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)=0 then begin
-      if COFFSectionHeader^.SizeOfRawData>0 then begin
-       if COFFSectionHeader^.SizeOfRawData>COFFSectionHeader^.VirtualSize then begin
-        TPACCInstance(Instance).AddError('SizeOfRawData is larger than VirtualSize at section "'+Section.Name+'"',nil,true);
-       end;
-       if AObjectStream.Seek(COFFSectionHeader^.PointerToRawData,soBeginning)<>COFFSectionHeader^.PointerToRawData then begin
-        TPACCInstance(Instance).AddError('Stream seek error',nil,true);
-       end;
-       if Section.Stream.CopyFrom(AObjectStream,COFFSectionHeader^.SizeOfRawData)<>COFFSectionHeader^.SizeOfRawData then begin
-        TPACCInstance(Instance).AddError('Stream read error',nil,true);
-       end;
+   LocalSections:=TPACCLinkerSectionList.Create;
+   try
+
+    for SectionIndex:=0 to COFFFileHeader.NumberOfSections-1 do begin
+     COFFSectionHeader:=@COFFSectionHeaders[SectionIndex];
+     if COFFSectionHeader^.VirtualSize>0 then begin
+      Section:=TPACCLinkerSection.Create(self,COFFSectionHeader^.Name);
+      Sections.Add(Section);
+      LocalSections.Add(Section);
+      if (COFFSectionHeader^.Characteristics and IMAGE_SCN_ALIGN_MASK)<>0 then begin
+       Section.Alignment:=1 shl (((COFFSectionHeader^.Characteristics and IMAGE_SCN_ALIGN_MASK) shr IMAGE_SCN_ALIGN_SHIFT)-1);
       end;
-     end;
-     if Section.Stream.Size<COFFSectionHeader^.VirtualSize then begin
-      OldSize:=Section.Stream.Size;
-      Section.Stream.SetSize(COFFSectionHeader^.VirtualSize);
-      if Section.Stream.Size<>COFFSectionHeader^.VirtualSize then begin
-       TPACCInstance(Instance).AddError('Stream resize error',nil,true);
-      end;
-      FillChar(PAnsiChar(Section.Stream.Memory)[OldSize],COFFSectionHeader^.VirtualSize-OldSize,#0);
-     end;
-     if COFFSectionHeader^.PointerToRelocations>0 then begin
-      if (COFFSectionHeader^.NumberOfRelocations=IMAGE_SCN_MAX_RELOC) and
-         ((COFFSectionHeader^.Characteristics and IMAGE_SCN_LNK_NRELOC_OVFL)<>0) then begin
-       COFFRelocations:=nil;
-       try
-        SetLength(COFFRelocations,1);
-        if AObjectStream.Seek(COFFSectionHeader^.PointerToRelocations,soBeginning)<>COFFSectionHeader^.PointerToRelocations then begin
+      if (COFFSectionHeader^.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)=0 then begin
+       if COFFSectionHeader^.SizeOfRawData>0 then begin
+        if COFFSectionHeader^.SizeOfRawData>COFFSectionHeader^.VirtualSize then begin
+         TPACCInstance(Instance).AddError('SizeOfRawData is larger than VirtualSize at section "'+Section.Name+'"',nil,true);
+        end;
+        if AObjectStream.Seek(COFFSectionHeader^.PointerToRawData,soBeginning)<>COFFSectionHeader^.PointerToRawData then begin
          TPACCInstance(Instance).AddError('Stream seek error',nil,true);
         end;
-        AObjectStream.ReadBuffer(COFFRelocations[0],SizeOf(TCOFFRelocation));
-        NumberOfRelocations:=COFFRelocations[0].VirtualAddress;
-        RelocationOffset:=SizeOf(TCOFFRelocation);
-       finally
+        if Section.Stream.CopyFrom(AObjectStream,COFFSectionHeader^.SizeOfRawData)<>COFFSectionHeader^.SizeOfRawData then begin
+         TPACCInstance(Instance).AddError('Stream read error',nil,true);
+        end;
+       end;
+      end;
+      if Section.Stream.Size<COFFSectionHeader^.VirtualSize then begin
+       OldSize:=Section.Stream.Size;
+       Section.Stream.SetSize(COFFSectionHeader^.VirtualSize);
+       if Section.Stream.Size<>COFFSectionHeader^.VirtualSize then begin
+        TPACCInstance(Instance).AddError('Stream resize error',nil,true);
+       end;
+       FillChar(PAnsiChar(Section.Stream.Memory)[OldSize],COFFSectionHeader^.VirtualSize-OldSize,#0);
+      end;
+      if COFFSectionHeader^.PointerToRelocations>0 then begin
+       if (COFFSectionHeader^.NumberOfRelocations=IMAGE_SCN_MAX_RELOC) and
+          ((COFFSectionHeader^.Characteristics and IMAGE_SCN_LNK_NRELOC_OVFL)<>0) then begin
         COFFRelocations:=nil;
-       end;
-      end else begin
-       NumberOfRelocations:=COFFSectionHeader^.NumberOfRelocations;
-       RelocationOffset:=0;
-      end;
-      if NumberOfRelocations>0 then begin
-       COFFRelocations:=nil;
-       try
-        SetLength(COFFRelocations,NumberOfRelocations);
-        if AObjectStream.Seek(COFFSectionHeader^.PointerToRelocations+RelocationOffset,soBeginning)<>(COFFSectionHeader^.PointerToRelocations+RelocationOffset) then begin
-         TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+        try
+         SetLength(COFFRelocations,1);
+         if AObjectStream.Seek(COFFSectionHeader^.PointerToRelocations,soBeginning)<>COFFSectionHeader^.PointerToRelocations then begin
+          TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+         end;
+         AObjectStream.ReadBuffer(COFFRelocations[0],SizeOf(TCOFFRelocation));
+         NumberOfRelocations:=COFFRelocations[0].VirtualAddress;
+         RelocationOffset:=SizeOf(TCOFFRelocation);
+        finally
+         COFFRelocations:=nil;
         end;
-        AObjectStream.ReadBuffer(COFFRelocations[0],NumberOfRelocations*SizeOf(TCOFFRelocation));
-        SetLength(Section.Relocations,NumberOfRelocations);
-        for RelocationIndex:=0 to NumberOfRelocations-1 do begin
-         COFFRelocation:=@COFFRelocations[RelocationIndex];
-         Relocation:=@Section.Relocations[RelocationIndex];
-         Relocation^.Type_:=plrtUnknown;
-         Relocation^.Position:=COFFRelocation^.VirtualAddress-COFFSectionHeader^.VirtualAddress;
-         Relocation^.Offset:=0;
-         Relocation^.Shift:=0;
-         case COFFFileHeader.Machine of
-          IMAGE_FILE_MACHINE_I386:begin
-           case COFFRelocation^.RelocationType of
-            IMAGE_REL_I386_ABSOLUTE:begin
-             // Ignore
-             Relocation^.Type_:=plrtIgnore;
-            end;
-            IMAGE_REL_I386_DIR16:begin
-             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
-            end;
-            IMAGE_REL_I386_REL16:begin
-             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
-            end;
-            IMAGE_REL_I386_DIR32:begin
-             // 32-bit absolute virtual address. The target’s 32-bit VA.
-             Relocation^.Type_:=plrtDirect;
-             Relocation^.Bits:=32;
-            end;
-            IMAGE_REL_I386_DIR32NB:begin
-             // 32-bit image relative address. The target’s 32-bit RVA.
-             Relocation^.Type_:=plrtImageRelative;
-             Relocation^.Bits:=32;
-            end;
-            IMAGE_REL_I386_SEG12:begin
-             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
-            end;
-            IMAGE_REL_I386_SECTION:begin
-             // 16-bit section index in file. The 16-bit section index of the section that contains the target.
-             // This is used to support debugging information.
-             Relocation^.Type_:=plrtSectionIndexOfSymbol;
-             Relocation^.Bits:=16;
-            end;
-            IMAGE_REL_I386_SECREL:begin
-             // 32-bit section-relative. The 32-bit offset of the target from the beginning of its section.
-             // This is used to support debugging information and static thread local storage.
-             Relocation^.Type_:=plrtSectionRelative;
-             Relocation^.Bits:=32;
-            end;
-            IMAGE_REL_I386_TOKEN:begin
-             // .NET common language runtime token
-             TPACCInstance(Instance).AddError('Unsupported .NET common language runtime token relocation type',nil,true);
-            end;
-            IMAGE_REL_I386_SECREL7:begin
-             // 7-bit section-relative. A 7-bit offset from the base of the section that contains the target.
-             Relocation^.Type_:=plrtSectionRelative;
-             Relocation^.Bits:=7;
-            end;
-            IMAGE_REL_I386_REL32:begin
-             // 32-bit self-relative. The 32-bit relative displacement to the target.
-             // This supports the x86 relative branch and call instructions.
-             Relocation^.Type_:=plrtSelfRelative;
-             Relocation^.Offset:=-4;
-             Relocation^.Bits:=32;
-            end;
-            else begin
-             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
+       end else begin
+        NumberOfRelocations:=COFFSectionHeader^.NumberOfRelocations;
+        RelocationOffset:=0;
+       end;
+       if NumberOfRelocations>0 then begin
+        COFFRelocations:=nil;
+        try
+         SetLength(COFFRelocations,NumberOfRelocations);
+         if AObjectStream.Seek(COFFSectionHeader^.PointerToRelocations+RelocationOffset,soBeginning)<>(COFFSectionHeader^.PointerToRelocations+RelocationOffset) then begin
+          TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+         end;
+         AObjectStream.ReadBuffer(COFFRelocations[0],NumberOfRelocations*SizeOf(TCOFFRelocation));
+         SetLength(Section.Relocations,NumberOfRelocations);
+         for RelocationIndex:=0 to NumberOfRelocations-1 do begin
+          COFFRelocation:=@COFFRelocations[RelocationIndex];
+          Relocation:=@Section.Relocations[RelocationIndex];
+          Relocation^.Type_:=plrtUnknown;
+          Relocation^.Position:=COFFRelocation^.VirtualAddress-COFFSectionHeader^.VirtualAddress;
+          Relocation^.Offset:=0;
+          Relocation^.Shift:=0;
+          case COFFFileHeader.Machine of
+           IMAGE_FILE_MACHINE_I386:begin
+            case COFFRelocation^.RelocationType of
+             IMAGE_REL_I386_ABSOLUTE:begin
+              // Ignore
+              Relocation^.Type_:=plrtIgnore;
+             end;
+             IMAGE_REL_I386_DIR16:begin
+              TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
+             end;
+             IMAGE_REL_I386_REL16:begin
+              TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
+             end;
+             IMAGE_REL_I386_DIR32:begin
+              // 32-bit absolute virtual address. The target’s 32-bit VA.
+              Relocation^.Type_:=plrtDirect;
+              Relocation^.Bits:=32;
+             end;
+             IMAGE_REL_I386_DIR32NB:begin
+              // 32-bit image relative address. The target’s 32-bit RVA.
+              Relocation^.Type_:=plrtImageRelative;
+              Relocation^.Bits:=32;
+             end;
+             IMAGE_REL_I386_SEG12:begin
+              TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
+             end;
+             IMAGE_REL_I386_SECTION:begin
+              // 16-bit section index in file. The 16-bit section index of the section that contains the target.
+              // This is used to support debugging information.
+              Relocation^.Type_:=plrtSectionIndexOfSymbol;
+              Relocation^.Bits:=16;
+             end;
+             IMAGE_REL_I386_SECREL:begin
+              // 32-bit section-relative. The 32-bit offset of the target from the beginning of its section.
+              // This is used to support debugging information and static thread local storage.
+              Relocation^.Type_:=plrtSectionRelative;
+              Relocation^.Bits:=32;
+             end;
+             IMAGE_REL_I386_TOKEN:begin
+              // .NET common language runtime token
+              TPACCInstance(Instance).AddError('Unsupported .NET common language runtime token relocation type',nil,true);
+             end;
+             IMAGE_REL_I386_SECREL7:begin
+              // 7-bit section-relative. A 7-bit offset from the base of the section that contains the target.
+              Relocation^.Type_:=plrtSectionRelative;
+              Relocation^.Bits:=7;
+             end;
+             IMAGE_REL_I386_REL32:begin
+              // 32-bit self-relative. The 32-bit relative displacement to the target.
+              // This supports the x86 relative branch and call instructions.
+              Relocation^.Type_:=plrtSelfRelative;
+              Relocation^.Offset:=-4;
+              Relocation^.Bits:=32;
+             end;
+             else begin
+              TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
+             end;
             end;
            end;
-          end;
-          IMAGE_FILE_MACHINE_AMD64:begin
-           case COFFRelocation^.RelocationType of
-            IMAGE_REL_AMD64_ABSOLUTE:begin
-             // Ignore
-            end;
-            IMAGE_REL_AMD64_ADDR64:begin
-             // 64-bit absolute virtual address. The target’s 64-bit VA.
-             Relocation^.Type_:=plrtDirect;
-             Relocation^.Bits:=64;
-            end;
-            IMAGE_REL_AMD64_ADDR32:begin
-             // 32-bit absolute virtual address. The target’s 32-bit VA.
-             Relocation^.Type_:=plrtDirect;
-             Relocation^.Bits:=32;
-            end;
-            IMAGE_REL_AMD64_ADDR32NB:begin
-             // 32-bit image relative address. The target’s 32-bit RVA.
-             Relocation^.Type_:=plrtImageRelative;
-             Relocation^.Bits:=32;
-            end;
-            IMAGE_REL_AMD64_REL32..IMAGE_REL_AMD64_REL32_5:begin
-             // 32-bit self-relative. The 32-bit relative displacement to the target.
-             // This supports the x86 relative branch and call instructions.
-             Relocation^.Type_:=plrtSelfRelative;
-             Relocation^.Offset:=-((COFFRelocation^.RelocationType+4)-IMAGE_REL_AMD64_REL32);
-             Relocation^.Bits:=32;
-            end;
-            IMAGE_REL_AMD64_SECTION:begin
-             // 16-bit section index in file. The 16-bit section index of the section that contains the target.
-             // This is used to support debugging information.
-             Relocation^.Type_:=plrtSectionIndexOfSymbol;
-             Relocation^.Bits:=16;
-            end;
-            IMAGE_REL_AMD64_SECREL:begin
-             // 32-bit section-relative. The 32-bit offset of the target from the beginning of its section.
-             // This is used to support debugging information and static thread local storage.
-             Relocation^.Type_:=plrtSectionRelative;
-             Relocation^.Bits:=32;
-            end;
-            IMAGE_REL_AMD64_SECREL7:begin
-             // 7-bit section-relative. A 7-bit offset from the base of the section that contains the target.
-             Relocation^.Type_:=plrtSectionRelative;
-             Relocation^.Bits:=7;
-            end;
-            IMAGE_REL_AMD64_TOKEN:begin
-             // .NET common language runtime token
-             TPACCInstance(Instance).AddError('Unsupported .NET common language runtime token relocation type',nil,true);
-            end;
-            IMAGE_REL_AMD64_SREL32:begin
-             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
-            end;
-            IMAGE_REL_AMD64_PAIR:begin
-             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
-            end;
-            IMAGE_REL_AMD64_SSPAN32:begin
-             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
-            end;
-            else begin
-             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
+           IMAGE_FILE_MACHINE_AMD64:begin
+            case COFFRelocation^.RelocationType of
+             IMAGE_REL_AMD64_ABSOLUTE:begin
+              // Ignore
+             end;
+             IMAGE_REL_AMD64_ADDR64:begin
+              // 64-bit absolute virtual address. The target’s 64-bit VA.
+              Relocation^.Type_:=plrtDirect;
+              Relocation^.Bits:=64;
+             end;
+             IMAGE_REL_AMD64_ADDR32:begin
+              // 32-bit absolute virtual address. The target’s 32-bit VA.
+              Relocation^.Type_:=plrtDirect;
+              Relocation^.Bits:=32;
+             end;
+             IMAGE_REL_AMD64_ADDR32NB:begin
+              // 32-bit image relative address. The target’s 32-bit RVA.
+              Relocation^.Type_:=plrtImageRelative;
+              Relocation^.Bits:=32;
+             end;
+             IMAGE_REL_AMD64_REL32..IMAGE_REL_AMD64_REL32_5:begin
+              // 32-bit self-relative. The 32-bit relative displacement to the target.
+              // This supports the x86 relative branch and call instructions.
+              Relocation^.Type_:=plrtSelfRelative;
+              Relocation^.Offset:=-((COFFRelocation^.RelocationType+4)-IMAGE_REL_AMD64_REL32);
+              Relocation^.Bits:=32;
+             end;
+             IMAGE_REL_AMD64_SECTION:begin
+              // 16-bit section index in file. The 16-bit section index of the section that contains the target.
+              // This is used to support debugging information.
+              Relocation^.Type_:=plrtSectionIndexOfSymbol;
+              Relocation^.Bits:=16;
+             end;
+             IMAGE_REL_AMD64_SECREL:begin
+              // 32-bit section-relative. The 32-bit offset of the target from the beginning of its section.
+              // This is used to support debugging information and static thread local storage.
+              Relocation^.Type_:=plrtSectionRelative;
+              Relocation^.Bits:=32;
+             end;
+             IMAGE_REL_AMD64_SECREL7:begin
+              // 7-bit section-relative. A 7-bit offset from the base of the section that contains the target.
+              Relocation^.Type_:=plrtSectionRelative;
+              Relocation^.Bits:=7;
+             end;
+             IMAGE_REL_AMD64_TOKEN:begin
+              // .NET common language runtime token
+              TPACCInstance(Instance).AddError('Unsupported .NET common language runtime token relocation type',nil,true);
+             end;
+             IMAGE_REL_AMD64_SREL32:begin
+              TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
+             end;
+             IMAGE_REL_AMD64_PAIR:begin
+              TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
+             end;
+             IMAGE_REL_AMD64_SSPAN32:begin
+              TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
+             end;
+             else begin
+              TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
+             end;
             end;
            end;
           end;
          end;
+        finally
+         COFFRelocations:=nil;
         end;
-       finally
-        COFFRelocations:=nil;
        end;
       end;
+     end else begin
+      LocalSections.Add(nil);
      end;
     end;
+
+    if (COFFFileHeader.PointerToSymbolTable>0) and (COFFFileHeader.NumberOfSymbols>0) then begin
+     COFFSymbols:=nil;
+     try
+      SetLength(COFFSymbols,COFFFileHeader.NumberOfSymbols);
+      if AObjectStream.Seek(COFFFileHeader.PointerToSymbolTable,soBeginning)<>COFFFileHeader.PointerToSymbolTable then begin
+       TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+      end;
+      AObjectStream.ReadBuffer(COFFSymbols[0],COFFFileHeader.NumberOfSymbols*SizeOf(TCOFFSymbol));
+      for SymbolIndex:=0 to COFFFileHeader.NumberOfSymbols-1 do begin
+       COFFSymbol:=@COFFSymbols[SymbolIndex];
+       if COFFSymbol^.Name.Zero=0 then begin
+        if AObjectStream.Seek(COFFSymbol^.Name.PointerToString,soBeginning)<>COFFSymbol^.Name.PointerToString then begin
+         TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+        end;
+        Name:='';
+        while AObjectStream.Position<AObjectStream.Size do begin
+         AObjectStream.Read(c,SizeOf(AnsiChar));
+         if c=#0 then begin
+          break;
+         end else begin
+          Name:=Name+c;
+         end;
+        end;
+       end else begin
+        Name:=COFFSymbol^.Name.Name;
+        for Index:=1 to length(Name) do begin
+         if Name[Index]=#0 then begin
+          Name:=copy(Name,1,Index-1);
+          break;
+         end;
+        end;
+       end;
+       if (COFFSymbol^.Section>0) and (COFFSymbol^.Section<=LocalSections.Count) then begin
+        Section:=LocalSections[COFFSymbol^.Section-1];
+       end else begin
+        Section:=nil;
+       end;
+       case COFFSymbol^.SymbolClass of
+        IMAGE_SYM_CLASS_END_OF_FUNCTION:begin
+        end;
+        IMAGE_SYM_CLASS_NULL:begin
+        end;
+        IMAGE_SYM_CLASS_AUTOMATIC:begin
+        end;
+        IMAGE_SYM_CLASS_EXTERNAL:begin
+        end;
+        IMAGE_SYM_CLASS_STATIC:begin
+        end;
+        IMAGE_SYM_CLASS_REGISTER:begin
+        end;
+        IMAGE_SYM_CLASS_EXTERNAL_DEF:begin
+        end;
+        IMAGE_SYM_CLASS_LABEL:begin
+        end;
+        IMAGE_SYM_CLASS_UNDEFINED_LABEL:begin
+        end;
+        IMAGE_SYM_CLASS_MEMBER_OF_STRUCT:begin
+        end;
+        IMAGE_SYM_CLASS_ARGUMENT:begin
+        end;
+        IMAGE_SYM_CLASS_STRUCT_TAG:begin
+        end;
+        IMAGE_SYM_CLASS_MEMBER_OF_UNION:begin
+        end;
+        IMAGE_SYM_CLASS_UNION_TAG:begin
+        end;
+        IMAGE_SYM_CLASS_TYPE_DEFINITION:begin
+        end;
+        IMAGE_SYM_CLASS_UNDEFINED_STATIC:begin
+        end;
+        IMAGE_SYM_CLASS_ENUM_TAG:begin
+        end;
+        IMAGE_SYM_CLASS_MEMBER_OF_ENUM:begin
+        end;
+        IMAGE_SYM_CLASS_REGISTER_PARAM:begin
+        end;
+        IMAGE_SYM_CLASS_BIT_FIELD:begin
+        end;
+        IMAGE_SYM_CLASS_BLOCK:begin
+        end;
+        IMAGE_SYM_CLASS_FUNCTION:begin
+        end;
+        IMAGE_SYM_CLASS_END_OF_STRUCT:begin
+        end;
+        IMAGE_SYM_CLASS_FILE:begin
+        end;
+        IMAGE_SYM_CLASS_SECTION:begin
+        end;
+        IMAGE_SYM_CLASS_WEAK_EXTERNAL:begin
+        end;
+        IMAGE_SYM_CLASS_CLR_TOKEN:begin
+        end;
+       end;
+       Symbol:=TPACCLinkerSymbol.Create(self,Name,Section,COFFSymbol^.Value);
+       Symbols.Add(Symbol);
+      end;
+     finally
+      COFFSymbols:=nil;
+     end;
+    end;
+
+   finally
+    LocalSections.Free;
    end;
 
   finally
