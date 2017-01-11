@@ -7,12 +7,38 @@ uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCRawByteStringHashMap,P
 
 type TPACCLinker=class;
 
+     PPACCLinkerRelocationType=^TPACCLinkerRelocationType;
+     TPACCLinkerRelocationType=
+      (
+       plrtUnknown,
+       plrtIgnore,
+       plrtDirect,
+       plrtSelfRelative,
+       plrtImageRelative,
+       plrtSectionRelative,
+       plrtSegmentRelative,
+       plrtSectionIndexOfSymbol
+      );
+
+     PPACCLinkerRelocation=^TPACCLinkerRelocation;
+     TPACCLinkerRelocation=record
+      Type_:TPACCLinkerRelocationType;
+      Position:TPACCInt64;
+      Offset:TPACCInt32;
+      Bits:TPACCInt32;
+      Shift:TPACCInt32;
+     end;
+
+     TPACCLinkerRelocations=array of TPACCLinkerRelocation;
+
      TPACCLinkerSection=class
       private
        fLinker:TPACCLinker;
        fName:TPACCRawByteString;
        fStream:TMemoryStream;
        fAlignment:TPACCInt32;
+      protected
+       Relocations:TPACCLinkerRelocations;
       public
        constructor Create(const ALinker:TPACCLinker;const AName:TPACCRawByteString); reintroduce;
        destructor Destroy; override;
@@ -32,13 +58,41 @@ type TPACCLinker=class;
        destructor Destroy; override;
        property Items[const Index:TPACCInt]:TPACCLinkerSection read GetItem write SetItem; default;
      end;
-     
+
+     TPACCLinkerSymbol=class
+      private
+       fLinker:TPACCLinker;
+       fName:TPACCRawByteString;
+       fSection:TPACCLinkerSection;
+       fPosition:TPACCInt64;
+      public
+       constructor Create(const ALinker:TPACCLinker;const AName:TPACCRawByteString;const ASection:TPACCLinkerSection;const APosition:TPACCInt64); reintroduce;
+       destructor Destroy; override;
+      published
+       property Linker:TPACCLinker read fLinker;
+       property Name:TPACCRawByteString read fName;
+       property Section:TPACCLinkerSection read fSection;
+       property Position:TPACCInt64 read fPosition;
+     end;
+
+     TPACCLinkerSymbolList=class(TList)
+      private
+       function GetItem(const Index:TPACCInt):TPACCLinkerSymbol;
+       procedure SetItem(const Index:TPACCInt;Node:TPACCLinkerSymbol);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const Index:TPACCInt]:TPACCLinkerSymbol read GetItem write SetItem; default;
+     end;
+
      TPACCLinker=class
       private
 
        fInstance:TObject;
 
        fSections:TPACCLinkerSectionList;
+
+       fSymbols:TPACCLinkerSymbolList;
 
       public
 
@@ -54,6 +108,8 @@ type TPACCLinker=class;
        property Instance:TObject read fInstance;
 
        property Sections:TPACCLinkerSectionList read fSections;
+
+       property Symbols:TPACCLinkerSymbolList read fSymbols;
 
      end;
 
@@ -246,6 +302,25 @@ const MZEXEHeaderSize=128;
       IMAGE_REL_AMD64_SREL32=$000e;
       IMAGE_REL_AMD64_PAIR=$000f;
       IMAGE_REL_AMD64_SSPAN32=$0010;
+
+      IMAGE_REL_PPC_ABSOLUTE=$0000;
+      IMAGE_REL_PPC_ADDR64=$0001;
+      IMAGE_REL_PPC_ADDR32=$0002;
+      IMAGE_REL_PPC_ADDR24=$0003;
+      IMAGE_REL_PPC_ADDR16=$0004;
+      IMAGE_REL_PPC_ADDR14=$0005;
+      IMAGE_REL_PPC_REL24=$0006;
+      IMAGE_REL_PPC_REL14=$0007;
+      IMAGE_REL_PPC_ADDR32NB=$000a;
+      IMAGE_REL_PPC_SECREL=$000b;
+      IMAGE_REL_PPC_SECTION=$000c;
+      IMAGE_REL_PPC_SECREL1=$000f;
+      IMAGE_REL_PPC_REFHI=$0010;
+      IMAGE_REL_PPC_REFLO=$0011;
+      IMAGE_REL_PPC_PAIR=$0012;
+      IMAGE_REL_PPC_SECRELLO=$0013;
+      IMAGE_REL_PPC_GPREL=$0015;
+      IMAGE_REL_PPC_TOKEN=$0016;
 
       IMAGE_SYM_CLASS_END_OF_FUNCTION=TPACCUInt8(-1); ///< Physical end of function
       IMAGE_SYM_CLASS_NULL=0;                   ///< No symbol
@@ -937,10 +1012,12 @@ begin
  fName:=AName;
  fStream:=TMemoryStream.Create;
  fAlignment:=1;
+ Relocations:=nil;
 end;
 
 destructor TPACCLinkerSection.Destroy;
 begin
+ Relocations:=nil;
  fStream.Free;
  inherited Destroy;
 end;
@@ -965,15 +1042,61 @@ begin
  inherited Items[Index]:=pointer(Node);
 end;
 
+constructor TPACCLinkerSymbol.Create(const ALinker:TPACCLinker;const AName:TPACCRawByteString;const ASection:TPACCLinkerSection;const APosition:TPACCInt64);
+begin
+ inherited Create;
+ fLinker:=ALinker;
+ fName:=AName;
+ fSection:=ASection;
+ fPosition:=APosition;
+end;
+
+destructor TPACCLinkerSymbol.Destroy;
+begin
+ inherited Destroy;
+end;
+
+constructor TPACCLinkerSymbolList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCLinkerSymbolList.Destroy;
+begin
+ inherited Destroy;
+end;
+
+function TPACCLinkerSymbolList.GetItem(const Index:TPACCInt):TPACCLinkerSymbol;
+begin
+ result:=pointer(inherited Items[Index]);
+end;
+
+procedure TPACCLinkerSymbolList.SetItem(const Index:TPACCInt;Node:TPACCLinkerSymbol);
+begin
+ inherited Items[Index]:=pointer(Node);
+end;
+
+
 constructor TPACCLinker.Create(const AInstance:TObject);
 begin
  inherited Create;
+
  fInstance:=AInstance;
+
  fSections:=TPACCLinkerSectionList.Create;
+
+ fSymbols:=TPACCLinkerSymbolList.Create;
+
 end;
 
 destructor TPACCLinker.Destroy;
 begin
+
+ while fSymbols.Count>0 do begin
+  fSymbols[fSymbols.Count-1].Free;
+  fSymbols.Delete(fSymbols.Count-1);
+ end;
+ fSymbols.Free;
 
  while fSections.Count>0 do begin
   fSections[fSections.Count-1].Free;
@@ -1047,6 +1170,7 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
      OldSize:TPACCInt64;
      COFFRelocations:TCOFFRelocations;
      COFFRelocation:PCOFFRelocation;
+     Relocation:PPACCLinkerRelocation;
  begin
 
   COFFSectionHeaders:=nil;
@@ -1147,43 +1271,70 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
          TPACCInstance(Instance).AddError('Stream seek error',nil,true);
         end;
         AObjectStream.ReadBuffer(COFFRelocations[0],NumberOfRelocations*SizeOf(TCOFFRelocation));
+        SetLength(Section.Relocations,NumberOfRelocations);
         for RelocationIndex:=0 to NumberOfRelocations-1 do begin
          COFFRelocation:=@COFFRelocations[RelocationIndex];
+         Relocation:=@Section.Relocations[RelocationIndex];
+         Relocation^.Type_:=plrtUnknown;
+         Relocation^.Position:=COFFRelocation^.VirtualAddress-COFFSectionHeader^.VirtualAddress;
+         Relocation^.Offset:=0;
+         Relocation^.Shift:=0;
          case COFFFileHeader.Machine of
           IMAGE_FILE_MACHINE_I386:begin
            case COFFRelocation^.RelocationType of
             IMAGE_REL_I386_ABSOLUTE:begin
              // Ignore
+             Relocation^.Type_:=plrtIgnore;
             end;
             IMAGE_REL_I386_DIR16:begin
+             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
             end;
             IMAGE_REL_I386_REL16:begin
+             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
             end;
             IMAGE_REL_I386_DIR32:begin
-             // 32-bit absolute virtual address
+             // 32-bit absolute virtual address. The target’s 32-bit VA.
+             Relocation^.Type_:=plrtDirect;
+             Relocation^.Bits:=32;
             end;
             IMAGE_REL_I386_DIR32NB:begin
-             // 32-bit image relative address
+             // 32-bit image relative address. The target’s 32-bit RVA.
+             Relocation^.Type_:=plrtImageRelative;
+             Relocation^.Bits:=32;
             end;
             IMAGE_REL_I386_SEG12:begin
              TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
             end;
             IMAGE_REL_I386_SECTION:begin
-             // 16-bit section index in file
+             // 16-bit section index in file. The 16-bit section index of the section that contains the target.
+             // This is used to support debugging information.
+             Relocation^.Type_:=plrtSectionIndexOfSymbol;
+             Relocation^.Bits:=16;
             end;
             IMAGE_REL_I386_SECREL:begin
-             // 32-bit section-relative
+             // 32-bit section-relative. The 32-bit offset of the target from the beginning of its section.
+             // This is used to support debugging information and static thread local storage.
+             Relocation^.Type_:=plrtSectionRelative;
+             Relocation^.Bits:=32;
             end;
             IMAGE_REL_I386_TOKEN:begin
              // .NET common language runtime token
              TPACCInstance(Instance).AddError('Unsupported .NET common language runtime token relocation type',nil,true);
             end;
             IMAGE_REL_I386_SECREL7:begin
-             // 8-bit section-relative
+             // 7-bit section-relative. A 7-bit offset from the base of the section that contains the target.
+             Relocation^.Type_:=plrtSectionRelative;
+             Relocation^.Bits:=7;
             end;
             IMAGE_REL_I386_REL32:begin
-             // 32-bit self-relative
-             
+             // 32-bit self-relative. The 32-bit relative displacement to the target.
+             // This supports the x86 relative branch and call instructions.
+             Relocation^.Type_:=plrtSelfRelative;
+             Relocation^.Offset:=-4;
+             Relocation^.Bits:=32;
+            end;
+            else begin
+             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
             end;
            end;
           end;
@@ -1193,38 +1344,59 @@ procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileNam
              // Ignore
             end;
             IMAGE_REL_AMD64_ADDR64:begin
+             // 64-bit absolute virtual address. The target’s 64-bit VA.
+             Relocation^.Type_:=plrtDirect;
+             Relocation^.Bits:=64;
             end;
             IMAGE_REL_AMD64_ADDR32:begin
+             // 32-bit absolute virtual address. The target’s 32-bit VA.
+             Relocation^.Type_:=plrtDirect;
+             Relocation^.Bits:=32;
             end;
             IMAGE_REL_AMD64_ADDR32NB:begin
+             // 32-bit image relative address. The target’s 32-bit RVA.
+             Relocation^.Type_:=plrtImageRelative;
+             Relocation^.Bits:=32;
             end;
-            IMAGE_REL_AMD64_REL32:begin
-            end;
-            IMAGE_REL_AMD64_REL32_1:begin
-            end;
-            IMAGE_REL_AMD64_REL32_2:begin
-            end;
-            IMAGE_REL_AMD64_REL32_3:begin
-            end;
-            IMAGE_REL_AMD64_REL32_4:begin
-            end;
-            IMAGE_REL_AMD64_REL32_5:begin
+            IMAGE_REL_AMD64_REL32..IMAGE_REL_AMD64_REL32_5:begin
+             // 32-bit self-relative. The 32-bit relative displacement to the target.
+             // This supports the x86 relative branch and call instructions.
+             Relocation^.Type_:=plrtSelfRelative;
+             Relocation^.Offset:=-((COFFRelocation^.RelocationType+4)-IMAGE_REL_AMD64_REL32);
+             Relocation^.Bits:=32;
             end;
             IMAGE_REL_AMD64_SECTION:begin
+             // 16-bit section index in file. The 16-bit section index of the section that contains the target.
+             // This is used to support debugging information.
+             Relocation^.Type_:=plrtSectionIndexOfSymbol;
+             Relocation^.Bits:=16;
             end;
             IMAGE_REL_AMD64_SECREL:begin
+             // 32-bit section-relative. The 32-bit offset of the target from the beginning of its section.
+             // This is used to support debugging information and static thread local storage.
+             Relocation^.Type_:=plrtSectionRelative;
+             Relocation^.Bits:=32;
             end;
             IMAGE_REL_AMD64_SECREL7:begin
+             // 7-bit section-relative. A 7-bit offset from the base of the section that contains the target.
+             Relocation^.Type_:=plrtSectionRelative;
+             Relocation^.Bits:=7;
             end;
             IMAGE_REL_AMD64_TOKEN:begin
              // .NET common language runtime token
              TPACCInstance(Instance).AddError('Unsupported .NET common language runtime token relocation type',nil,true);
             end;
             IMAGE_REL_AMD64_SREL32:begin
+             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
             end;
             IMAGE_REL_AMD64_PAIR:begin
+             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
             end;
             IMAGE_REL_AMD64_SSPAN32:begin
+             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
+            end;
+            else begin
+             TPACCInstance(Instance).AddError('Unsupported relocation type',nil,true);
             end;
            end;
           end;
