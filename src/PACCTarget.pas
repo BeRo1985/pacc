@@ -53,9 +53,9 @@ type TPACCTarget=class
 
        procedure GenerateCode(const ARoot:TPACCAbstractSyntaxTreeNode;const AOutputStream:TStream); virtual;
 
-       procedure AssembleCode(const AInputStream,AOutputStream:TStream); virtual;
+       procedure AssembleCode(const AInputStream,AOutputStream:TStream;const AInputFileName:TPUCUUTF8String=''); virtual;
 
-       procedure LinkCode(const AInputStreams:TList;const AOutputStream:TStream); virtual;
+       procedure LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AInputFileName:TPUCUUTF8String=''); virtual;
 
       published
 
@@ -103,6 +103,8 @@ var PACCRegisteredTargetClassList:TList;
 procedure PACCRegisterTarget(const ATargetClass:TPACCTargetClass);
 
 implementation
+
+uses PACCInstance;
 
 constructor TPACCTarget.Create(const AInstance:TObject);
 begin
@@ -163,12 +165,21 @@ procedure TPACCTarget.GenerateCode(const ARoot:TPACCAbstractSyntaxTreeNode;const
 begin
 end;
 
-procedure TPACCTarget.AssembleCode(const AInputStream,AOutputStream:TStream);
+procedure TPACCTarget.AssembleCode(const AInputStream,AOutputStream:TStream;const AInputFileName:TPUCUUTF8String='');
 begin
 end;
 
-procedure TPACCTarget.LinkCode(const AInputStreams:TList;const AOutputStream:TStream);
+procedure TPACCTarget.LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AInputFileName:TPUCUUTF8String='');
+var Index:TPACCInt32;
 begin
+ for Index:=0 to AInputStreams.Count-1 do begin
+  if assigned(AInputStreams[Index]) then begin
+   TPACCInstance(Instance).Linker.AddObject(TStream(AInputStreams[Index]),AInputFileNames[Index]);
+  end;
+ end;
+ if assigned(AOutputStream) then begin
+  TPACCInstance(Instance).Linker.Link(AOutputStream);
+ end;
 end;
 
 procedure PACCRegisterTarget(const ATargetClass:TPACCTargetClass);

@@ -56,6 +56,8 @@ var ParameterIndex,CountParameters,Index:TPACCInt32;
 
     AssembledCodeStreams:TList;
 
+    AssembledCodeFileNames:TStringList;
+
     TargetList:TStringList;
 
 procedure Compile(const InputFileName,OutputFileName:TPUCUUTF8String;const InputIndex:TPACCInt32);
@@ -93,7 +95,7 @@ begin
       AssembledCodeStream:=TMemoryStream.Create;
       try
 
-       Instance.Target.AssembleCode(AssemblerCodeStream,AssembledCodeStream);
+       Instance.Target.AssembleCode(AssemblerCodeStream,AssembledCodeStream,InputFileName);
 
        if OnlyRunPreprocessAndCompileAndAssembleSteps then begin
 
@@ -111,6 +113,7 @@ begin
         try
          writeln('Storing assembled code for ',ExtractFileName(InputFileName),' for the linking step . . .');
          AssembledCodeStreams[InputIndex]:=AssembledCodeStream;
+         AssembledCodeFileNames[InputIndex]:=ChangeFileExt(InputFileName,'.o');
          AssembledCodeStream:=nil;
         finally
          OutputLock.Release;
@@ -220,7 +223,7 @@ begin
         finally
          OutputLock.Release;
         end;
-        Instance.Target.AssembleCode(AssemblerCodeStream,AssembledCodeStream);
+        Instance.Target.AssembleCode(AssemblerCodeStream,AssembledCodeStream,ChangeFileExt(InputFileName,'.s'));
 
         if OnlyRunPreprocessAndCompileAndAssembleSteps then begin
 
@@ -238,6 +241,7 @@ begin
          try
           writeln('Storing assembled code for ',ExtractFileName(InputFileName),' for the linking step . . .');
           AssembledCodeStreams[InputIndex]:=AssembledCodeStream;
+          AssembledCodeFileNames[InputIndex]:=ChangeFileExt(InputFileName,'.o');
           AssembledCodeStream:=nil;
          finally
           OutputLock.Release;
@@ -272,6 +276,7 @@ begin
      OutputLock.Acquire;
      try
       AssembledCodeStreams[InputIndex]:=AssembledCodeStream;
+      AssembledCodeFileNames[InputIndex]:=InputFileName;
       AssembledCodeStream:=nil;
      finally
       OutputLock.Release;
@@ -351,6 +356,8 @@ begin
  OutputFiles:=TStringList.Create;
 
  AssembledCodeStreams:=TList.Create;
+
+ AssembledCodeFileNames:=TStringList.Create;
 
  try
   CountParameters:=ParamCount;
@@ -443,6 +450,7 @@ begin
     end else begin
      for Index:=0 to InputFiles.Count-1 do begin
       AssembledCodeStreams.Add(nil);
+      AssembledCodeFileNames.Add('');
      end;
      if OutputFiles.Count>0 then begin
       for Index:=OutputFiles.Count-1 downto 1 do begin
@@ -465,7 +473,7 @@ begin
      try
       OutputStream:=TMemoryStream.Create;
       try
-       Instance.Target.LinkCode(AssembledCodeStreams,OutputStream);
+       Instance.Target.LinkCode(AssembledCodeStreams,AssembledCodeFileNames,OutputStream);
        OutputStream.SaveToFile(OutputFiles[0]);
       finally
        OutputStream.Free;
@@ -543,6 +551,8 @@ begin
    AssembledCodeStreams[Index]:=nil;
   end;
   AssembledCodeStreams.Free;
+
+  AssembledCodeFileNames.Free;
 
  end;
 

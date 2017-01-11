@@ -4,7 +4,8 @@ unit PACCInstance;
 interface
 
 uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCRawByteStringHashMap,PACCTarget,
-     PACCPreprocessor,PACCLexer,PACCParser,PACCAnalyzer,PACCHighLevelOptimizer;
+     PACCPreprocessor,PACCLexer,PACCParser,PACCAnalyzer,PACCHighLevelOptimizer,
+     PACCLinker;
 
 type EPACCError=class(Exception)
       public
@@ -25,6 +26,7 @@ type EPACCError=class(Exception)
        Parser:TPACCParser;
        Analyzer:TPACCAnalyzer;
        HighLevelOptimizer:TPACCHighLevelOptimizer;
+       Linker:TPACCLinker;
 
        TokenSymbols:TPACCTokenSymbols;
        CountTokenSymbols:TPACCInt;
@@ -151,6 +153,7 @@ begin
  Parser:=TPACCParser.Create(self);
  Analyzer:=TPACCAnalyzer.Create(self); 
  HighLevelOptimizer:=TPACCHighLevelOptimizer.Create(self);
+ Linker:=TPACCLinker.Create(self);
 
 end;
 
@@ -162,6 +165,8 @@ begin
  SetLength(TokenSymbols,0);
 
  TokenSymbolStringHashMap.Free;
+
+ Linker.Free;
 
  HighLevelOptimizer.Free;
 

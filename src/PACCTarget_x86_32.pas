@@ -23,15 +23,15 @@ type TPACCTarget_x86_32=class(TPACCTarget)
 
        procedure GenerateCode(const ARoot:TPACCAbstractSyntaxTreeNode;const AOutputStream:TStream); override;
 
-       procedure AssembleCode(const AInputStream,AOutputStream:TStream); override;
+       procedure AssembleCode(const AInputStream,AOutputStream:TStream;const AInputFileName:TPUCUUTF8String=''); override;
 
-       procedure LinkCode(const AInputStreams:TList;const AOutputStream:TStream); override;
+       procedure LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AInputFileName:TPUCUUTF8String=''); override;
 
      end;
 
 implementation
 
-uses PACCInstance;
+uses PACCInstance,PACCPreprocessor,SASMCore;
 
 constructor TPACCTarget_x86_32.Create(const AInstance:TObject);
 begin
@@ -105,12 +105,52 @@ procedure TPACCTarget_x86_32.GenerateCode(const ARoot:TPACCAbstractSyntaxTreeNod
 begin
 end;
 
-procedure TPACCTarget_x86_32.AssembleCode(const AInputStream,AOutputStream:TStream);
+procedure TPACCTarget_x86_32.AssembleCode(const AInputStream,AOutputStream:TStream;const AInputFileName:TPUCUUTF8String='');
+var Assembler_:TAssembler;
+    SourceLocation:TPACCSourceLocation;
+    StringList:TStringList;
+    Index:TPACCInt32;
 begin
+ Assembler_:=TAssembler.Create;
+ try
+  Assembler_.Target:=ttCOFF32;
+  Assembler_.ParseStream(AInputStream);
+  if not Assembler_.AreErrors then begin
+   Assembler_.Write(AOutputStream);
+  end;
+  SourceLocation.Source:=TPACCInstance(Instance).Preprocessor.GetInputSourceIndex(iskFILE,AInputFileName);
+  SourceLocation.Line:=0;
+  SourceLocation.Column:=0;
+  if Assembler_.AreWarnings then begin
+   StringList:=TStringList.Create;
+   try
+    StringList.Text:=Assembler_.Warnings;
+    for Index:=0 to StringList.Count-1 do begin
+     TPACCInstance(Instance).AddWarning(StringList[Index],@SourceLocation);
+    end;
+   finally
+    StringList.Free;
+   end;
+  end;
+  if Assembler_.AreErrors then begin
+   StringList:=TStringList.Create;
+   try
+    StringList.Text:=Assembler_.Errors;
+    for Index:=0 to StringList.Count-1 do begin
+     TPACCInstance(Instance).AddError(StringList[Index],@SourceLocation,false);
+    end;
+   finally
+    StringList.Free;
+   end;
+  end;
+ finally
+  Assembler_.Free;
+ end;
 end;
 
-procedure TPACCTarget_x86_32.LinkCode(const AInputStreams:TList;const AOutputStream:TStream);
+procedure TPACCTarget_x86_32.LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AInputFileName:TPUCUUTF8String='');
 begin
+ inherited LinkCode(AInputStreams,AInputFileNames,AOutputStream,AInputFileName);
 end;
 
 initialization

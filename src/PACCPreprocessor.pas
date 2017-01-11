@@ -76,6 +76,9 @@ type TPACCPreprocessorInputSourceKind=(iskNONE,iskFILE,iskMACRO);
 
        constructor Create(const AInstance:TObject);
        destructor Destroy; override;
+
+       function GetInputSourceIndex(const Kind:TPACCPreprocessorInputSourceKind;Name:TPUCUUTF8String):TPACCInt;
+
        procedure ProcessIt;
        procedure ProcessString(const AInputText:TPUCUUTF8String;const AInputName:TPUCUUTF8String='');
        procedure ProcessFile(const AInputFileName:TPUCUUTF8String='');
@@ -99,6 +102,20 @@ begin
  finally
   FileStream.Free;
  end;
+end;
+
+function RoundUpToPowerOfTwo(x:TPACCPtrUInt):TPACCPtrUInt;
+begin
+ dec(x);
+ x:=x or (x shr 1);
+ x:=x or (x shr 2);
+ x:=x or (x shr 4);
+ x:=x or (x shr 8);
+ x:=x or (x shr 16);
+{$ifdef cpu64}
+ x:=x or (x shr 32);
+{$endif}
+ result:=x+1;
 end;
 
 constructor TPACCPreprocessor.Create(const AInstance:TObject);
@@ -155,6 +172,34 @@ begin
  SetLength(OutputInfos,0);
  OutputText:='';
  inherited Destroy;
+end;
+
+function TPACCPreprocessor.GetInputSourceIndex(const Kind:TPACCPreprocessorInputSourceKind;Name:TPUCUUTF8String):TPACCInt;
+var i,j:TPACCInt;
+begin
+ for i:=0 to CountInputSources-1 do begin
+  if (InputSources[i].Kind=Kind) and (InputSources[i].Name=Name) then begin
+   result:=i;
+   exit;
+  end;
+ end;
+ result:=CountInputSources;
+ inc(CountInputSources);
+ if (result+1)>length(InputSources) then begin
+  SetLength(InputSources,RoundUpToPowerOfTwo(result+2));
+ end;
+ InputSources[result].Kind:=Kind;
+ InputSources[result].Name:=Name;
+ case Kind of
+  iskMACRO:begin
+   Name:='MACRO('+Name+')';
+  end;
+ end;
+ j:=SourceFiles.IndexOf(Name);
+ if j<0 then begin
+  j:=SourceFiles.Add(Name);
+ end;
+ InputSources[result].Index:=j;
 end;
 
 procedure TPACCPreprocessor.ProcessIt;
@@ -228,19 +273,6 @@ var InputStack:TInputStack;
     MacroStringHashMap:TPACCRawByteStringHashMap;
     KeywordStringHashMap:TPACCRawByteStringHashMap;
     HideSet:TStringList;
- function RoundUpToPowerOfTwo(x:TPACCPtrUInt):TPACCPtrUInt;
- begin
-  dec(x);
-  x:=x or (x shr 1);
-  x:=x or (x shr 2);
-  x:=x or (x shr 4);
-  x:=x or (x shr 8);
-  x:=x or (x shr 16);
- {$ifdef cpu64}
-  x:=x or (x shr 32);
- {$endif}
-  result:=x+1;
- end;
  procedure AddError(const s:TPUCUUTF8String;const SourceLocation:PPACCSourceLocation=nil;const DoAbort:boolean=false);
  begin
   TPACCInstance(Instance).AddError(s,SourceLocation,DoAbort);
@@ -249,7 +281,6 @@ var InputStack:TInputStack;
  begin
   TPACCInstance(Instance).AddWarning(s,SourceLocation);
  end;
- function GetInputSourceIndex(const Kind:TPACCPreprocessorInputSourceKind;Name:TPUCUUTF8String):TPACCInt; forward;
  function hex2byte(c:TPUCUUTF32Char):TPACCInt;
  begin
   case c of
@@ -774,33 +805,6 @@ var InputStack:TInputStack;
   if i>=0 then begin
    Macros[i].Defined:=false;
   end;
- end;
- function GetInputSourceIndex(const Kind:TPACCPreprocessorInputSourceKind;Name:TPUCUUTF8String):TPACCInt;
- var i,j:TPACCInt;
- begin
-  for i:=0 to CountInputSources-1 do begin
-   if (InputSources[i].Kind=Kind) and (InputSources[i].Name=Name) then begin
-    result:=i;
-    exit;
-   end;
-  end;
-  result:=CountInputSources;
-  inc(CountInputSources);
-  if (result+1)>length(InputSources) then begin
-   SetLength(InputSources,RoundUpToPowerOfTwo(result+2));
-  end;
-  InputSources[result].Kind:=Kind;
-  InputSources[result].Name:=Name;
-  case Kind of
-   iskMACRO:begin
-    Name:='MACRO('+Name+')';
-   end;
-  end;
-  j:=SourceFiles.IndexOf(Name);
-  if j<0 then begin
-   j:=SourceFiles.Add(Name);
-  end;
-  InputSources[result].Index:=j;
  end;
  procedure PushInputSource(Kind:TPACCPreprocessorInputSourceKind;const Name:TPUCUUTF8String;const Text:TPUCUUTF8String;const TextSourceLocations:TPACCPreprocessorInputSourceLocations);
  var i:TPACCInt;
