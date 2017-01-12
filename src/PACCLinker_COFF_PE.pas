@@ -59,6 +59,7 @@ type TPACCLinker_COFF_PE=class;
        fType:TPACCInt32;
        fClass:TPACCInt32;
        fSubSymbols:TPACCLinker_COFF_PESymbolList;
+       fAuxData:TMemoryStream;
       public
        constructor Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32); reintroduce;
        destructor Destroy; override;
@@ -70,6 +71,7 @@ type TPACCLinker_COFF_PE=class;
        property Type_:TPACCInt32 read fType;
        property Class_:TPACCInt32 read fClass;
        property SubSymbols:TPACCLinker_COFF_PESymbolList read fSubSymbols;
+       property AuxData:TMemoryStream read fAuxData write fAuxData;
      end;
 
      TPACCLinker_COFF_PESymbolList=class(TList)
@@ -694,22 +696,36 @@ end;
 constructor TPACCLinker_COFF_PESymbol.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32);
 begin
  inherited Create;
+
  fLinker:=ALinker;
+
  fName:=AName;
+
  fSection:=ASection;
+
  fValue:=AValue;
+
  fType:=AType;
+
  fClass:=AClass;
+
  fSubSymbols:=TPACCLinker_COFF_PESymbolList.Create;
+
+ fAuxData:=nil;
+
 end;
 
 destructor TPACCLinker_COFF_PESymbol.Destroy;
 begin
+
+ fAuxData.Free;
+
  while fSubSymbols.Count>0 do begin
   fSubSymbols[fSubSymbols.Count-1].Free;
   fSubSymbols.Delete(fSubSymbols.Count-1);
  end;
  fSubSymbols.Free;
+
  inherited Destroy;
 end;
 
@@ -823,13 +839,7 @@ type PCOFFFileHeader=^TCOFFFileHeader;
       RelocationType:TPACCUInt16;
      end;
      TCOFFRelocations=array of TCOFFRelocation;
-     PSymbolTargetStackItem=^TSymbolTargetStackItem;
-     TSymbolTargetStackItem=record
-      SymbolTarget:TPACCLinker_COFF_PESymbolList;
-      Remaining:TPACCInt32;
-     end;
-     TSymbolTargetStackItems=array of TSymbolTargetStackItem;
-var SectionIndex,RelocationIndex,NumberOfRelocations,SymbolIndex,Index,SymbolTargetStackPointer:TPACCInt32;
+var SectionIndex,RelocationIndex,NumberOfRelocations,SymbolIndex,Index:TPACCInt32;
     RelocationOffset:TPACCUInt32;
     COFFFileHeader:TCOFFFileHeader;
     LocalSections:TPACCLinker_COFF_PESectionList;
@@ -843,8 +853,6 @@ var SectionIndex,RelocationIndex,NumberOfRelocations,SymbolIndex,Index,SymbolTar
     COFFSymbols:TCOFFSymbols;
     COFFSymbol:PCOFFSymbol;
     Symbol:TPACCLinker_COFF_PESymbol;
-    SymbolTargetStackItems:TSymbolTargetStackItems;
-    SymbolTargetStackItem:PSymbolTargetStackItem;
     Name:TPACCRawByteString;
     c:ansichar;
 begin
@@ -974,73 +982,56 @@ begin
    end;
 
    if (COFFFileHeader.PointerToSymbolTable>0) and (COFFFileHeader.NumberOfSymbols>0) then begin
-    SymbolTargetStackItems:=nil;
+    COFFSymbols:=nil;
     try
-     SetLength(SymbolTargetStackItems,16);
-     SymbolTargetStackItem:=@SymbolTargetStackItems[0];
-     SymbolTargetStackItem^.SymbolTarget:=Symbols;
-     SymbolTargetStackItem^.Remaining:=-1;
-     SymbolTargetStackPointer:=0;
-     COFFSymbols:=nil;
-     try
-      SetLength(COFFSymbols,COFFFileHeader.NumberOfSymbols);
-      if AObjectStream.Seek(COFFFileHeader.PointerToSymbolTable,soBeginning)<>COFFFileHeader.PointerToSymbolTable then begin
-       TPACCInstance(Instance).AddError('Stream seek error',nil,true);
-      end;
-      AObjectStream.ReadBuffer(COFFSymbols[0],COFFFileHeader.NumberOfSymbols*SizeOf(TCOFFSymbol));
-      for SymbolIndex:=0 to COFFFileHeader.NumberOfSymbols-1 do begin
-       COFFSymbol:=@COFFSymbols[SymbolIndex];
-       if COFFSymbol^.Name.Zero=0 then begin
-        if AObjectStream.Seek(COFFSymbol^.Name.PointerToString,soBeginning)<>COFFSymbol^.Name.PointerToString then begin
-         TPACCInstance(Instance).AddError('Stream seek error',nil,true);
-        end;
-        Name:='';
-        while AObjectStream.Position<AObjectStream.Size do begin
-         AObjectStream.Read(c,SizeOf(AnsiChar));
-         if c=#0 then begin
-          break;
-         end else begin
-          Name:=Name+c;
-         end;
-        end;
-       end else begin
-        Name:=COFFSymbol^.Name.Name;
-        for Index:=1 to length(Name) do begin
-         if Name[Index]=#0 then begin
-          Name:=copy(Name,1,Index-1);
-          break;
-         end;
+     SetLength(COFFSymbols,COFFFileHeader.NumberOfSymbols);
+     if AObjectStream.Seek(COFFFileHeader.PointerToSymbolTable,soBeginning)<>COFFFileHeader.PointerToSymbolTable then begin
+      TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+     end;
+     AObjectStream.ReadBuffer(COFFSymbols[0],COFFFileHeader.NumberOfSymbols*SizeOf(TCOFFSymbol));
+     SymbolIndex:=0;
+     while TPACCUInt32(SymbolIndex)<COFFFileHeader.NumberOfSymbols do begin
+      COFFSymbol:=@COFFSymbols[SymbolIndex];
+      inc(SymbolIndex);
+      if COFFSymbol^.Name.Zero=0 then begin
+       if AObjectStream.Seek(COFFSymbol^.Name.PointerToString,soBeginning)<>COFFSymbol^.Name.PointerToString then begin
+        TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+       end;
+       Name:='';
+       while AObjectStream.Position<AObjectStream.Size do begin
+        AObjectStream.Read(c,SizeOf(AnsiChar));
+        if c=#0 then begin
+         break;
+        end else begin
+         Name:=Name+c;
         end;
        end;
-       if (COFFSymbol^.Section>0) and (COFFSymbol^.Section<=LocalSections.Count) then begin
-        Section:=LocalSections[COFFSymbol^.Section-1];
-       end else begin
-        Section:=nil;
-       end;
-       Symbol:=TPACCLinker_COFF_PESymbol.Create(self,Name,Section,COFFSymbol^.Value,COFFSymbol^.SymbolType,COFFSymbol^.SymbolClass);
-       SymbolTargetStackItem:=@SymbolTargetStackItems[SymbolTargetStackPointer];
-       SymbolTargetStackItem^.SymbolTarget.Add(Symbol);
-       if SymbolTargetStackItem^.Remaining>0 then begin
-        dec(SymbolTargetStackItem^.Remaining);
-        if SymbolTargetStackItem^.Remaining=0 then begin
-         dec(SymbolTargetStackPointer);
+      end else begin
+       Name:=COFFSymbol^.Name.Name;
+       for Index:=1 to length(Name) do begin
+        if Name[Index]=#0 then begin
+         Name:=copy(Name,1,Index-1);
+         break;
         end;
-       end;
-       if COFFSymbol^.Aux>0 then begin
-        inc(SymbolTargetStackPointer);
-        if length(SymbolTargetStackItems)<=SymbolTargetStackPointer then begin
-         SetLength(SymbolTargetStackItems,(SymbolTargetStackPointer+1)*2);
-        end;
-        SymbolTargetStackItem:=@SymbolTargetStackItems[SymbolTargetStackPointer];
-        SymbolTargetStackItem^.SymbolTarget:=Symbol.SubSymbols;
-        SymbolTargetStackItem^.Remaining:=COFFSymbol^.Aux;
        end;
       end;
-     finally
-      COFFSymbols:=nil;
+      if (COFFSymbol^.Section>0) and (COFFSymbol^.Section<=LocalSections.Count) then begin
+       Section:=LocalSections[COFFSymbol^.Section-1];
+      end else begin
+       Section:=nil;
+      end;
+      Symbol:=TPACCLinker_COFF_PESymbol.Create(self,Name,Section,COFFSymbol^.Value,COFFSymbol^.SymbolType,COFFSymbol^.SymbolClass);
+      Symbols.Add(Symbol);
+      if COFFSymbol^.Aux>0 then begin
+       if not assigned(Symbol.fAuxData) then begin
+        Symbol.fAuxData:=TMemoryStream.Create;
+       end;
+       Symbol.fAuxData.WriteBuffer(COFFSymbols[SymbolIndex],COFFSymbol^.Aux*SizeOf(TCOFFSymbol));
+       inc(SymbolIndex,COFFSymbol^.Aux);
+      end;
      end;
     finally
-     SymbolTargetStackItems:=nil;
+     COFFSymbols:=nil;
     end;
    end;
 
