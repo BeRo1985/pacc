@@ -153,7 +153,7 @@ begin
  Parser:=TPACCParser.Create(self);
  Analyzer:=TPACCAnalyzer.Create(self); 
  HighLevelOptimizer:=TPACCHighLevelOptimizer.Create(self);
- Linker:=TPACCLinker.Create(self);
+ Linker:=TPACCLinkerClass(Target.LinkerClass).Create(self);
 
 end;
 

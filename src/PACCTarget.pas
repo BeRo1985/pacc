@@ -42,6 +42,8 @@ type TPACCTarget=class
 
        fMaximumAlignment:TPACCInt32;
 
+       fLinkerClass:TClass;
+
       public
 
        constructor Create(const AInstance:TObject); reintroduce; virtual;
@@ -93,6 +95,8 @@ type TPACCTarget=class
 
        property MaximumAlignment:TPACCInt32 read fMaximumAlignment write fMaximumAlignment;
 
+       property LinkerClass:TClass read fLinkerClass write fLinkerClass;
+       
      end;
 
      TPACCTargetClass=class of TPACCTarget;
@@ -104,7 +108,7 @@ procedure PACCRegisterTarget(const ATargetClass:TPACCTargetClass);
 
 implementation
 
-uses PACCInstance;
+uses PACCInstance,PACCLinker;
 
 constructor TPACCTarget.Create(const AInstance:TObject);
 begin
@@ -143,6 +147,8 @@ begin
  fAlignmentOfEnum:=SizeOf(TPACCInt32);
 
  fMaximumAlignment:=SizeOf(TPACCUInt64)*2;
+
+ fLinkerClass:=TPACCLinker;
 
 end;
 

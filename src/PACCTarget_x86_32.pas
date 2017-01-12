@@ -8,7 +8,7 @@ uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCAbstractSyntaxTree,PAC
 const ccCDECL=0;
       ccSTDCALL=1;
       ccFASTCALL=2;
-      
+
 type TPACCTarget_x86_32=class(TPACCTarget)
       private
 
@@ -29,9 +29,20 @@ type TPACCTarget_x86_32=class(TPACCTarget)
 
      end;
 
+     TPACCTarget_x86_32_COFF_PE=class(TPACCTarget_x86_32)
+      private
+
+      public
+
+       constructor Create(const AInstance:TObject); override;
+
+       class function GetName:TPACCRawByteString; override;
+
+     end;
+
 implementation
 
-uses PACCInstance,PACCPreprocessor,SASMCore;
+uses PACCInstance,PACCPreprocessor,SASMCore,PACCLinker_COFF_PE;
 
 constructor TPACCTarget_x86_32.Create(const AInstance:TObject);
 begin
@@ -153,8 +164,19 @@ begin
  inherited LinkCode(AInputStreams,AInputFileNames,AOutputStream,AOutputFileName);
 end;
 
+constructor TPACCTarget_x86_32_COFF_PE.Create(const AInstance:TObject);
+begin
+ inherited Create(AInstance);
+ LinkerClass:=TPACCLinker_COFF_PE;
+end;
+
+class function TPACCTarget_x86_32_COFF_PE.GetName:TPACCRawByteString;
+begin
+ result:='x86_32_coff_pe';
+end;
+
 initialization
- PACCRegisterTarget(TPACCTarget_x86_32);
+ PACCRegisterTarget(TPACCTarget_x86_32_COFF_PE);
 end.
 
 

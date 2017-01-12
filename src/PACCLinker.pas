@@ -31,6 +31,8 @@ type TPACCLinker=class;
 
      end;
 
+     TPACCLinkerClass=class of TPACCLinker;
+
 implementation
 
 uses PACCInstance;

@@ -1,36 +1,36 @@
-unit PACCLinkerCOFF_PE;
+unit PACCLinker_COFF_PE;
 {$i PACC.inc}
 
 interface
 
 uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCRawByteStringHashMap,PACCPointerHashMap,PACCLinker;
 
-type TPACCLinkerCOFF_PE=class;
+type TPACCLinker_COFF_PE=class;
 
-     PPACCLinkerCOFF_PERelocation=^TPACCLinkerCOFF_PERelocation;
-     TPACCLinkerCOFF_PERelocation=record
+     PPACCLinker_COFF_PERelocation=^TPACCLinker_COFF_PERelocation;
+     TPACCLinker_COFF_PERelocation=record
       VirtualAddress:TPACCUInt32;
       Symbol:TPACCUInt32;
       RelocationType:TPACCUInt16;
      end;
 
-     TPACCLinkerCOFF_PERelocations=array of TPACCLinkerCOFF_PERelocation;
+     TPACCLinker_COFF_PERelocations=array of TPACCLinker_COFF_PERelocation;
 
-     TPACCLinkerCOFF_PESection=class
+     TPACCLinker_COFF_PESection=class
       private
-       fLinker:TPACCLinkerCOFF_PE;
+       fLinker:TPACCLinker_COFF_PE;
        fName:TPACCRawByteString;
        fStream:TMemoryStream;
        fAlignment:TPACCInt32;
        fVirtualAddress:TPACCUInt64;
        fCharacteristics:TPACCUInt32;
       protected
-       Relocations:TPACCLinkerCOFF_PERelocations;
+       Relocations:TPACCLinker_COFF_PERelocations;
       public
-       constructor Create(const ALinker:TPACCLinkerCOFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32); reintroduce;
+       constructor Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32); reintroduce;
        destructor Destroy; override;
       published
-       property Linker:TPACCLinkerCOFF_PE read fLinker;
+       property Linker:TPACCLinker_COFF_PE read fLinker;
        property Name:TPACCRawByteString read fName;
        property Stream:TMemoryStream read fStream;
        property Alignment:TPACCInt32 read fAlignment write fAlignment;
@@ -38,58 +38,58 @@ type TPACCLinkerCOFF_PE=class;
        property Characteristics:TPACCUInt32 read fCharacteristics write fCharacteristics;
      end;
 
-     TPACCLinkerCOFF_PESectionList=class(TList)
+     TPACCLinker_COFF_PESectionList=class(TList)
       private
-       function GetItem(const Index:TPACCInt):TPACCLinkerCOFF_PESection;
-       procedure SetItem(const Index:TPACCInt;Node:TPACCLinkerCOFF_PESection);
+       function GetItem(const Index:TPACCInt):TPACCLinker_COFF_PESection;
+       procedure SetItem(const Index:TPACCInt;Node:TPACCLinker_COFF_PESection);
       public
        constructor Create;
        destructor Destroy; override;
-       property Items[const Index:TPACCInt]:TPACCLinkerCOFF_PESection read GetItem write SetItem; default;
+       property Items[const Index:TPACCInt]:TPACCLinker_COFF_PESection read GetItem write SetItem; default;
      end;
 
-     TPACCLinkerCOFF_PESymbolList=class;
+     TPACCLinker_COFF_PESymbolList=class;
 
-     TPACCLinkerCOFF_PESymbol=class
+     TPACCLinker_COFF_PESymbol=class
       private
-       fLinker:TPACCLinkerCOFF_PE;
+       fLinker:TPACCLinker_COFF_PE;
        fName:TPACCRawByteString;
-       fSection:TPACCLinkerCOFF_PESection;
+       fSection:TPACCLinker_COFF_PESection;
        fValue:TPACCInt64;
        fType:TPACCInt32;
        fClass:TPACCInt32;
-       fSubSymbols:TPACCLinkerCOFF_PESymbolList;
+       fSubSymbols:TPACCLinker_COFF_PESymbolList;
       public
-       constructor Create(const ALinker:TPACCLinkerCOFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinkerCOFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32); reintroduce;
+       constructor Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32); reintroduce;
        destructor Destroy; override;
       published
-       property Linker:TPACCLinkerCOFF_PE read fLinker;
+       property Linker:TPACCLinker_COFF_PE read fLinker;
        property Name:TPACCRawByteString read fName;
-       property Section:TPACCLinkerCOFF_PESection read fSection;
+       property Section:TPACCLinker_COFF_PESection read fSection;
        property Value:TPACCInt64 read fValue;
        property Type_:TPACCInt32 read fType;
        property Class_:TPACCInt32 read fClass;
-       property SubSymbols:TPACCLinkerCOFF_PESymbolList read fSubSymbols;
+       property SubSymbols:TPACCLinker_COFF_PESymbolList read fSubSymbols;
      end;
 
-     TPACCLinkerCOFF_PESymbolList=class(TList)
+     TPACCLinker_COFF_PESymbolList=class(TList)
       private
-       function GetItem(const Index:TPACCInt):TPACCLinkerCOFF_PESymbol;
-       procedure SetItem(const Index:TPACCInt;Node:TPACCLinkerCOFF_PESymbol);
+       function GetItem(const Index:TPACCInt):TPACCLinker_COFF_PESymbol;
+       procedure SetItem(const Index:TPACCInt;Node:TPACCLinker_COFF_PESymbol);
       public
        constructor Create;
        destructor Destroy; override;
-       property Items[const Index:TPACCInt]:TPACCLinkerCOFF_PESymbol read GetItem write SetItem; default;
+       property Items[const Index:TPACCInt]:TPACCLinker_COFF_PESymbol read GetItem write SetItem; default;
      end;
 
-     TPACCLinkerCOFF_PE=class(TPACCLinker)
+     TPACCLinker_COFF_PE=class(TPACCLinker)
       private
 
        fMachine:TPACCUInt16;
 
-       fSections:TPACCLinkerCOFF_PESectionList;
+       fSections:TPACCLinker_COFF_PESectionList;
 
-       fSymbols:TPACCLinkerCOFF_PESymbolList;
+       fSymbols:TPACCLinker_COFF_PESymbolList;
 
       public
 
@@ -104,9 +104,9 @@ type TPACCLinkerCOFF_PE=class;
 
        property Machine:TPACCUInt16 read fMachine;
        
-       property Sections:TPACCLinkerCOFF_PESectionList read fSections;
+       property Sections:TPACCLinker_COFF_PESectionList read fSections;
 
-       property Symbols:TPACCLinkerCOFF_PESymbolList read fSymbols;
+       property Symbols:TPACCLinker_COFF_PESymbolList read fSymbols;
 
      end;
 
@@ -644,7 +644,7 @@ type TBytes=array of TPACCUInt8;
       AddressOfData:TPACCUInt32;
      end;
 
-constructor TPACCLinkerCOFF_PESection.Create(const ALinker:TPACCLinkerCOFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32);
+constructor TPACCLinker_COFF_PESection.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32);
 begin
  inherited Create;
 
@@ -664,34 +664,34 @@ begin
 
 end;
 
-destructor TPACCLinkerCOFF_PESection.Destroy;
+destructor TPACCLinker_COFF_PESection.Destroy;
 begin
  Relocations:=nil;
  fStream.Free;
  inherited Destroy;
 end;
 
-constructor TPACCLinkerCOFF_PESectionList.Create;
+constructor TPACCLinker_COFF_PESectionList.Create;
 begin
  inherited Create;
 end;
 
-destructor TPACCLinkerCOFF_PESectionList.Destroy;
+destructor TPACCLinker_COFF_PESectionList.Destroy;
 begin
  inherited Destroy;
 end;
 
-function TPACCLinkerCOFF_PESectionList.GetItem(const Index:TPACCInt):TPACCLinkerCOFF_PESection;
+function TPACCLinker_COFF_PESectionList.GetItem(const Index:TPACCInt):TPACCLinker_COFF_PESection;
 begin
  result:=pointer(inherited Items[Index]);
 end;
 
-procedure TPACCLinkerCOFF_PESectionList.SetItem(const Index:TPACCInt;Node:TPACCLinkerCOFF_PESection);
+procedure TPACCLinker_COFF_PESectionList.SetItem(const Index:TPACCInt;Node:TPACCLinker_COFF_PESection);
 begin
  inherited Items[Index]:=pointer(Node);
 end;
 
-constructor TPACCLinkerCOFF_PESymbol.Create(const ALinker:TPACCLinkerCOFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinkerCOFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32);
+constructor TPACCLinker_COFF_PESymbol.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32);
 begin
  inherited Create;
  fLinker:=ALinker;
@@ -700,10 +700,10 @@ begin
  fValue:=AValue;
  fType:=AType;
  fClass:=AClass;
- fSubSymbols:=TPACCLinkerCOFF_PESymbolList.Create;
+ fSubSymbols:=TPACCLinker_COFF_PESymbolList.Create;
 end;
 
-destructor TPACCLinkerCOFF_PESymbol.Destroy;
+destructor TPACCLinker_COFF_PESymbol.Destroy;
 begin
  while fSubSymbols.Count>0 do begin
   fSubSymbols[fSubSymbols.Count-1].Free;
@@ -713,27 +713,27 @@ begin
  inherited Destroy;
 end;
 
-constructor TPACCLinkerCOFF_PESymbolList.Create;
+constructor TPACCLinker_COFF_PESymbolList.Create;
 begin
  inherited Create;
 end;
 
-destructor TPACCLinkerCOFF_PESymbolList.Destroy;
+destructor TPACCLinker_COFF_PESymbolList.Destroy;
 begin
  inherited Destroy;
 end;
 
-function TPACCLinkerCOFF_PESymbolList.GetItem(const Index:TPACCInt):TPACCLinkerCOFF_PESymbol;
+function TPACCLinker_COFF_PESymbolList.GetItem(const Index:TPACCInt):TPACCLinker_COFF_PESymbol;
 begin
  result:=pointer(inherited Items[Index]);
 end;
 
-procedure TPACCLinkerCOFF_PESymbolList.SetItem(const Index:TPACCInt;Node:TPACCLinkerCOFF_PESymbol);
+procedure TPACCLinker_COFF_PESymbolList.SetItem(const Index:TPACCInt;Node:TPACCLinker_COFF_PESymbol);
 begin
  inherited Items[Index]:=pointer(Node);
 end;
 
-constructor TPACCLinkerCOFF_PE.Create(const AInstance:TObject);
+constructor TPACCLinker_COFF_PE.Create(const AInstance:TObject);
 begin
  inherited Create(AInstance);
 
@@ -745,13 +745,13 @@ begin
   fMachine:=IMAGE_FILE_MACHINE_UNKNOWN;
  end;
 
- fSections:=TPACCLinkerCOFF_PESectionList.Create;
+ fSections:=TPACCLinker_COFF_PESectionList.Create;
 
- fSymbols:=TPACCLinkerCOFF_PESymbolList.Create;
+ fSymbols:=TPACCLinker_COFF_PESymbolList.Create;
 
 end;
 
-destructor TPACCLinkerCOFF_PE.Destroy;
+destructor TPACCLinker_COFF_PE.Destroy;
 begin
 
  while fSymbols.Count>0 do begin
@@ -769,7 +769,7 @@ begin
  inherited Destroy;
 end;
 
-procedure TPACCLinkerCOFF_PE.AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String='');
+procedure TPACCLinker_COFF_PE.AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String='');
 const COFF_SIZEOF_SHORT_NAME=8;
 type PCOFFFileHeader=^TCOFFFileHeader;
      TCOFFFileHeader=packed record
@@ -825,24 +825,24 @@ type PCOFFFileHeader=^TCOFFFileHeader;
      TCOFFRelocations=array of TCOFFRelocation;
      PSymbolTargetStackItem=^TSymbolTargetStackItem;
      TSymbolTargetStackItem=record
-      SymbolTarget:TPACCLinkerCOFF_PESymbolList;
+      SymbolTarget:TPACCLinker_COFF_PESymbolList;
       Remaining:TPACCInt32;
      end;
      TSymbolTargetStackItems=array of TSymbolTargetStackItem;
 var SectionIndex,RelocationIndex,NumberOfRelocations,SymbolIndex,Index,SymbolTargetStackPointer:TPACCInt32;
     RelocationOffset:TPACCUInt32;
     COFFFileHeader:TCOFFFileHeader;
-    LocalSections:TPACCLinkerCOFF_PESectionList;
+    LocalSections:TPACCLinker_COFF_PESectionList;
     COFFSectionHeaders:TCOFFSectionHeaders;
     COFFSectionHeader:PCOFFSectionHeader;
-    Section:TPACCLinkerCOFF_PESection;
+    Section:TPACCLinker_COFF_PESection;
     OldSize:TPACCInt64;
     COFFRelocations:TCOFFRelocations;
     COFFRelocation:PCOFFRelocation;
-    Relocation:PPACCLinkerCOFF_PERelocation;
+    Relocation:PPACCLinker_COFF_PERelocation;
     COFFSymbols:TCOFFSymbols;
     COFFSymbol:PCOFFSymbol;
-    Symbol:TPACCLinkerCOFF_PESymbol;
+    Symbol:TPACCLinker_COFF_PESymbol;
     SymbolTargetStackItems:TSymbolTargetStackItems;
     SymbolTargetStackItem:PSymbolTargetStackItem;
     Name:TPACCRawByteString;
@@ -895,13 +895,13 @@ begin
   SetLength(COFFSectionHeaders,COFFFileHeader.NumberOfSections);
   AObjectStream.ReadBuffer(COFFSectionHeaders[0],COFFFileHeader.NumberOfSections*SizeOf(TCOFFSectionHeader));
 
-  LocalSections:=TPACCLinkerCOFF_PESectionList.Create;
+  LocalSections:=TPACCLinker_COFF_PESectionList.Create;
   try
 
    for SectionIndex:=0 to COFFFileHeader.NumberOfSections-1 do begin
     COFFSectionHeader:=@COFFSectionHeaders[SectionIndex];
     if COFFSectionHeader^.VirtualSize>0 then begin
-     Section:=TPACCLinkerCOFF_PESection.Create(self,COFFSectionHeader^.Name,COFFSectionHeader^.VirtualAddress,COFFSectionHeader^.Characteristics);
+     Section:=TPACCLinker_COFF_PESection.Create(self,COFFSectionHeader^.Name,COFFSectionHeader^.VirtualAddress,COFFSectionHeader^.Characteristics);
      Sections.Add(Section);
      LocalSections.Add(Section);
      if (COFFSectionHeader^.Characteristics and IMAGE_SCN_ALIGN_MASK)<>0 then begin
@@ -1017,7 +1017,7 @@ begin
        end else begin
         Section:=nil;
        end;
-       Symbol:=TPACCLinkerCOFF_PESymbol.Create(self,Name,Section,COFFSymbol^.Value,COFFSymbol^.SymbolType,COFFSymbol^.SymbolClass);
+       Symbol:=TPACCLinker_COFF_PESymbol.Create(self,Name,Section,COFFSymbol^.Value,COFFSymbol^.SymbolType,COFFSymbol^.SymbolClass);
        SymbolTargetStackItem:=@SymbolTargetStackItems[SymbolTargetStackPointer];
        SymbolTargetStackItem^.SymbolTarget.Add(Symbol);
        if SymbolTargetStackItem^.Remaining>0 then begin
@@ -1053,7 +1053,7 @@ begin
  end;
 end;
 
-procedure TPACCLinkerCOFF_PE.Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
+procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
 begin
 end;
 

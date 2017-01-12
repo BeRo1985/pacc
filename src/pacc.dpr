@@ -53,7 +53,7 @@ var ParameterIndex,CountParameters,Index:TPACCInt32;
 
     HasErrors:TPasMPBool32=false;
 
-    TargetClass:TPACCTargetClass=TPACCTarget_x86_32;
+    TargetClass:TPACCTargetClass;
 
     AssembledCodeStreams:TList;
 
@@ -269,7 +269,7 @@ begin
 
      OutputLock.Acquire;
      try
-      writeln('Loading ',ExtractFileName(OutputFileName),' . . .');
+      writeln('Loading ',ExtractFileName(InputFileName),' . . .');
      finally
       OutputLock.Release;
      end;
@@ -341,6 +341,8 @@ end;
 var Instance:TPACCInstance;
     OutputStream:TMemoryStream;
 begin
+
+ TargetClass:=PACCRegisteredTargetClassList[0];
 
  OutputLock:=TPasMPCriticalSection.Create;
 
