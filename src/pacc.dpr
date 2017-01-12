@@ -31,7 +31,8 @@ uses
   PACCLinker in 'PACCLinker.pas',
   PACCInstance in 'PACCInstance.pas',
   PACCTarget_x86_32 in 'PACCTarget_x86_32.pas',
-  PACCTarget_x86_64_SystemV in 'PACCTarget_x86_64_SystemV.pas';
+  PACCTarget_x86_64_SystemV in 'PACCTarget_x86_64_SystemV.pas',
+  PACCLinkerCOFF_PE in 'PACCLinkerCOFF_PE.pas';
 
 var ParameterIndex,CountParameters,Index:TPACCInt32;
     Parameter:TPUCUUTF8String;
@@ -388,6 +389,8 @@ begin
       OutputFiles.Add(ParamStr(ParameterIndex));
       inc(ParameterIndex);
      end;
+    end else if Parameter='-shared' then begin
+     Options.CreateSharedLibrary:=true;
     end else if Parameter='-S' then begin
      OnlyRunPreprocessAndCompilationSteps:=true;
     end else if Parameter='-t' then begin
@@ -473,10 +476,10 @@ begin
      try
       OutputStream:=TMemoryStream.Create;
       try
-       Instance.Target.LinkCode(AssembledCodeStreams,AssembledCodeFileNames,OutputStream);
+       Instance.Target.LinkCode(AssembledCodeStreams,AssembledCodeFileNames,OutputStream,OutputFiles[0]);
        OutputStream.SaveToFile(OutputFiles[0]);
       finally
-       OutputStream.Free;
+       OutputStream.Free;                                                                      
       end;
      finally
       Instance.Free;
@@ -507,6 +510,7 @@ begin
    writeln('         -I <direcrtory>            Add directory to include search path');
    writeln('         -o <output file>           With -c, -E or -S: The n-th output file name of n-th input file name in same order');
    writeln('                                            Otherwise: The single output file name of the linked binary file');
+   writeln('         -shared                    Create shared library');
    writeln('         -S                         Only run preprocess and compilation steps');
    writeln('         -t <target>                Select target');
    writeln('         -T <number of CPU threads> Number of CPU threads to use for to compile all input files');

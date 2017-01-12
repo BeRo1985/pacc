@@ -23,6 +23,7 @@ type PPACCEncoding=^TPACCEncoding;
       EnableWarnings:boolean;
       WarningsAreErrors:boolean;
       HandleUTF8:boolean;
+      CreateSharedLibrary:boolean;
      end;
 
      PPACCTokenSymbol=^TPACCTokenSymbol;
@@ -145,6 +146,7 @@ const PACCDefaultOptions:TPACCOptions=
         EnableWarnings:true;
         WarningsAreErrors:false;
         HandleUTF8:false;
+        CreateSharedLibrary:false;
        );
 
 procedure DebuggerWaitEnterKey;

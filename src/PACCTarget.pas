@@ -55,7 +55,7 @@ type TPACCTarget=class
 
        procedure AssembleCode(const AInputStream,AOutputStream:TStream;const AInputFileName:TPUCUUTF8String=''); virtual;
 
-       procedure LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AInputFileName:TPUCUUTF8String=''); virtual;
+       procedure LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String=''); virtual;
 
       published
 
@@ -169,7 +169,7 @@ procedure TPACCTarget.AssembleCode(const AInputStream,AOutputStream:TStream;cons
 begin
 end;
 
-procedure TPACCTarget.LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AInputFileName:TPUCUUTF8String='');
+procedure TPACCTarget.LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
 var Index:TPACCInt32;
 begin
  for Index:=0 to AInputStreams.Count-1 do begin
@@ -178,7 +178,7 @@ begin
   end;
  end;
  if assigned(AOutputStream) then begin
-  TPACCInstance(Instance).Linker.Link(AOutputStream);
+  TPACCInstance(Instance).Linker.Link(AOutputStream,AOutputFileName);
  end;
 end;
 

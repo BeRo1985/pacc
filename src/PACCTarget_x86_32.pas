@@ -25,7 +25,7 @@ type TPACCTarget_x86_32=class(TPACCTarget)
 
        procedure AssembleCode(const AInputStream,AOutputStream:TStream;const AInputFileName:TPUCUUTF8String=''); override;
 
-       procedure LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AInputFileName:TPUCUUTF8String=''); override;
+       procedure LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String=''); override;
 
      end;
 
@@ -148,9 +148,9 @@ begin
  end;
 end;
 
-procedure TPACCTarget_x86_32.LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AInputFileName:TPUCUUTF8String='');
+procedure TPACCTarget_x86_32.LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
 begin
- inherited LinkCode(AInputStreams,AInputFileNames,AOutputStream,AInputFileName);
+ inherited LinkCode(AInputStreams,AInputFileNames,AOutputStream,AOutputFileName);
 end;
 
 initialization
