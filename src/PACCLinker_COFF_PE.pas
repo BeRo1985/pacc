@@ -22,6 +22,7 @@ type TPACCLinker_COFF_PE=class;
       private
        fLinker:TPACCLinker_COFF_PE;
        fName:TPACCRawByteString;
+       fOrdering:TPACCRawByteString;
        fStream:TMemoryStream;
        fAlignment:TPACCInt32;
        fVirtualAddress:TPACCUInt64;
@@ -34,7 +35,8 @@ type TPACCLinker_COFF_PE=class;
        destructor Destroy; override;
       published
        property Linker:TPACCLinker_COFF_PE read fLinker;
-       property Name:TPACCRawByteString read fName;
+       property Name:TPACCRawByteString read fName write fName;
+       property Ordering:TPACCRawByteString read fOrdering write fOrdering;
        property Stream:TMemoryStream read fStream;
        property Alignment:TPACCInt32 read fAlignment write fAlignment;
        property VirtualAddress:TPACCUInt64 read fVirtualAddress write fVirtualAddress;
@@ -799,12 +801,20 @@ type TBytes=array of TPACCUInt8;
      end;
 
 constructor TPACCLinker_COFF_PESection.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32);
+var Index:TPACCInt32;
 begin
  inherited Create;
 
  fLinker:=ALinker;
 
- fName:=AName;
+ Index:=pos('$',AName);
+ if Index>0 then begin
+  fName:=copy(AName,1,Index-1);
+  fOrdering:=copy(AName,Index+1,length(AName)-(Index+1));
+ end else begin
+  fName:=AName;
+  fOrdering:='';
+ end;
 
  fStream:=TMemoryStream.Create;
 
@@ -1173,16 +1183,32 @@ end;
 
 procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
  procedure MergeDuplicateSections;
- var SectionIndex,RelocationIndex,RelocationStartIndex,SymbolIndex:TPACCInt32;
+ var SectionIndex,RelocationIndex,RelocationStartIndex,SymbolIndex,Index:TPACCInt32;
      FillUpCount,StartOffset,VirtualAddressDelta:TPACCInt64;
      SectionNameHashMap:TPACCRawByteStringHashMap;
      Section,DestinationSection:TPACCLinker_COFF_PESection;
      Relocation:PPACCLinker_COFF_PERelocation;
      Symbol:TPACCLinker_COFF_PESymbol;
+     Name:TPACCRawByteString;
  begin
 
   SectionNameHashMap:=TPACCRawByteStringHashMap.Create;
   try
+
+   SectionIndex:=0;
+   while (SectionIndex+1)<Sections.Count do begin
+    if (Sections[SectionIndex].Name=Sections[SectionIndex+1].Name) and
+       (Sections[SectionIndex].Ordering>Sections[SectionIndex+1].Ordering) then begin
+     Sections.Exchange(SectionIndex,SectionIndex+1);
+     if SectionIndex>0 then begin
+      dec(SectionIndex);
+     end else begin
+      inc(SectionIndex);
+     end;
+    end else begin
+     inc(SectionIndex);
+    end;
+   end;
 
    SectionIndex:=0;
    while SectionIndex<Sections.Count do begin
