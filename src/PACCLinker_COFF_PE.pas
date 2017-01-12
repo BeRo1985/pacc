@@ -1183,7 +1183,7 @@ end;
 
 procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
  procedure MergeDuplicateSections;
- var SectionIndex,RelocationIndex,RelocationStartIndex,SymbolIndex,Index:TPACCInt32;
+ var SectionIndex,RelocationIndex,RelocationStartIndex,SymbolIndex:TPACCInt32;
      FillUpCount,StartOffset,VirtualAddressDelta:TPACCInt64;
      SectionNameHashMap:TPACCRawByteStringHashMap;
      Section,DestinationSection:TPACCLinker_COFF_PESection;
