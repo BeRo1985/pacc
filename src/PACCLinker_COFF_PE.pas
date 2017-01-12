@@ -16,6 +16,8 @@ type TPACCLinker_COFF_PE=class;
 
      TPACCLinker_COFF_PERelocations=array of TPACCLinker_COFF_PERelocation;
 
+     TPACCLinker_COFF_PESymbolList=class;
+
      TPACCLinker_COFF_PESection=class
       private
        fLinker:TPACCLinker_COFF_PE;
@@ -24,6 +26,7 @@ type TPACCLinker_COFF_PE=class;
        fAlignment:TPACCInt32;
        fVirtualAddress:TPACCUInt64;
        fCharacteristics:TPACCUInt32;
+       fSymbols:TPACCLinker_COFF_PESymbolList;
       protected
        Relocations:TPACCLinker_COFF_PERelocations;
       public
@@ -36,6 +39,7 @@ type TPACCLinker_COFF_PE=class;
        property Alignment:TPACCInt32 read fAlignment write fAlignment;
        property VirtualAddress:TPACCUInt64 read fVirtualAddress write fVirtualAddress;
        property Characteristics:TPACCUInt32 read fCharacteristics write fCharacteristics;
+       property Symbols:TPACCLinker_COFF_PESymbolList read fSymbols;
      end;
 
      TPACCLinker_COFF_PESectionList=class(TList)
@@ -47,8 +51,6 @@ type TPACCLinker_COFF_PE=class;
        destructor Destroy; override;
        property Items[const Index:TPACCInt]:TPACCLinker_COFF_PESection read GetItem write SetItem; default;
      end;
-
-     TPACCLinker_COFF_PESymbolList=class;
 
      TPACCLinker_COFF_PESymbol=class
       private
@@ -66,8 +68,8 @@ type TPACCLinker_COFF_PE=class;
       published
        property Linker:TPACCLinker_COFF_PE read fLinker;
        property Name:TPACCRawByteString read fName;
-       property Section:TPACCLinker_COFF_PESection read fSection;
-       property Value:TPACCInt64 read fValue;
+       property Section:TPACCLinker_COFF_PESection read fSection write fSection;
+       property Value:TPACCInt64 read fValue write fValue;
        property Type_:TPACCInt32 read fType;
        property Class_:TPACCInt32 read fClass;
        property SubSymbols:TPACCLinker_COFF_PESymbolList read fSubSymbols;
@@ -662,6 +664,8 @@ begin
 
  fCharacteristics:=ACharacteristics;
  
+ fSymbols:=TPACCLinker_COFF_PESymbolList.Create;
+
  Relocations:=nil;
 
 end;
@@ -669,6 +673,7 @@ end;
 destructor TPACCLinker_COFF_PESection.Destroy;
 begin
  Relocations:=nil;
+ fSymbols.Free;
  fStream.Free;
  inherited Destroy;
 end;
@@ -1023,6 +1028,9 @@ begin
       end;
       Symbol:=TPACCLinker_COFF_PESymbol.Create(self,Name,Section,COFFSymbol^.Value,COFFSymbol^.SymbolType,COFFSymbol^.SymbolClass);
       Symbols.Add(Symbol);
+      if assigned(Section) then begin
+       Section.Symbols.Add(Symbol);
+      end;
       if COFFSymbol^.Aux>0 then begin
        if not assigned(Symbol.fAuxData) then begin
         Symbol.fAuxData:=TMemoryStream.Create;
@@ -1046,6 +1054,87 @@ begin
 end;
 
 procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
+ procedure MergeDuplicateSections;
+ var SectionIndex,RelocationIndex,RelocationStartIndex,SymbolIndex:TPACCInt32;
+     FillUpCount,StartOffset,VirtualAddressDelta:TPACCInt64;
+     SectionNameHashMap:TPACCRawByteStringHashMap;
+     Section,DestinationSection:TPACCLinker_COFF_PESection;
+     Relocation:PPACCLinker_COFF_PERelocation;
+     Symbol:TPACCLinker_COFF_PESymbol;
+ begin
+
+  SectionNameHashMap:=TPACCRawByteStringHashMap.Create;
+  try
+
+   SectionIndex:=0;
+   while SectionIndex<Sections.Count do begin
+
+    Section:=Sections[SectionIndex];
+
+    DestinationSection:=SectionNameHashMap[Section.Name];
+
+    if assigned(DestinationSection) then begin
+
+     try
+
+      DestinationSection.Stream.Seek(DestinationSection.Stream.Size,soBeginning);
+      Section.Stream.Seek(0,soBeginning);
+      StartOffset:=DestinationSection.Stream.Size;
+
+      if DestinationSection.Alignment<>0 then begin
+       FillUpCount:=((DestinationSection.Stream.Size+Section.Alignment) and (Section.Alignment-1))-DestinationSection.Stream.Size;
+       if FillUpCount>0 then begin
+        DestinationSection.Stream.SetSize(StartOffset+FillUpCount);
+        FillChar(PAnsiChar(DestinationSection.Stream.Memory)[StartOffset],FillUpCount,#0);
+        StartOffset:=DestinationSection.Stream.Size;
+       end;
+      end;
+
+      DestinationSection.Alignment:=Max(DestinationSection.Alignment,Section.Alignment);
+
+      DestinationSection.Characteristics:=DestinationSection.Characteristics or Section.Characteristics;
+
+      DestinationSection.Stream.CopyFrom(Section.Stream,Section.Stream.Size);
+
+      RelocationStartIndex:=length(DestinationSection.Relocations);
+      SetLength(DestinationSection.Relocations,RelocationStartIndex+length(Section.Relocations));
+
+      VirtualAddressDelta:=(DestinationSection.VirtualAddress+StartOffset)-Section.VirtualAddress;
+
+      for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
+       Relocation:=@DestinationSection.Relocations[RelocationStartIndex+RelocationIndex];
+       Relocation^:=Section.Relocations[RelocationStartIndex+RelocationIndex];
+       inc(Relocation^.VirtualAddress,VirtualAddressDelta);
+      end;
+
+      for SymbolIndex:=0 to Section.Symbols.Count-1 do begin
+       Symbol:=Section.Symbols[SymbolIndex];
+       DestinationSection.Symbols.Add(Symbol);
+       Symbol.Section:=DestinationSection;
+       case Symbol.Class_ of
+        IMAGE_SYM_CLASS_EXTERNAL,IMAGE_SYM_CLASS_STATIC:begin
+         Symbol.Value:=Symbol.Value+StartOffset;
+        end;
+       end;
+      end;
+
+     finally
+      Section.Free;
+      Sections.Delete(SectionIndex);
+     end;
+
+    end else begin
+     inc(SectionIndex);
+     SectionNameHashMap[Section.Name]:=Section;
+    end;
+
+   end;
+
+  finally
+   SectionNameHashMap.Free;
+  end;
+
+ end;
 begin
 end;
 
