@@ -421,6 +421,8 @@ const MZEXEHeaderSize=128;
       PECOFFSectionAlignment=$1000;
       PECOFFFileAlignment=$200;
 
+      COFF_SIZEOF_SHORT_NAME=8;
+
 type TBytes=array of TPACCUInt8;
 
      PPOINTER=^pointer;
@@ -648,6 +650,154 @@ type TBytes=array of TPACCUInt8;
       AddressOfData:TPACCUInt32;
      end;
 
+     PCOFFFileHeader=^TCOFFFileHeader;
+     TCOFFFileHeader=packed record
+      Machine:TPACCUInt16;
+      NumberOfSections:TPACCUInt16;
+      TimeDateStamp:TPACCUInt32;
+      PointerToSymbolTable:TPACCUInt32;
+      NumberOfSymbols:TPACCUInt32;
+      SizeOfOptionalHeader:TPACCUInt16;
+      Characteristics:TPACCUInt16;
+     end;
+
+     PCOFFSectionHeader=^TCOFFSectionHeader;
+     TCOFFSectionHeader=packed record
+      Name:packed array[0..COFF_SIZEOF_SHORT_NAME-1] of ansichar;
+      VirtualSize:TPACCUInt32;
+      VirtualAddress:TPACCUInt32;
+      SizeOfRawData:TPACCUInt32;
+      PointerToRawData:TPACCUInt32;
+      PointerToRelocations:TPACCUInt32;
+      PointerToLineNumbers:TPACCUInt32;
+      NumberOfRelocations:TPACCUInt16;
+      NumberOfLineNumbers:TPACCUInt16;
+      Characteristics:TPACCUInt32;
+     end;
+
+     TCOFFSectionHeaders=array of TCOFFSectionHeader;
+
+     PCOFFSymbolName=^TCOFFSymbolName;
+     TCOFFSymbolName=packed record
+      case TPACCInt32 of
+       0:(
+        Name:packed array[0..7] of ansichar;
+       );
+       1:(
+        Zero:TPACCUInt32;
+        PointerToString:TPACCUInt32;
+       );
+     end;
+
+     PCOFFSymbol=^TCOFFSymbol;
+     TCOFFSymbol=packed record
+      Name:TCOFFSymbolName;
+      Value:TPACCUInt32;
+      Section:TPACCUInt16;
+      SymbolType:TPACCUInt16;
+      SymbolClass:TPACCUInt8;
+      Aux:TPACCUInt8;
+     end;
+
+     TCOFFSymbols=array of TCOFFSymbol;
+
+     PCOFFRelocation=^TCOFFRelocation;
+     TCOFFRelocation=packed record
+      VirtualAddress:TPACCUInt32;
+      Symbol:TPACCUInt32;
+      RelocationType:TPACCUInt16;
+     end;
+
+     TCOFFRelocations=array of TCOFFRelocation;
+
+     PImageAuxSymbol=^TImageAuxSymbol;
+     TImageAuxSymbol=packed record
+      case TPACCUInt32 of
+       IMAGE_SYM_CLASS_END_OF_FUNCTION:(
+       );
+       IMAGE_SYM_CLASS_NULL:(
+       );
+       IMAGE_SYM_CLASS_AUTOMATIC:(
+       );
+       IMAGE_SYM_CLASS_EXTERNAL:(
+        FunctionDefinition:packed record
+         TagIndex:TPACCUInt32;
+         TotalSize:TPACCUInt32;
+         PointerToLineNumber:TPACCUInt32;
+         PointerToNextFunction:TPACCUInt32;
+        end;
+       );
+       IMAGE_SYM_CLASS_STATIC:(
+       );
+       IMAGE_SYM_CLASS_REGISTER:(
+       );
+       IMAGE_SYM_CLASS_EXTERNAL_DEF:(
+       );
+       IMAGE_SYM_CLASS_LABEL:(
+       );
+       IMAGE_SYM_CLASS_UNDEFINED_LABEL:(
+       );
+       IMAGE_SYM_CLASS_MEMBER_OF_STRUCT:(
+       );
+       IMAGE_SYM_CLASS_ARGUMENT:(
+       );
+       IMAGE_SYM_CLASS_STRUCT_TAG:(
+       );
+       IMAGE_SYM_CLASS_MEMBER_OF_UNION:(
+       );
+       IMAGE_SYM_CLASS_UNION_TAG:(
+       );
+       IMAGE_SYM_CLASS_TYPE_DEFINITION:(
+       );
+       IMAGE_SYM_CLASS_UNDEFINED_STATIC:(
+       );
+       IMAGE_SYM_CLASS_ENUM_TAG:(
+       );
+       IMAGE_SYM_CLASS_MEMBER_OF_ENUM:(
+       );
+       IMAGE_SYM_CLASS_REGISTER_PARAM:(
+       );
+       IMAGE_SYM_CLASS_BIT_FIELD:(
+       );
+       IMAGE_SYM_CLASS_BLOCK:(
+       );
+       IMAGE_SYM_CLASS_FUNCTION:(
+        BFAndEFSymbols:packed record
+         TagIndex:TPACCUInt32;
+         LineNumberOrSize:TPACCUInt16;
+         TotalSize:TPACCUInt32;
+         PointerToNextFunction:TPACCUInt32;
+         Dimension:array[0..2] of TPACCUInt16;
+         TvIndex:TPACCUInt16;
+        end;
+       );
+       IMAGE_SYM_CLASS_END_OF_STRUCT:(
+       );
+       IMAGE_SYM_CLASS_FILE:(
+        File_:packed record
+         Name:array[0..SizeOf(TCOFFSymbol)-1] of AnsiChar;
+        end;
+       );
+       IMAGE_SYM_CLASS_SECTION:(
+        Section:packed record
+         Length:TPACCUInt32;
+         NumberOfRelocations:TPACCUInt16;
+         NumberOfLineNumbers:TPACCUInt16;
+         CheckSum:TPACCUInt32;
+         Number:TPACCUInt16;
+         Selection:TPACCUInt8;
+        end;
+       );
+       IMAGE_SYM_CLASS_WEAK_EXTERNAL:(
+        WeakExternals:packed record
+         TagIndex:TPACCUInt32;
+         Characteristics:TPACCUInt32;
+        end;
+       );
+       IMAGE_SYM_CLASS_CLR_TOKEN:(
+       );
+     end;
+
 constructor TPACCLinker_COFF_PESection.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32);
 begin
  inherited Create;
@@ -663,7 +813,7 @@ begin
  fVirtualAddress:=AVirtualAddress;
 
  fCharacteristics:=ACharacteristics;
- 
+
  fSymbols:=TPACCLinker_COFF_PESymbolList.Create;
 
  Relocations:=nil;
@@ -791,60 +941,7 @@ begin
 end;
 
 procedure TPACCLinker_COFF_PE.AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String='');
-const COFF_SIZEOF_SHORT_NAME=8;
-type PCOFFFileHeader=^TCOFFFileHeader;
-     TCOFFFileHeader=packed record
-      Machine:TPACCUInt16;
-      NumberOfSections:TPACCUInt16;
-      TimeDateStamp:TPACCUInt32;
-      PointerToSymbolTable:TPACCUInt32;
-      NumberOfSymbols:TPACCUInt32;
-      SizeOfOptionalHeader:TPACCUInt16;
-      Characteristics:TPACCUInt16;
-     end;
-     PCOFFSectionHeader=^TCOFFSectionHeader;
-     TCOFFSectionHeader=packed record
-      Name:packed array[0..COFF_SIZEOF_SHORT_NAME-1] of ansichar;
-      VirtualSize:TPACCUInt32;
-      VirtualAddress:TPACCUInt32;
-      SizeOfRawData:TPACCUInt32;
-      PointerToRawData:TPACCUInt32;
-      PointerToRelocations:TPACCUInt32;
-      PointerToLineNumbers:TPACCUInt32;
-      NumberOfRelocations:TPACCUInt16;
-      NumberOfLineNumbers:TPACCUInt16;
-      Characteristics:TPACCUInt32;
-     end;
-     TCOFFSectionHeaders=array of TCOFFSectionHeader;
-     PCOFFSymbolName=^TCOFFSymbolName;
-     TCOFFSymbolName=packed record
-      case TPACCInt32 of
-       0:(
-        Name:packed array[0..7] of ansichar;
-       );
-       1:(
-        Zero:TPACCUInt32;
-        PointerToString:TPACCUInt32;
-       );
-     end;
-     PCOFFSymbol=^TCOFFSymbol;
-     TCOFFSymbol=packed record
-      Name:TCOFFSymbolName;
-      Value:TPACCUInt32;
-      Section:TPACCUInt16;
-      SymbolType:TPACCUInt16;
-      SymbolClass:TPACCUInt8;
-      Aux:TPACCUInt8;
-     end;
-     TCOFFSymbols=array of TCOFFSymbol;
-     PCOFFRelocation=^TCOFFRelocation;
-     TCOFFRelocation=packed record
-      VirtualAddress:TPACCUInt32;
-      Symbol:TPACCUInt32;
-      RelocationType:TPACCUInt16;
-     end;
-     TCOFFRelocations=array of TCOFFRelocation;
-var SectionIndex,RelocationIndex,NumberOfRelocations,SymbolIndex,Index:TPACCInt32;
+var SectionIndex,RelocationIndex,NumberOfRelocations,SymbolIndex,SectionStartIndex,SymbolStartIndex,Index:TPACCInt32;
     RelocationOffset:TPACCUInt32;
     COFFFileHeader:TCOFFFileHeader;
     LocalSections:TPACCLinker_COFF_PESectionList;
@@ -907,6 +1004,8 @@ begin
 
   SetLength(COFFSectionHeaders,COFFFileHeader.NumberOfSections);
   AObjectStream.ReadBuffer(COFFSectionHeaders[0],COFFFileHeader.NumberOfSections*SizeOf(TCOFFSectionHeader));
+
+  SectionStartIndex:=Sections.Count;
 
   LocalSections:=TPACCLinker_COFF_PESectionList.Create;
   try
@@ -994,6 +1093,7 @@ begin
       TPACCInstance(Instance).AddError('Stream seek error',nil,true);
      end;
      AObjectStream.ReadBuffer(COFFSymbols[0],COFFFileHeader.NumberOfSymbols*SizeOf(TCOFFSymbol));
+     SymbolStartIndex:=Symbols.Count;
      SymbolIndex:=0;
      while TPACCUInt32(SymbolIndex)<COFFFileHeader.NumberOfSymbols do begin
       COFFSymbol:=@COFFSymbols[SymbolIndex];
@@ -1037,6 +1137,24 @@ begin
        end;
        Symbol.fAuxData.WriteBuffer(COFFSymbols[SymbolIndex],COFFSymbol^.Aux*SizeOf(TCOFFSymbol));
        inc(SymbolIndex,COFFSymbol^.Aux);
+       case Symbol.Class_ of
+        IMAGE_SYM_CLASS_EXTERNAL:begin
+         inc(PImageAuxSymbol(Symbol.fAuxData.Memory)^.FunctionDefinition.PointerToNextFunction,SymbolStartIndex);
+        end;
+        IMAGE_SYM_CLASS_STATIC:begin
+         if PImageAuxSymbol(Symbol.fAuxData.Memory)^.Section.Number>0 then begin
+          inc(PImageAuxSymbol(Symbol.fAuxData.Memory)^.Section.Number,SectionStartIndex);
+         end;
+        end;
+        IMAGE_SYM_CLASS_FUNCTION:begin
+         inc(PImageAuxSymbol(Symbol.fAuxData.Memory)^.BFAndEFSymbols.PointerToNextFunction,SymbolStartIndex);
+        end;
+        IMAGE_SYM_CLASS_SECTION:begin
+         if PImageAuxSymbol(Symbol.fAuxData.Memory)^.Section.Number>0 then begin
+          inc(PImageAuxSymbol(Symbol.fAuxData.Memory)^.Section.Number,SectionStartIndex);
+         end;
+        end;
+       end;
       end;
      end;
     finally
@@ -1136,6 +1254,7 @@ procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFile
 
  end;
 begin
+ MergeDuplicateSections;
 end;
 
 
