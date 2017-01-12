@@ -14,7 +14,7 @@ type TPACCLinker=class;
 
       public
 
-       constructor Create(const AInstance:TObject); reintroduce;
+       constructor Create(const AInstance:TObject); reintroduce; virtual;
        destructor Destroy; override;
 
        procedure AddImport(const ASymbolName,AImportLibraryName,AImportName:TPUCUUTF8String); virtual;

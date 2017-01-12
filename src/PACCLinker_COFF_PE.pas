@@ -93,7 +93,7 @@ type TPACCLinker_COFF_PE=class;
 
       public
 
-       constructor Create(const AInstance:TObject); reintroduce;
+       constructor Create(const AInstance:TObject); override;
        destructor Destroy; override;
 
        procedure AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String=''); override;
