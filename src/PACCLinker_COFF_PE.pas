@@ -846,7 +846,7 @@ var SectionIndex,RelocationIndex,NumberOfRelocations,SymbolIndex,Index:TPACCInt3
     COFFSectionHeaders:TCOFFSectionHeaders;
     COFFSectionHeader:PCOFFSectionHeader;
     Section:TPACCLinker_COFF_PESection;
-    OldSize:TPACCInt64;
+    OldSize,Offset:TPACCInt64;
     COFFRelocations:TCOFFRelocations;
     COFFRelocation:PCOFFRelocation;
     Relocation:PPACCLinker_COFF_PERelocation;
@@ -994,7 +994,8 @@ begin
       COFFSymbol:=@COFFSymbols[SymbolIndex];
       inc(SymbolIndex);
       if COFFSymbol^.Name.Zero=0 then begin
-       if AObjectStream.Seek(COFFSymbol^.Name.PointerToString,soBeginning)<>COFFSymbol^.Name.PointerToString then begin
+       Offset:=COFFFileHeader.PointerToSymbolTable+(COFFFileHeader.NumberOfSymbols*SizeOf(TCOFFSymbol))+COFFSymbol^.Name.PointerToString;
+       if AObjectStream.Seek(Offset,soBeginning)<>Offset then begin
         TPACCInstance(Instance).AddError('Stream seek error',nil,true);
        end;
        Name:='';
