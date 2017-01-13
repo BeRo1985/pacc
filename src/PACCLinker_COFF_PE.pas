@@ -2523,7 +2523,7 @@ var Relocations:TRelocations;
 
   for SectionIndex:=0 to Sections.Count-1 do begin
    Section:=Sections[SectionIndex];
-   if (Section.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)<>0 then begin
+   if (Section.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)=0 then begin
     CountBytes:=Section.FileOffset-Stream.Position;
     if CountBytes>0 then begin
      Stream.WriteBuffer(NullBytes[0],CountBytes);
