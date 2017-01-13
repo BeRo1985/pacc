@@ -367,6 +367,7 @@ const MZEXEHeaderSize=128;
       IMAGE_REL_AMD64_SREL32=$000e;
       IMAGE_REL_AMD64_PAIR=$000f;
       IMAGE_REL_AMD64_SSPAN32=$0010;
+      IMAGE_REL_AMD64_ADDR64NB=$ffff; // Only for internal usage
 
       IMAGE_REL_PPC_ABSOLUTE=$0000;
       IMAGE_REL_PPC_ADDR64=$0001;
@@ -1623,7 +1624,7 @@ var Relocations:TRelocations;
       end;
       TImportLibraries=array of TImportLibrary;
  var ImportIndex,SectionIndex,LibraryIndex,CountLibraries,LibraryImportIndex,PassIndex,
-     ImportSectionSymbolIndex,CodeSectionSymbolIndex,OriginalFirstThunkSymbolIndex,
+     ImportSectionSymbolIndex,CodeSectionSymbolIndex,FirstThunkSymbolIndex,
      LibraryNameSymbolIndex,LibraryImportSymbolIndex,LibraryImportNameSymbolIndex,
      LibraryImportTrunkCodeSymbolIndex:TPACCInt32;
      Import_:PPACCLinker_COFF_PEImport;
@@ -1639,7 +1640,7 @@ var Relocations:TRelocations;
      Size:TPACCUInt64;
      v32:TPACCUInt32;
      v64:TPACCUInt64;
-     ImportSectionSymbol,CodeSectionSymbol,OriginalFirstThunkSymbol,
+     ImportSectionSymbol,CodeSectionSymbol,FirstThunkSymbol,
      LibraryNameSymbol,LibraryImportSymbol,LibraryImportNameSymbol,
      LibraryImportTrunkCodeSymbol:TPACCLinker_COFF_PESymbol;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
@@ -1742,18 +1743,18 @@ var Relocations:TRelocations;
       if PassIndex=1 then begin
 
        begin
-        OriginalFirstThunkSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_library_'+IntToStr(LibraryIndex)+'_thunk',ImportSection,Library_^.ThunkOffset,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
-        OriginalFirstThunkSymbolIndex:=Symbols.Add(OriginalFirstThunkSymbol);
-        ImportSection.Symbols.Add(OriginalFirstThunkSymbol);
+        FirstThunkSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_library_'+IntToStr(LibraryIndex)+'_thunk',ImportSection,Library_^.ThunkOffset,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+        FirstThunkSymbolIndex:=Symbols.Add(FirstThunkSymbol);
+        ImportSection.Symbols.Add(FirstThunkSymbol);
         Relocation:=ImportSection.NewRelocation;
-        Relocation^.VirtualAddress:=TPACCPtrUInt(pointer(@PImageImportDescriptor(@PSectionBytes(ImportSection.Stream.Memory)^[ImportSection.Stream.Position])^.OriginalFirstThunk))-TPACCPtrUInt(pointer(@PSectionBytes(ImportSection.Stream.Memory)^[0]));
-        Relocation^.Symbol:=OriginalFirstThunkSymbolIndex;
+        Relocation^.VirtualAddress:=TPACCPtrUInt(pointer(@PImageImportDescriptor(@PSectionBytes(ImportSection.Stream.Memory)^[ImportSection.Stream.Position])^.FirstThunk))-TPACCPtrUInt(pointer(@PSectionBytes(ImportSection.Stream.Memory)^[0]));
+        Relocation^.Symbol:=FirstThunkSymbolIndex;
         case fMachine of
          IMAGE_FILE_MACHINE_I386:begin
-          Relocation^.RelocationType:=IMAGE_REL_I386_DIR32;
+          Relocation^.RelocationType:=IMAGE_REL_I386_DIR32NB;
          end;
          else begin
-          Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR64;
+          Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR64NB;
          end;
         end;
        end;
@@ -1767,10 +1768,10 @@ var Relocations:TRelocations;
         Relocation^.Symbol:=LibraryNameSymbolIndex;
         case fMachine of
          IMAGE_FILE_MACHINE_I386:begin
-          Relocation^.RelocationType:=IMAGE_REL_I386_DIR32;
+          Relocation^.RelocationType:=IMAGE_REL_I386_DIR32NB;
          end;
          else begin
-          Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR64;
+          Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR64NB;
          end;
         end;
        end;
@@ -1825,10 +1826,10 @@ var Relocations:TRelocations;
         Relocation^.Symbol:=LibraryImportNameSymbolIndex;
         case fMachine of
          IMAGE_FILE_MACHINE_I386:begin
-          Relocation^.RelocationType:=IMAGE_REL_I386_DIR32;
+          Relocation^.RelocationType:=IMAGE_REL_I386_DIR32NB;
          end;
          else begin
-          Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR64;
+          Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR64NB;
          end;
         end;
 
@@ -1869,6 +1870,7 @@ var Relocations:TRelocations;
        LibraryImport:=@Library_^.Imports[LibraryImportIndex];
 
        LibraryImport^.NameOffset:=ImportSection.Stream.Position;
+       ImportSection.Stream.WriteBuffer(NullBytes[0],SizeOf(TPACCUInt16));
        ImportSection.Stream.WriteBuffer(LibraryImport^.Name[1],length(LibraryImport^.Name));
        ImportSection.Stream.WriteBuffer(NullBytes[0],SizeOf(TPACCUInt8));
 
@@ -2277,6 +2279,9 @@ var Relocations:TRelocations;
        end;
        IMAGE_REL_AMD64_SSPAN32:begin
         TPACCInstance(Instance).AddError('Unsupported relocation',nil,true);
+       end;
+       IMAGE_REL_AMD64_ADDR64NB:begin
+        inc(PPACCUInt64(pointer(@SectionData^[Offset]))^,SymbolRVA);
        end;
        else begin
         TPACCInstance(Instance).AddError('Unsupported relocation',nil,true);
