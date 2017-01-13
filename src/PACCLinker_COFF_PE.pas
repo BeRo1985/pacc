@@ -1321,7 +1321,7 @@ var Relocations:TRelocations;
  end;
  procedure RelocationsSort(var Instance:TRelocations);
  var PartA,PartB,Node:PRelocationNode;
-     InSize,PartASize,PartBSize,Merges:longint;
+     InSize,PartASize,PartBSize,Merges:TPACCInt32;
  begin
   if assigned(Instance.RootNode) then begin
    InSize:=1;
@@ -1389,7 +1389,7 @@ var Relocations:TRelocations;
    if (CurrentNode=OldNode) or ((CurrentNode^.VirtualAddress-OldNode^.VirtualAddress)>=$1000) then begin
     inc(result,sizeof(TImageBaseRelocation));
    end;
-   inc(result,sizeof(word));
+   inc(result,sizeof(TPACCUInt16));
    OldNode:=CurrentNode;
    CurrentNode:=CurrentNode^.Next;
   end;
@@ -1412,9 +1412,9 @@ var Relocations:TRelocations;
     BaseRelocation^.VirtualAddress:=CurrentNode^.VirtualAddress;
     BaseRelocation^.SizeOfBlock:=sizeof(TImageBaseRelocation);
    end;
-   pword(CurrentPointer)^:=(CurrentNode^.RelocationType shl 12) or ((CurrentNode^.VirtualAddress-BaseRelocation^.VirtualAddress) and $fff);
-   inc(CurrentPointer,sizeof(word));
-   inc(BaseRelocation^.SizeOfBlock,sizeof(word));
+   PPACCUInt16(CurrentPointer)^:=(CurrentNode^.RelocationType shl 12) or ((CurrentNode^.VirtualAddress-BaseRelocation^.VirtualAddress) and $fff);
+   inc(CurrentPointer,sizeof(TPACCUInt16));
+   inc(BaseRelocation^.SizeOfBlock,sizeof(TPACCUInt16));
    OldNode:=CurrentNode;
    CurrentNode:=CurrentNode^.Next;
   end;
@@ -1902,7 +1902,6 @@ begin
  finally
   RelocationsDone(Relocations);
  end;
-//WritePE;
 end;
 
 initialization
