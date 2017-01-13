@@ -1612,6 +1612,7 @@ var Relocations:TRelocations;
        Name:TPACCRawByteString;
        NameOffset:TPACCUInt64;
        CodeOffset:TPACCUInt64;
+       CodePatchOffset:TPACCUInt64;
       end;
       TImportLibraryImports=array of TImportLibraryImport;
       PImportLibrary=^TImportLibrary;
@@ -1712,6 +1713,7 @@ var Relocations:TRelocations;
        LibraryImport^.Name:=Import_^.ImportName;
        LibraryImport^.NameOffset:=0;
        LibraryImport^.CodeOffset:=0;
+       LibraryImport^.CodePatchOffset:=0;
       end;
      end;
     finally
@@ -1807,8 +1809,8 @@ var Relocations:TRelocations;
         LibraryImportSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'__imp_'+LibraryImport^.SymbolName,ImportSection,ImportSection.Stream.Position,0,IMAGE_SYM_CLASS_EXTERNAL,plcpskNormal);
         LibraryImportSymbolIndex:=Symbols.Add(LibraryImportSymbol);
         ImportSection.Symbols.Add(LibraryImportSymbol);
-        Relocation:=CodeSection.NewRelocation;
-        Relocation^.VirtualAddress:=LibraryImport^.CodeOffset;
+        Relocation:=CodeSection.NewRelocation;            
+        Relocation^.VirtualAddress:=LibraryImport^.CodePatchOffset;
         Relocation^.Symbol:=LibraryImportSymbolIndex;
         case fMachine of
          IMAGE_FILE_MACHINE_I386:begin
@@ -1875,7 +1877,8 @@ var Relocations:TRelocations;
        ImportSection.Stream.WriteBuffer(LibraryImport^.Name[1],length(LibraryImport^.Name));
        ImportSection.Stream.WriteBuffer(NullBytes[0],SizeOf(TPACCUInt8));
 
-       LibraryImport^.CodeOffset:=CodeSection.Stream.Position+2;
+       LibraryImport^.CodeOffset:=CodeSection.Stream.Position;
+       LibraryImport^.CodePatchOffset:=CodeSection.Stream.Position+2;
        CodeSection.Stream.WriteBuffer(ImportThunkX86,SizeOf(ImportThunkX86));
 
       end;
