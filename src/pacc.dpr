@@ -338,8 +338,24 @@ begin
  end;
 end;
 
+function GetFileContent(fn:TPUCUUTF8String):TPACCRawByteString;
+var FileStream:TFileStream;
+begin
+ result:='';
+ FileStream:=TFileStream.Create(fn,fmOpenRead or fmShareDenyWrite);
+ try
+  SetLength(result,FileStream.Size);
+  if length(result)>0 then begin
+   FileStream.ReadBuffer(result[1],length(result));
+  end;
+ finally
+  FileStream.Free;
+ end;
+end;
+
 var Instance:TPACCInstance;
     OutputStream:TMemoryStream;
+    InputFileName,Extension:TPUCUUTF8String;
 begin
 
  TargetClass:=PACCRegisteredTargetClassList[0];
@@ -470,12 +486,25 @@ begin
 
     if not (OnlyRunPreprocessStep or
             OnlyRunPreprocessAndCompilationSteps or
-            OnlyRunPreprocessAndCompileAndAssembleSteps) then begin 
-
-     writeln('Linking to ',ExtractFileName(OutputFiles[0]),' . . .');
+            OnlyRunPreprocessAndCompileAndAssembleSteps) then begin
 
      Instance:=TPACCInstance.Create(TargetClass,Options);
      try
+
+      for Index:=0 to InputFiles.Count-1 do begin
+       InputFileName:=InputFiles[Index];
+       Extension:=LowerCase(ExtractFileExt(InputFileName));
+       if Extension='.exp' then begin
+        writeln('Loading exports from ',ExtractFileName(InputFileName),' . . .');
+        Instance.Linker.AddExports(GetFileContent(InputFileName),InputFileName);
+       end else if Extension='.imp' then begin
+        writeln('Loading imports from ',ExtractFileName(InputFileName),' . . .');
+        Instance.Linker.AddImports(GetFileContent(InputFileName),InputFileName);
+       end;
+      end;
+
+      writeln('Linking to ',ExtractFileName(OutputFiles[0]),' . . .');
+
       OutputStream:=TMemoryStream.Create;
       try
        try
@@ -486,6 +515,7 @@ begin
       finally
        OutputStream.Free;
       end;
+
       if Instance.HasWarnings or Instance.HasErrors then begin
        OutputLock.Acquire;
        try
