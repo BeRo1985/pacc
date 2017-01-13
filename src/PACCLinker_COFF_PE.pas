@@ -1278,6 +1278,189 @@ begin
 end;
 
 procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
+type PRelocationNode=^TRelocationNode;
+     TRelocationNode=packed record
+      Next:PRelocationNode;
+      Previous:PRelocationNode;
+      VirtualAddress:TPACCUInt32;
+      RelocationType:TPACCUInt32;
+     end;
+     PRelocations=^TRelocations;
+     TRelocations=packed record
+      RootNode,LastNode:PRelocationNode;
+     end;
+var Relocations:TRelocations;
+ procedure RelocationsInit(out Instance:TRelocations);
+ begin
+  FillChar(Instance,SizeOf(TRelocations),#0);
+ end;
+ procedure RelocationsDone(var Instance:TRelocations);
+ var CurrentNode,NextNode:PRelocationNode;
+ begin
+  CurrentNode:=Instance.RootNode;
+  Instance.RootNode:=nil;
+  Instance.LastNode:=nil;
+  while assigned(CurrentNode) do begin
+   NextNode:=CurrentNode^.Next;
+   FreeMem(CurrentNode);
+   CurrentNode:=NextNode;
+  end;
+ end;
+ procedure RelocationsAdd(var Instance:TRelocations;const VirtualAddress,RelocationType:TPACCUInt32);
+ var NewNode:PRelocationNode;
+ begin
+  GetMem(NewNode,SizeOf(TRelocationNode));
+  FillChar(NewNode^,SizeOf(TRelocationNode),#0);
+  NewNode^.VirtualAddress:=VirtualAddress;
+  NewNode^.RelocationType:=RelocationType;
+  if assigned(Instance.LastNode) then begin
+   Instance.LastNode^.Next:=NewNode;
+   NewNode^.Previous:=Instance.LastNode;
+  end else begin
+   Instance.RootNode:=NewNode;
+  end;
+  Instance.LastNode:=NewNode;
+ end;
+ procedure RelocationsSort(var Instance:TRelocations);
+ var PartA,PartB,Node:PRelocationNode;
+     InSize,PartASize,PartBSize,Merges:longint;
+ begin
+  if assigned(Instance.RootNode) then begin
+   InSize:=1;
+   while true do begin
+    PartA:=Instance.RootNode;
+    Instance.RootNode:=nil;
+    Instance.LastNode:=nil;
+    Merges:=0;
+    while assigned(PartA) do begin
+     inc(Merges);
+     PartB:=PartA;
+     PartASize:=0;
+     while PartASize<InSize do begin
+      inc(PartASize);
+      PartB:=PartB^.Next;
+      if not assigned(PartB) then begin
+       break;
+      end;
+     end;
+     PartBSize:=InSize;
+     while (PartASize>0) or ((PartBSize>0) and assigned(PartB)) do begin
+      if PartASize=0 then begin
+       Node:=PartB;
+       PartB:=PartB^.Next;
+       dec(PartBSize);
+      end else if (PartBSize=0) or not assigned(PartB) then begin
+       Node:=PartA;
+       PartA:=PartA^.Next;
+       dec(PartASize);
+      end else if PartA^.VirtualAddress<=PartB^.VirtualAddress then begin
+       Node:=PartA;
+       PartA:=PartA^.Next;
+       dec(PartASize);
+      end else begin
+       Node:=PartB;
+       PartB:=PartB^.Next;
+       dec(PartBSize);
+      end;
+      if assigned(Instance.LastNode) then begin
+       Instance.LastNode^.Next:=Node;
+      end else begin
+       Instance.RootNode:=Node;
+      end;
+      Node^.Previous:=Instance.LastNode;
+      Instance.LastNode:=Node;
+     end;
+     PartA:=PartB;
+    end;
+    Instance.LastNode^.Next:=nil;
+    if Merges<=1 then begin
+     break;
+    end;
+    inc(InSize,InSize);
+   end;
+  end;
+ end;
+ function RelocationsSize(var Instance:TRelocations):TPACCUInt32;
+ var CurrentNode,OldNode:PRelocationNode;
+ begin
+  RelocationsSort(Instance);
+  result:=0;
+  CurrentNode:=Instance.RootNode;
+  OldNode:=CurrentNode;
+  while assigned(CurrentNode) do begin
+   if (CurrentNode=OldNode) or ((CurrentNode^.VirtualAddress-OldNode^.VirtualAddress)>=$1000) then begin
+    inc(result,sizeof(TImageBaseRelocation));
+   end;
+   inc(result,sizeof(word));
+   OldNode:=CurrentNode;
+   CurrentNode:=CurrentNode^.Next;
+  end;
+  inc(result,sizeof(TImageBaseRelocation));
+ end;
+ procedure RelocationsBuild(var Instance:TRelocations;NewBase:pointer;VirtualAddress:TPACCUInt32);
+ var CurrentNode,OldNode:PRelocationNode;
+     CurrentPointer:pchar;
+     BaseRelocation:PImageBaseRelocation;
+ begin
+  RelocationsSort(Instance);
+  CurrentPointer:=NewBase;
+  BaseRelocation:=pointer(CurrentPointer);
+  CurrentNode:=Instance.RootNode;
+  OldNode:=CurrentNode;
+  while assigned(CurrentNode) do begin
+   if (CurrentNode=OldNode) or ((CurrentNode^.VirtualAddress-OldNode^.VirtualAddress)>=$1000) then begin
+    BaseRelocation:=pointer(CurrentPointer);
+    inc(CurrentPointer,sizeof(TImageBaseRelocation));
+    BaseRelocation^.VirtualAddress:=CurrentNode^.VirtualAddress;
+    BaseRelocation^.SizeOfBlock:=sizeof(TImageBaseRelocation);
+   end;
+   pword(CurrentPointer)^:=(CurrentNode^.RelocationType shl 12) or ((CurrentNode^.VirtualAddress-BaseRelocation^.VirtualAddress) and $fff);
+   inc(CurrentPointer,sizeof(word));
+   inc(BaseRelocation^.SizeOfBlock,sizeof(word));
+   OldNode:=CurrentNode;
+   CurrentNode:=CurrentNode^.Next;
+  end;
+  BaseRelocation:=pointer(CurrentPointer);
+  inc(CurrentPointer,sizeof(TImageBaseRelocation));
+  BaseRelocation^.VirtualAddress:=0;
+  BaseRelocation^.SizeOfBlock:=0;
+ end;
+ procedure RelocationsDump(var Instance:TRelocations);
+ var CurrentNode:PRelocationNode;
+ begin
+  CurrentNode:=Instance.RootNode;
+  while assigned(CurrentNode) do begin
+   writeln(CurrentNode^.VirtualAddress);
+   CurrentNode:=CurrentNode^.Next;
+  end;
+ end;
+ function SectionSizeAlign(Size:TPACCInt64):TPACCInt64;
+ begin
+  result:=Size;
+  if (result and (PECOFFSectionAlignment-1))<>0 then begin
+   result:=(result+(PECOFFSectionAlignment-1)) and not (PECOFFSectionAlignment-1);
+  end;
+ end;
+ function FileSizeAlign(Size:TPACCInt64):TPACCInt64;
+ begin
+  result:=Size;
+  if (result and (PECOFFFileAlignment-1))<>0 then begin
+   result:=(result+(PECOFFFileAlignment-1)) and not (PECOFFFileAlignment-1);
+  end;
+ end;
+ procedure DoAlign;
+ var Position,FillUpCount,ToDoCount:TPACCInt64;
+ begin
+  Position:=AOutputStream.Position;
+  if (Position and (PECOFFFileAlignment-1))<>0 then begin
+   FillUpCount:=((Position+(PECOFFFileAlignment-1)) and not (PECOFFFileAlignment-1))-Position;
+   while FillUpCount>0 do begin
+    ToDoCount:=Min(FillUpCount,SizeOf(NullBytes));
+    AOutputStream.WriteBuffer(NullBytes[0],ToDoCount);
+    dec(FillUpCount,ToDoCount);
+   end;
+  end;
+ end;
  procedure SortSections;
 {$ifdef Debug_UseBubbleSortForSortingSections}
  var SectionIndex:TPACCInt32;
@@ -1542,13 +1725,15 @@ procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFile
         // ignore
        end;
        IMAGE_REL_I386_DIR16:begin
-        inc(PPACCUInt16(pointer(@SectionData^[Offset]))^,(ImageBase+SymbolRVA) shr 16);
+        inc(PPACCUInt16(pointer(@SectionData^[Offset]))^,(ImageBase+SymbolRVA) and $ffff);
+        RelocationsAdd(Relocations,VirtualAddress,IMAGE_REL_BASED_LOW);
        end;
        IMAGE_REL_I386_REL16:begin
-        inc(PPACCUInt16(pointer(@SectionData^[Offset]))^,(SymbolRVA-(VirtualAddress+4)) shr 16);
+        inc(PPACCUInt16(pointer(@SectionData^[Offset]))^,(SymbolRVA-(VirtualAddress+4)) and $ffff);
        end;
        IMAGE_REL_I386_DIR32:begin
         inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,ImageBase+SymbolRVA);
+        RelocationsAdd(Relocations,VirtualAddress,IMAGE_REL_BASED_HIGHLOW);
        end;
        IMAGE_REL_I386_DIR32NB:begin
         inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA);
@@ -1592,12 +1777,15 @@ procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFile
      IMAGE_FILE_MACHINE_AMD64:begin
       case Relocation^.RelocationType of
        IMAGE_REL_AMD64_ABSOLUTE:begin
+        // ignore
        end;
        IMAGE_REL_AMD64_ADDR64:begin
         inc(PPACCUInt64(pointer(@SectionData^[Offset]))^,ImageBase+SymbolRVA);
+        RelocationsAdd(Relocations,VirtualAddress,IMAGE_REL_BASED_DIR64);
        end;
        IMAGE_REL_AMD64_ADDR32:begin
         inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,ImageBase+SymbolRVA);
+        RelocationsAdd(Relocations,VirtualAddress,IMAGE_REL_BASED_HIGHLOW);
        end;
        IMAGE_REL_AMD64_ADDR32NB:begin
         inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA);
@@ -1665,271 +1853,12 @@ procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFile
     end;
    end;
   end;
- end;
+  if assigned(Relocations.RootNode) then begin
+   RelocationsSort(Relocations);
+  end;
+ end;              
 {procedure WritePE;
-  function SectionSizeAlign(Size:TPACCInt64):TPACCInt64;
-  begin
-   result:=Size;
-   if (result and (PECOFFSectionAlignment-1))<>0 then begin
-    result:=(result+(PECOFFSectionAlignment-1)) and not (PECOFFSectionAlignment-1);
-   end;
-  end;
-  function FileSizeAlign(Size:TPACCInt64):TPACCInt64;
-  begin
-   result:=Size;
-   if (result and (PECOFFFileAlignment-1))<>0 then begin
-    result:=(result+(PECOFFFileAlignment-1)) and not (PECOFFFileAlignment-1);
-   end;
-  end;
-  procedure DoAlign;
-  var Position,FillUpCount,ToDoCount:TPACCInt64;
-  begin
-   Position:=AOutputStream.Position;
-   if (Position and (PECOFFFileAlignment-1))<>0 then begin
-    FillUpCount:=((Position+(PECOFFFileAlignment-1)) and not (PECOFFFileAlignment-1))-Position;
-    while FillUpCount>0 do begin
-     ToDoCount:=Min(FillUpCount,SizeOf(NullBytes));
-     AOutputStream.WriteBuffer(NullBytes[0],ToDoCount);
-     dec(FillUpCount,ToDoCount);
-    end;
-   end;
-  end;
-  procedure ProcessRelocations;
-  var SectionIndex,RelocationIndex:TPACCInt32;
-      Relocation:PPACCLinker_COFF_PERelocation;
-      Section:TPACCLinker_COFF_PESection;
-  begin
-   for SectionIndex:=0 to Sections.Count-1 do begin
-    Section:=Sections[SectionIndex];
-    for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
-     Relocation:=@Section.Relocations[RelocationIndex];
-     case fMachine of
-      IMAGE_FILE_MACHINE_I386:begin
-       case Relocation^.RelocationType of
-        IMAGE_REL_I386_ABSOLUTE:begin
-         // ignore
-        end;
-        IMAGE_REL_I386_DIR16:begin
-        end;
-        IMAGE_REL_I386_REL16:begin
-        end;
-        IMAGE_REL_I386_DIR32:begin
-        end;
-        IMAGE_REL_I386_DIR32NB:begin
-        end;
-        IMAGE_REL_I386_SEG12:begin
-        end;
-        IMAGE_REL_I386_SECTION:begin
-         // ignore
-        end;
-        IMAGE_REL_I386_SECREL:begin
-        end;
-        IMAGE_REL_I386_TOKEN:begin
-        end;
-        IMAGE_REL_I386_SECREL7:begin
-        end;
-        IMAGE_REL_I386_REL32:begin
-        end;
-       end;
-      end;
-      IMAGE_FILE_MACHINE_AMD64:begin
-       case Relocation^.RelocationType of
-        IMAGE_REL_AMD64_ABSOLUTE:begin
-        end;
-        IMAGE_REL_AMD64_ADDR64:begin
-        end;
-        IMAGE_REL_AMD64_ADDR32:begin
-        end;
-        IMAGE_REL_AMD64_ADDR32NB:begin
-        end;
-        IMAGE_REL_AMD64_REL32:begin
-        end;
-        IMAGE_REL_AMD64_REL32_1:begin
-        end;
-        IMAGE_REL_AMD64_REL32_2:begin
-        end;
-        IMAGE_REL_AMD64_REL32_3:begin
-        end;
-        IMAGE_REL_AMD64_REL32_4:begin
-        end;
-        IMAGE_REL_AMD64_REL32_5:begin
-        end;
-        IMAGE_REL_AMD64_SECTION:begin
-        end;
-        IMAGE_REL_AMD64_SECREL:begin
-        end;
-        IMAGE_REL_AMD64_SECREL7:begin
-        end;
-        IMAGE_REL_AMD64_TOKEN:begin
-        end;
-        IMAGE_REL_AMD64_SREL32:begin
-        end;
-        IMAGE_REL_AMD64_PAIR:begin
-        end;
-        IMAGE_REL_AMD64_SSPAN32:begin
-        end;
-       end;
-      end;
-     end;
-    end;
-   end;
-  end;
   function WriteRelocations:boolean;
-  type PRelocationNode=^TRelocationNode;
-       TRelocationNode=packed record
-        Next:PRelocationNode;
-        Previous:PRelocationNode;
-        VirtualAddress:TPACCUInt32;
-        RelocationType:TPACCUInt32;
-       end;
-       PRelocations=^TRelocations;
-       TRelocations=packed record
-        RootNode,LastNode:PRelocationNode;
-       end;
-   procedure RelocationsInit(var Instance:TRelocations);
-   begin
-    FillChar(Instance,SizeOf(TRelocations),#0);
-   end;
-   procedure RelocationsDone(var Instance:TRelocations);
-   var CurrentNode,NextNode:PRelocationNode;
-   begin
-    CurrentNode:=Instance.RootNode;
-    Instance.RootNode:=nil;
-    Instance.LastNode:=nil;
-    while assigned(CurrentNode) do begin
-     NextNode:=CurrentNode^.Next;
-     FreeMem(CurrentNode);
-     CurrentNode:=NextNode;
-    end;
-   end;
-   procedure RelocationsAdd(var Instance:TRelocations;const VirtualAddress,RelocationType:TPACCUInt32);
-   var NewNode:PRelocationNode;
-   begin
-    GetMem(NewNode,SizeOf(TRelocationNode));
-    FillChar(NewNode^,SizeOf(TRelocationNode),#0);
-    NewNode^.VirtualAddress:=VirtualAddress;
-    NewNode^.RelocationType:=RelocationType;
-    if assigned(Instance.LastNode) then begin
-     Instance.LastNode^.Next:=NewNode;
-     NewNode^.Previous:=Instance.LastNode;
-    end else begin
-     Instance.RootNode:=NewNode;
-    end;
-    Instance.LastNode:=NewNode;
-   end;
-   procedure RelocationsSort(var Instance:TRelocations);
-   var PartA,PartB,Node:PRelocationNode;
-       InSize,PartASize,PartBSize,Merges:longint;
-   begin
-    if assigned(Instance.RootNode) then begin
-     InSize:=1;
-     while true do begin
-      PartA:=Instance.RootNode;
-      Instance.RootNode:=nil;
-      Instance.LastNode:=nil;
-      Merges:=0;
-      while assigned(PartA) do begin
-       inc(Merges);
-       PartB:=PartA;
-       PartASize:=0;
-       while PartASize<InSize do begin
-        inc(PartASize);
-        PartB:=PartB^.Next;
-        if not assigned(PartB) then begin
-         break;
-        end;
-       end;
-       PartBSize:=InSize;
-       while (PartASize>0) or ((PartBSize>0) and assigned(PartB)) do begin
-        if PartASize=0 then begin
-         Node:=PartB;
-         PartB:=PartB^.Next;
-         dec(PartBSize);
-        end else if (PartBSize=0) or not assigned(PartB) then begin
-         Node:=PartA;
-         PartA:=PartA^.Next;
-         dec(PartASize);
-        end else if PartA^.VirtualAddress<=PartB^.VirtualAddress then begin
-         Node:=PartA;
-         PartA:=PartA^.Next;
-         dec(PartASize);
-        end else begin
-         Node:=PartB;
-         PartB:=PartB^.Next;
-         dec(PartBSize);
-        end;
-        if assigned(Instance.LastNode) then begin
-         Instance.LastNode^.Next:=Node;
-        end else begin
-         Instance.RootNode:=Node;
-        end;
-        Node^.Previous:=Instance.LastNode;
-        Instance.LastNode:=Node;
-       end;
-       PartA:=PartB;
-      end;
-      Instance.LastNode^.Next:=nil;
-      if Merges<=1 then begin
-       break;
-      end;
-      inc(InSize,InSize);
-     end;
-    end;
-   end;
-   function RelocationsSize(var Instance:TRelocations):TPACCUInt32;
-   var CurrentNode,OldNode:PRelocationNode;
-   begin
-    RelocationsSort(Instance);
-    result:=0;
-    CurrentNode:=Instance.RootNode;
-    OldNode:=CurrentNode;
-    while assigned(CurrentNode) do begin
-     if (CurrentNode=OldNode) or ((CurrentNode^.VirtualAddress-OldNode^.VirtualAddress)>=$1000) then begin
-      inc(result,sizeof(TImageBaseRelocation));
-     end;
-     inc(result,sizeof(word));
-     OldNode:=CurrentNode;
-     CurrentNode:=CurrentNode^.Next;
-    end;
-    inc(result,sizeof(TImageBaseRelocation));
-   end;
-   procedure RelocationsBuild(var Instance:TRelocations;NewBase:pointer;VirtualAddress:TPACCUInt32);
-   var CurrentNode,OldNode:PRelocationNode;
-       CurrentPointer:pchar;
-       BaseRelocation:PImageBaseRelocation;
-   begin
-    RelocationsSort(Instance);
-    CurrentPointer:=NewBase;
-    BaseRelocation:=pointer(CurrentPointer);
-    CurrentNode:=Instance.RootNode;
-    OldNode:=CurrentNode;
-    while assigned(CurrentNode) do begin
-     if (CurrentNode=OldNode) or ((CurrentNode^.VirtualAddress-OldNode^.VirtualAddress)>=$1000) then begin
-      BaseRelocation:=pointer(CurrentPointer);
-      inc(CurrentPointer,sizeof(TImageBaseRelocation));
-      BaseRelocation^.VirtualAddress:=CurrentNode^.VirtualAddress;
-      BaseRelocation^.SizeOfBlock:=sizeof(TImageBaseRelocation);
-     end;
-     pword(CurrentPointer)^:=(CurrentNode^.RelocationType shl 12) or ((CurrentNode^.VirtualAddress-BaseRelocation^.VirtualAddress) and $fff);
-     inc(CurrentPointer,sizeof(word));
-     inc(BaseRelocation^.SizeOfBlock,sizeof(word));
-     OldNode:=CurrentNode;
-     CurrentNode:=CurrentNode^.Next;
-    end;
-    BaseRelocation:=pointer(CurrentPointer);
-    inc(CurrentPointer,sizeof(TImageBaseRelocation));
-    BaseRelocation^.VirtualAddress:=0;
-    BaseRelocation^.SizeOfBlock:=0;
-   end;
-   procedure RelocationsDump(var Instance:TRelocations);
-   var CurrentNode:PRelocationNode;
-   begin
-    CurrentNode:=Instance.RootNode;
-    while assigned(CurrentNode) do begin
-     writeln(CurrentNode^.VirtualAddress);
-     CurrentNode:=CurrentNode^.Next;
-    end;
-   end;
   var SectionIndex,RelocationIndex:TPACCInt32;
       Relocations:TRelocations;
       Relocation:PPACCLinker_COFF_PERelocation;
@@ -1941,102 +1870,6 @@ procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFile
    begin
     RelocationsInit(Relocations);
     try
-     for SectionIndex:=0 to Sections.Count-1 do begin
-      Section:=Sections[SectionIndex];
-      for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
-       Relocation:=@Section.Relocations[RelocationIndex];
-       case fMachine of
-        IMAGE_FILE_MACHINE_I386:begin
-         case Relocation^.RelocationType of
-          IMAGE_REL_I386_ABSOLUTE:begin
-           // ignore
-          end;
-          IMAGE_REL_I386_DIR16:begin
-          end;
-          IMAGE_REL_I386_REL16:begin
-          end;
-          IMAGE_REL_I386_DIR32:begin
-          end;
-          IMAGE_REL_I386_DIR32NB:begin
-          end;
-          IMAGE_REL_I386_SEG12:begin
-          end;
-          IMAGE_REL_I386_SECTION:begin
-           // ignore
-          end;
-          IMAGE_REL_I386_SECREL:begin
-          end;
-          IMAGE_REL_I386_TOKEN:begin
-          end;
-          IMAGE_REL_I386_SECREL7:begin
-          end;
-          IMAGE_REL_I386_REL32:begin
-          end;
-         end;
-        end;
-        IMAGE_FILE_MACHINE_AMD64:begin
-         case Relocation^.RelocationType of
-          IMAGE_REL_AMD64_ABSOLUTE:begin
-          end;
-          IMAGE_REL_AMD64_ADDR64:begin
-          end;
-          IMAGE_REL_AMD64_ADDR32:begin
-          end;
-          IMAGE_REL_AMD64_ADDR32NB:begin
-          end;
-          IMAGE_REL_AMD64_REL32:begin
-          end;
-          IMAGE_REL_AMD64_REL32_1:begin
-          end;
-          IMAGE_REL_AMD64_REL32_2:begin
-          end;
-          IMAGE_REL_AMD64_REL32_3:begin
-          end;
-          IMAGE_REL_AMD64_REL32_4:begin
-          end;
-          IMAGE_REL_AMD64_REL32_5:begin
-          end;
-          IMAGE_REL_AMD64_SECTION:begin
-          end;
-          IMAGE_REL_AMD64_SECREL:begin
-          end;
-          IMAGE_REL_AMD64_SECREL7:begin
-          end;
-          IMAGE_REL_AMD64_TOKEN:begin
-          end;
-          IMAGE_REL_AMD64_SREL32:begin
-          end;
-          IMAGE_REL_AMD64_PAIR:begin
-          end;
-          IMAGE_REL_AMD64_SSPAN32:begin
-          end;
-         end;
-        end;
-       end;
-      end;
-     end;
-     FixUpExpression:=StartFixUpExpression;
-     while assigned(FixUpExpression) do begin
-      if assigned(FixUpExpression^.Expression) and not FixUpExpression^.Relative then begin
-       Symbol:=FixUpExpression^.Expression.GetFixUpSymbol(self);
-       if assigned(Symbol) and ((Symbol.SymbolType in [ustLABEL,ustIMPORT]) and Symbol.Used) then begin
-        if assigned(FixUpExpression^.Section) then begin
-         case FixUpExpression^.Bits of
-          16:begin
-           RelocationsAdd(Relocations,FixUpExpression^.Position+FixUpExpression^.Section^.Offset,IMAGE_REL_BASED_LOW);
-          end;
-          32:begin
-           RelocationsAdd(Relocations,FixUpExpression^.Position+FixUpExpression^.Section^.Offset,IMAGE_REL_BASED_HIGHLOW);
-          end;
-          64:begin
-           RelocationsAdd(Relocations,FixUpExpression^.Position+FixUpExpression^.Section^.Offset,IMAGE_REL_BASED_DIR64);
-          end;
-         end;
-        end;
-       end;
-      end;
-      FixUpExpression:=FixUpExpression^.Next;
-     end;
      if assigned(Relocations.RootNode) then begin
       RelocationsSort(Relocations);
       Size:=RelocationsSize(Relocations);
@@ -2068,11 +1901,16 @@ procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFile
  begin
  end;}
 begin
- SortSections;
- MergeDuplicateAndDeleteUnusedSections;
- PositionAndSizeSections;
- ResolveSymbols;
- ResolveRelocations;
+ RelocationsInit(Relocations);
+ try
+  SortSections;
+  MergeDuplicateAndDeleteUnusedSections;
+  PositionAndSizeSections;
+  ResolveSymbols;
+  ResolveRelocations;
+ finally
+  RelocationsDone(Relocations);
+ end;
 //WritePE;
 end;
 
