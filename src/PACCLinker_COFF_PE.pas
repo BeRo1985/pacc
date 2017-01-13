@@ -30,6 +30,7 @@ type TPACCLinker_COFF_PE=class;
        fRawSize:TPACCUInt64;
        fCharacteristics:TPACCUInt32;
        fSymbols:TPACCLinker_COFF_PESymbolList;
+       fFileOffset:TPACCInt64;
        fActive:boolean;
       protected
        Relocations:TPACCLinker_COFF_PERelocations;
@@ -49,6 +50,7 @@ type TPACCLinker_COFF_PE=class;
        property RawSize:TPACCUInt64 read fRawSize write fRawSize;
        property Characteristics:TPACCUInt32 read fCharacteristics write fCharacteristics;
        property Symbols:TPACCLinker_COFF_PESymbolList read fSymbols;
+       property FileOffset:TPACCInt64 read fFileOffset write fFileOffset;
        property Active:boolean read fActive write fActive;
      end;
 
@@ -1394,6 +1396,7 @@ type PRelocationNode=^TRelocationNode;
 var Relocations:TRelocations;
     LastVirtualAddress:TPACCUInt64;
     PECOFFDirectoryEntries:PPECOFFDirectoryEntries;
+    Is64Bit:boolean;
  procedure RelocationsInit(out Instance:TRelocations);
  begin
   FillChar(Instance,SizeOf(TRelocations),#0);
@@ -2309,12 +2312,242 @@ var Relocations:TRelocations;
    PECOFFDirectoryEntry^.Size:=Size;
   end;
  end;
+ procedure GenerateImage(const Stream:TStream);
+ var Index,HeaderSize,SectionIndex,Len:TPACCInt32;
+     Characteristics,TotalImageSize,AddressOfEntryPoint,CodeBase,SubSystem,
+     DLLCharacteristics,SizeOfStackReserve,SizeOfStackCommit,
+     SizeOfHeapReserve,SizeOfHeapCommit,StackSize,HeapSize:TPACCUInt32;
+     ImageNTHeaders:TImageNTHeaders;
+     PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
+     FileOffset,TotalFileOffset,CountBytes:TPACCInt64;
+     Section:TPACCLinker_COFF_PESection;
+     ImageSectionHeader:TImageSectionHeader;
+ begin
+
+  Characteristics:=IMAGE_FILE_EXECUTABLE_IMAGE or IMAGE_FILE_LINE_NUMS_STRIPPED or IMAGE_FILE_LOCAL_SYMS_STRIPPED or IMAGE_FILE_DEBUG_STRIPPED;
+  if not Is64Bit then begin
+   Characteristics:=Characteristics or IMAGE_FILE_32BIT_MACHINE;
+  end;
+  if TPACCInstance(Instance).Options.CreateSharedLibrary then begin
+   Characteristics:=Characteristics or IMAGE_FILE_DLL;
+  end else begin
+   Characteristics:=Characteristics or IMAGE_FILE_RELOCS_STRIPPED;
+  end;
+
+  TotalImageSize:=LastVirtualAddress;
+
+  AddressOfEntryPoint:=0;
+
+  CodeBase:=PECOFFSectionAlignment;
+
+  SubSystem:=IMAGE_SUBSYSTEM_WINDOWS_CUI;
+
+  DLLCharacteristics:=0;
+
+  SizeOfStackReserve:=$100000;
+
+  SizeOfStackCommit:=$2000;
+
+  SizeOfHeapReserve:=$100000;
+
+  SizeOfHeapCommit:=$2000;
+
+  StackSize:=16777216;
+
+  HeapSize:=67108864;
+
+  Stream.Size:=0;
+  Stream.Seek(0,soBeginning);
+
+  HeaderSize:=MZEXEHeaderSize+SizeOf(TPACCUInt32)+SizeOf(TImageFileHeader);
+  if Is64Bit then begin
+   inc(HeaderSize,SizeOf(TImageOptionalHeader64));
+  end else begin
+   inc(HeaderSize,SizeOf(TImageOptionalHeader));
+  end;
+  inc(HeaderSize,SizeOf(TImageSectionHeader)*Sections.Count);
+  if (HeaderSize and (PECOFFFileAlignment-1))<>0 then begin
+   HeaderSize:=(HeaderSize+(PECOFFFileAlignment-1)) and not (PECOFFFileAlignment-1);
+  end;
+
+  Stream.Write(MZEXEHeaderBytes[0],MZEXEHeaderSize);
+
+  ImageNTHeaders.Signature:=$00004550;
+  ImageNTHeaders.FileHeader.Machine:=fMachine;
+  ImageNTHeaders.FileHeader.NumberOfSections:=Sections.Count;
+  ImageNTHeaders.FileHeader.TimeDateStamp:=0;
+  ImageNTHeaders.FileHeader.PointerToSymbolTable:=0;
+  ImageNTHeaders.FileHeader.NumberOfSymbols:=0;
+  if Is64Bit then begin
+   ImageNTHeaders.FileHeader.SizeOfOptionalHeader:=SizeOf(TImageOptionalHeader64);
+  end else begin
+   ImageNTHeaders.FileHeader.SizeOfOptionalHeader:=SizeOf(TImageOptionalHeader);
+  end;
+  ImageNTHeaders.FileHeader.Characteristics:=Characteristics;
+
+  Stream.Write(ImageNTHeaders.Signature,SizeOf(TPACCUInt32));
+  Stream.Write(ImageNTHeaders.FileHeader,SizeOf(TImageFileHeader));
+
+  if Is64Bit then begin
+   ImageNTHeaders.OptionalHeader64.Magic:=$020b;
+   ImageNTHeaders.OptionalHeader64.MajorLinkerVersion:=2;
+   ImageNTHeaders.OptionalHeader64.MinorLinkerVersion:=50;
+   ImageNTHeaders.OptionalHeader64.SizeOfCode:=TotalImageSize;
+   ImageNTHeaders.OptionalHeader64.SizeOfInitializedData:=0;
+   ImageNTHeaders.OptionalHeader64.SizeOfUninitializedData:=0;
+   ImageNTHeaders.OptionalHeader64.AddressOfEntryPoint:=AddressOfEntryPoint;
+   ImageNTHeaders.OptionalHeader64.BaseOfCode:=CodeBase;
+   ImageNTHeaders.OptionalHeader64.ImageBase:=ImageBase;
+   ImageNTHeaders.OptionalHeader64.SectionAlignment:=PECOFFSectionAlignment;
+   ImageNTHeaders.OptionalHeader64.FileAlignment:=PECOFFFileAlignment;
+   ImageNTHeaders.OptionalHeader64.MajorOperatingSystemVersion:=1;
+   ImageNTHeaders.OptionalHeader64.MinorOperatingSystemVersion:=0;
+   ImageNTHeaders.OptionalHeader64.MajorImageVersion:=0;
+   ImageNTHeaders.OptionalHeader64.MinorImageVersion:=0;
+   ImageNTHeaders.OptionalHeader64.MajorSubsystemVersion:=4;
+   ImageNTHeaders.OptionalHeader64.MinorSubsystemVersion:=0;
+   ImageNTHeaders.OptionalHeader64.Win32VersionValue:=0;
+   ImageNTHeaders.OptionalHeader64.SizeOfImage:=SectionSizeAlign(TotalImageSize);
+   ImageNTHeaders.OptionalHeader64.SizeOfHeaders:=HeaderSize;
+   ImageNTHeaders.OptionalHeader64.CheckSum:=0;
+   ImageNTHeaders.OptionalHeader64.Subsystem:=SubSystem;
+   ImageNTHeaders.OptionalHeader64.DLLCharacteristics:=DLLCharacteristics;
+   ImageNTHeaders.OptionalHeader64.SizeOfStackReserve:=SizeOfStackReserve;
+   ImageNTHeaders.OptionalHeader64.SizeOfStackCommit:=SizeOfStackCommit;
+   ImageNTHeaders.OptionalHeader64.SizeOfHeapReserve:=SizeOfHeapReserve;
+   ImageNTHeaders.OptionalHeader64.SizeOfHeapCommit:=SizeOfHeapCommit;
+   ImageNTHeaders.OptionalHeader64.LoaderFlags:=0;
+   ImageNTHeaders.OptionalHeader64.NumberOfRvaAndSizes:=IMAGE_NUMBEROF_DIRECTORY_ENTRIES;
+   for Index:=0 to IMAGE_NUMBEROF_DIRECTORY_ENTRIES-1 do begin
+    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries[Index];
+    if PECOFFDirectoryEntry^.Size>0 then begin
+     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].VirtualAddress:=PECOFFDirectoryEntry^.VirtualAddress;
+     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].Size:=PECOFFDirectoryEntry^.Size;
+    end else begin
+     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].VirtualAddress:=0;
+     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].Size:=0;
+    end;
+   end;
+   Stream.Write(ImageNTHeaders.OptionalHeader64,SizeOf(TImageOptionalHeader64));
+  end else begin
+   ImageNTHeaders.OptionalHeader.Magic:=$010b;
+   ImageNTHeaders.OptionalHeader.MajorLinkerVersion:=2;
+   ImageNTHeaders.OptionalHeader.MinorLinkerVersion:=50;
+   ImageNTHeaders.OptionalHeader.SizeOfCode:=TotalImageSize;
+   ImageNTHeaders.OptionalHeader.SizeOfInitializedData:=0;
+   ImageNTHeaders.OptionalHeader.SizeOfUninitializedData:=0;
+   ImageNTHeaders.OptionalHeader.AddressOfEntryPoint:=AddressOfEntryPoint;
+   ImageNTHeaders.OptionalHeader.BaseOfCode:=CodeBase;
+   ImageNTHeaders.OptionalHeader.BaseOfData:=0;
+   ImageNTHeaders.OptionalHeader.ImageBase:=ImageBase;
+   ImageNTHeaders.OptionalHeader.SectionAlignment:=PECOFFSectionAlignment;
+   ImageNTHeaders.OptionalHeader.FileAlignment:=PECOFFFileAlignment;
+   ImageNTHeaders.OptionalHeader.MajorOperatingSystemVersion:=1;
+   ImageNTHeaders.OptionalHeader.MinorOperatingSystemVersion:=0;
+   ImageNTHeaders.OptionalHeader.MajorImageVersion:=0;
+   ImageNTHeaders.OptionalHeader.MinorImageVersion:=0;
+   ImageNTHeaders.OptionalHeader.MajorSubsystemVersion:=4;
+   ImageNTHeaders.OptionalHeader.MinorSubsystemVersion:=0;
+   ImageNTHeaders.OptionalHeader.Win32VersionValue:=0;
+   ImageNTHeaders.OptionalHeader.SizeOfImage:=SectionSizeAlign(TotalImageSize);
+   ImageNTHeaders.OptionalHeader.SizeOfHeaders:=HeaderSize;
+   ImageNTHeaders.OptionalHeader.CheckSum:=0;
+   ImageNTHeaders.OptionalHeader.Subsystem:=SubSystem;
+   ImageNTHeaders.OptionalHeader.DLLCharacteristics:=DLLCharacteristics;
+   ImageNTHeaders.OptionalHeader.SizeOfStackReserve:=SizeOfStackReserve;
+   ImageNTHeaders.OptionalHeader.SizeOfStackCommit:=SizeOfStackCommit;
+   ImageNTHeaders.OptionalHeader.SizeOfHeapReserve:=SizeOfHeapReserve;
+   ImageNTHeaders.OptionalHeader.SizeOfHeapCommit:=SizeOfHeapCommit;
+   ImageNTHeaders.OptionalHeader.LoaderFlags:=0;
+   ImageNTHeaders.OptionalHeader.NumberOfRvaAndSizes:=IMAGE_NUMBEROF_DIRECTORY_ENTRIES;
+   for Index:=0 to IMAGE_NUMBEROF_DIRECTORY_ENTRIES-1 do begin
+    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries[Index];
+    if PECOFFDirectoryEntry^.Size>0 then begin
+     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].VirtualAddress:=PECOFFDirectoryEntry^.VirtualAddress;
+     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].Size:=PECOFFDirectoryEntry^.Size;
+    end else begin
+     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].VirtualAddress:=0;
+     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].Size:=0;
+    end;
+   end;
+   Stream.Write(ImageNTHeaders.OptionalHeader,SizeOf(TImageOptionalHeader));
+  end;
+
+  FileOffset:=HeaderSize;
+  for SectionIndex:=0 to Sections.Count-1 do begin
+   Section:=Sections[SectionIndex];
+   Section.FileOffset:=FileOffset;
+   if (Section.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)=0 then begin
+    inc(FileOffset,Section.RawSize);
+    if (FileOffset and (PECOFFFileAlignment-1))<>0 then begin
+     FileOffset:=(FileOffset+(PECOFFFileAlignment-1)) and not (PECOFFFileAlignment-1);
+    end;
+   end;
+  end;
+  if (FileOffset and (PECOFFFileAlignment-1))<>0 then begin
+   FileOffset:=(FileOffset+(PECOFFFileAlignment-1)) and not (PECOFFFileAlignment-1);
+  end;
+  TotalFileOffset:=FileOffset;
+
+  for SectionIndex:=0 to Sections.Count-1 do begin
+   Section:=Sections[SectionIndex];
+   FillChar(ImageSectionHeader,SizeOf(TImageSectionHeader),#0);
+   Len:=length(Section.Name);
+   if Len>0 then begin
+    if Len>8 then begin
+     Len:=8;
+    end;
+    Move(Section.Name[1],ImageSectionHeader.Name[0],Len);
+   end;
+   ImageSectionHeader.Misc.VirtualSize:=Section.VirtualSize;
+   ImageSectionHeader.VirtualAddress:=Section.VirtualAddress;
+   if (Section.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)<>0 then begin
+    ImageSectionHeader.SizeOfRawData:=0;
+    ImageSectionHeader.PointerToRawData:=0;
+   end else begin
+    ImageSectionHeader.SizeOfRawData:=FileSizeAlign(Section.RawSize);
+    ImageSectionHeader.PointerToRawData:=Section.FileOffset;
+   end;
+   ImageSectionHeader.PointerToRelocations:=0;
+   ImageSectionHeader.PointerToLineNumbers:=0;
+   ImageSectionHeader.NumberOfRelocations:=0;
+   ImageSectionHeader.NumberOfLineNumbers:=0;
+   ImageSectionHeader.Characteristics:=Section.Characteristics;
+   Stream.Write(ImageSectionHeader,SizeOf(TImageSectionHeader));
+  end;
+
+  CountBytes:=HeaderSize-Stream.Position;
+  if CountBytes>0 then begin
+   Stream.WriteBuffer(NullBytes[0],CountBytes);
+  end;
+
+  for SectionIndex:=0 to Sections.Count-1 do begin
+   Section:=Sections[SectionIndex];
+   if (Section.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)<>0 then begin
+    CountBytes:=Section.FileOffset-Stream.Position;
+    if CountBytes>0 then begin
+     Stream.WriteBuffer(NullBytes[0],CountBytes);
+    end;
+    Section.Stream.Seek(0,soBeginning);
+    Stream.CopyFrom(Section.Stream,Section.RawSize);
+   end;
+  end;
+
+ end;
 begin
  RelocationsInit(Relocations);
  try
   GetMem(PECOFFDirectoryEntries,SizeOf(TPECOFFDirectoryEntries));
   try
    FillChar(PECOFFDirectoryEntries^,SizeOf(TPECOFFDirectoryEntries),#0);
+   case fMachine of
+    IMAGE_FILE_MACHINE_AMD64:begin
+     Is64Bit:=true;
+    end;
+    else begin
+     Is64Bit:=false;
+    end;
+   end;
    ScanImports;
    GenerateImports;
    SortSections;
@@ -2323,6 +2556,7 @@ begin
    ResolveSymbols;
    ResolveRelocations;
    GenerateRelocationSection;
+   GenerateImage(AOutputStream);
   finally
    FreeMem(PECOFFDirectoryEntries);
   end;
