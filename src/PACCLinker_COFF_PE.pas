@@ -78,6 +78,7 @@ type TPACCLinker_COFF_PE=class;
        fType:TPACCInt32;
        fClass:TPACCInt32;
        fSymbolKind:TPACCLinker_COFF_PESymbolKind;
+       fAlias:TPACCLinker_COFF_PESymbol;
        fSubSymbols:TPACCLinker_COFF_PESymbolList;
        fAuxData:TMemoryStream;
        fActive:boolean;
@@ -92,6 +93,7 @@ type TPACCLinker_COFF_PE=class;
        property Type_:TPACCInt32 read fType;
        property Class_:TPACCInt32 read fClass;
        property SymbolKind:TPACCLinker_COFF_PESymbolKind read fSymbolKind write fSymbolKind;
+       property Alias:TPACCLinker_COFF_PESymbol read fAlias write fAlias;
        property SubSymbols:TPACCLinker_COFF_PESymbolList read fSubSymbols;
        property AuxData:TMemoryStream read fAuxData write fAuxData;
        property Active:boolean read fActive write fActive;
@@ -911,6 +913,8 @@ begin
 
  fSymbolKind:=ASymbolKind;
 
+ fAlias:=nil;
+ 
  fSubSymbols:=TPACCLinker_COFF_PESymbolList.Create;
 
  fAuxData:=nil;
@@ -1437,6 +1441,47 @@ procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFile
    inc(VirtualAddress,Section.VirtualSize);
   end;
  end;
+ procedure ResolveSymbols;
+ var SymbolIndex:TPACCInt32;
+     ExternalAvailableSymbolHashMap:TPACCRawByteStringHashMap;
+     Symbol:TPACCLinker_COFF_PESymbol;
+     UnresolvableExternalSymbols:boolean;
+ begin
+  ExternalAvailableSymbolHashMap:=TPACCRawByteStringHashMap.Create;
+  try
+   UnresolvableExternalSymbols:=false;
+   for SymbolIndex:=0 to Symbols.Count-1 do begin
+    Symbol:=Symbols[SymbolIndex];
+    if Symbol.Active and (Symbol.Class_=IMAGE_SYM_CLASS_EXTERNAL) and (Symbol.SymbolKind=plcpskNormal) and assigned(Symbol.Section) then begin
+     if assigned(ExternalAvailableSymbolHashMap[Symbol.Name]) then begin
+      if Symbol.Name<>'@feat.00' then begin
+       TPACCInstance(Instance).AddWarning('Duplicate public symbol "'+Symbol.Name+'"',nil);
+      end;
+     end else begin
+      ExternalAvailableSymbolHashMap[Symbol.Name]:=Symbol;
+     end;
+    end;
+   end;
+   for SymbolIndex:=0 to Symbols.Count-1 do begin
+    Symbol:=Symbols[SymbolIndex];
+    if Symbol.Active and (Symbol.Class_=IMAGE_SYM_CLASS_EXTERNAL) and
+       ((Symbol.SymbolKind=plcpskUndefined) or
+        ((Symbol.SymbolKind=plcpskNormal) and not assigned(Symbol.Section))) and
+        not assigned(Symbol.Alias) then begin
+     Symbol.Alias:=ExternalAvailableSymbolHashMap[Symbol.Name];
+     if not assigned(Symbol.Alias) then begin
+      UnresolvableExternalSymbols:=true;
+      TPACCInstance(Instance).AddError('Unresolvable external symbol "'+Symbol.Name+'"',nil,false);
+     end;
+    end;
+   end;
+   if UnresolvableExternalSymbols then begin
+    TPACCInstance(Instance).AddError('Unresolvable external symbols',nil,true);
+   end;
+  finally
+   ExternalAvailableSymbolHashMap.Free;
+  end;
+ end;
  procedure ResolveRelocations;
  type PSectionBytes=^TSectionBytes;
       TSectionBytes=array[0..65535] of TPACCUInt8;
@@ -1459,24 +1504,14 @@ procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFile
     if (SymbolIndex>=0) and (SymbolIndex<Symbols.Count) then begin
      Symbol:=Symbols[SymbolIndex];
      if Symbol.Active then begin
+      if assigned(Symbol.Alias) then begin
+       Symbol:=Symbol.Alias;
+      end;
       case Symbol.Class_ of
-       IMAGE_SYM_CLASS_EXTERNAL:begin
-        if assigned(Symbol.Section) then begin
-         SymbolRVA:=Symbol.Section.VirtualAddress+Symbol.Value;
-        end else begin
-         TPACCInstance(Instance).AddError('Unsupported symbol type "'+Symbol.Name+'" for relocation',nil,true);
-        end;
-       end;
-       IMAGE_SYM_CLASS_STATIC:begin
+       IMAGE_SYM_CLASS_EXTERNAL,IMAGE_SYM_CLASS_STATIC:begin
         case Symbol.SymbolKind of
-         plcpskUndefined:begin
-          TPACCInstance(Instance).AddError('Unsupported symbol type "'+Symbol.Name+'" for relocation',nil,true);
-         end;
          plcpskAbsolute:begin
           SymbolRVA:=Symbol.Value;
-         end;
-         plcpskDebug:begin
-          TPACCInstance(Instance).AddError('Unsupported symbol type "'+Symbol.Name+'" for relocation',nil,true);
          end;
          plcpskNormal:begin
           if assigned(Symbol.Section) then begin
@@ -1485,14 +1520,17 @@ procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFile
            TPACCInstance(Instance).AddError('Invalid symbol "'+Symbol.Name+'"',nil,true);
           end;
          end;
+         else begin
+          TPACCInstance(Instance).AddError('Symbol "'+Symbol.Name+'" is not applicable for relocation',nil,true);
+         end;
         end;
        end;
        else begin
-        TPACCInstance(Instance).AddError('Unsupported symbol type "'+Symbol.Name+'" for relocation',nil,true);
+        TPACCInstance(Instance).AddError('Symbol "'+Symbol.Name+'" is not applicable for relocation',nil,true);
        end;
       end;
      end else begin
-      TPACCInstance(Instance).AddError('Invalid symbol "'+Symbol.Name+'"',nil,true);
+      TPACCInstance(Instance).AddError('Symbol "'+Symbol.Name+'" is not applicable for relocation, because it is stripped out',nil,true);
      end;
     end else begin
      Symbol:=nil;
@@ -2033,6 +2071,7 @@ begin
  SortSections;
  MergeDuplicateAndDeleteUnusedSections;
  PositionAndSizeSections;
+ ResolveSymbols;
  ResolveRelocations;
 //WritePE;
 end;
