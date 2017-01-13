@@ -64,7 +64,7 @@ end;
 
 procedure TPACCLinker.AddImports(const AInput:TPACCRawByteString;const AFileName:TPUCUUTF8String='');
 const WhiteSpaceChars=[#0..#32];
-      IdentChars=['a'..'z','A'..'Z','0'..'9','_','@','$','.'];
+      IdentChars=['a'..'z','A'..'Z','0'..'9','_','@','$','.',#$80..#$ff{UTF-8}];
 var Index,Len,StartIndex:TPACCInt32;
     LibraryName,SymbolName,ImportName:TPACCRawByteString;
 begin
