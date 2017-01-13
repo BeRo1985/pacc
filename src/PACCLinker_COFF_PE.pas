@@ -859,12 +859,6 @@ type TBytes=array of TPACCUInt8;
        );
      end;
 
-     PPECOFFDirectoryEntry=^TPECOFFDirectoryEntry;
-     TPECOFFDirectoryEntry=TImageDataDirectory;
-
-     PPECOFFDirectoryEntries=^TPECOFFDirectoryEntries;
-     TPECOFFDirectoryEntries=array[0..IMAGE_NUMBEROF_DIRECTORY_ENTRIES-1] of TPECOFFDirectoryEntry;
-
 var NullBytes:array[0..65535] of TPACCUInt8;
 
 constructor TPACCLinker_COFF_PESection.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32);
@@ -1393,6 +1387,14 @@ type PRelocationNode=^TRelocationNode;
      TRelocations=packed record
       RootNode,LastNode:PRelocationNode;
      end;
+     PPECOFFDirectoryEntry=^TPECOFFDirectoryEntry;
+     TPECOFFDirectoryEntry=record
+      Section:TPACCLinker_COFF_PESection;
+      Offset:TPACCUInt32;
+      Size:TPACCUInt32;
+     end;
+     PPECOFFDirectoryEntries=^TPECOFFDirectoryEntries;
+     TPECOFFDirectoryEntries=array[0..IMAGE_NUMBEROF_DIRECTORY_ENTRIES-1] of TPECOFFDirectoryEntry;
 var Relocations:TRelocations;
     LastVirtualAddress:TPACCUInt64;
     PECOFFDirectoryEntries:PPECOFFDirectoryEntries;
@@ -1640,6 +1642,7 @@ var Relocations:TRelocations;
      ImportSectionSymbol,CodeSectionSymbol,OriginalFirstThunkSymbol,
      LibraryNameSymbol,LibraryImportSymbol,LibraryImportNameSymbol,
      LibraryImportTrunkCodeSymbol:TPACCLinker_COFF_PESymbol;
+     PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
  begin
 
   OK:=false;
@@ -1881,6 +1884,11 @@ var Relocations:TRelocations;
    finally
     Libraries:=nil;
    end;
+
+   PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_IMPORT];
+   PECOFFDirectoryEntry^.Section:=ImportSection;
+   PECOFFDirectoryEntry^.Offset:=0;
+   PECOFFDirectoryEntry^.Size:=ImportSection.Stream.Size;
 
   end;
  end;
@@ -2308,7 +2316,8 @@ var Relocations:TRelocations;
    end;
    inc(LastVirtualAddress,Section.VirtualSize);
    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_BASERELOC];
-   PECOFFDirectoryEntry^.VirtualAddress:=Section.VirtualAddress;
+   PECOFFDirectoryEntry^.Section:=Section;
+   PECOFFDirectoryEntry^.Offset:=0;
    PECOFFDirectoryEntry^.Size:=Size;
   end;
  end;
@@ -2419,9 +2428,9 @@ var Relocations:TRelocations;
    ImageNTHeaders.OptionalHeader64.LoaderFlags:=0;
    ImageNTHeaders.OptionalHeader64.NumberOfRvaAndSizes:=IMAGE_NUMBEROF_DIRECTORY_ENTRIES;
    for Index:=0 to IMAGE_NUMBEROF_DIRECTORY_ENTRIES-1 do begin
-    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries[Index];
-    if PECOFFDirectoryEntry^.Size>0 then begin
-     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].VirtualAddress:=PECOFFDirectoryEntry^.VirtualAddress;
+    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[Index];
+    if assigned(PECOFFDirectoryEntry^.Section) and (PECOFFDirectoryEntry^.Size>0) then begin
+     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].VirtualAddress:=PECOFFDirectoryEntry^.Section.VirtualAddress+PECOFFDirectoryEntry^.Offset;
      ImageNTHeaders.OptionalHeader64.DataDirectory[Index].Size:=PECOFFDirectoryEntry^.Size;
     end else begin
      ImageNTHeaders.OptionalHeader64.DataDirectory[Index].VirtualAddress:=0;
@@ -2461,9 +2470,9 @@ var Relocations:TRelocations;
    ImageNTHeaders.OptionalHeader.LoaderFlags:=0;
    ImageNTHeaders.OptionalHeader.NumberOfRvaAndSizes:=IMAGE_NUMBEROF_DIRECTORY_ENTRIES;
    for Index:=0 to IMAGE_NUMBEROF_DIRECTORY_ENTRIES-1 do begin
-    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries[Index];
-    if PECOFFDirectoryEntry^.Size>0 then begin
-     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].VirtualAddress:=PECOFFDirectoryEntry^.VirtualAddress;
+    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[Index];
+    if assigned(PECOFFDirectoryEntry^.Section) and (PECOFFDirectoryEntry^.Size>0) then begin
+     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].VirtualAddress:=PECOFFDirectoryEntry^.Section.VirtualAddress+PECOFFDirectoryEntry^.Offset;
      ImageNTHeaders.OptionalHeader64.DataDirectory[Index].Size:=PECOFFDirectoryEntry^.Size;
     end else begin
      ImageNTHeaders.OptionalHeader64.DataDirectory[Index].VirtualAddress:=0;
@@ -2477,6 +2486,9 @@ var Relocations:TRelocations;
   for SectionIndex:=0 to Sections.Count-1 do begin
    Section:=Sections[SectionIndex];
    Section.FileOffset:=FileOffset;
+   if ((Section.Characteristics and IMAGE_SCN_CNT_INITIALIZED_DATA)<>0) and (Section.RawSize=0) then begin
+    Section.Characteristics:=(Section.Characteristics and not IMAGE_SCN_CNT_INITIALIZED_DATA) or IMAGE_SCN_CNT_UNINITIALIZED_DATA;
+   end;
    if (Section.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)=0 then begin
     inc(FileOffset,Section.RawSize);
     if (FileOffset and (PECOFFFileAlignment-1))<>0 then begin
