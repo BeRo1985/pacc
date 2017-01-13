@@ -2472,11 +2472,11 @@ var Relocations:TRelocations;
    for Index:=0 to IMAGE_NUMBEROF_DIRECTORY_ENTRIES-1 do begin
     PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[Index];
     if assigned(PECOFFDirectoryEntry^.Section) and (PECOFFDirectoryEntry^.Size>0) then begin
-     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].VirtualAddress:=PECOFFDirectoryEntry^.Section.VirtualAddress+PECOFFDirectoryEntry^.Offset;
-     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].Size:=PECOFFDirectoryEntry^.Size;
+     ImageNTHeaders.OptionalHeader.DataDirectory[Index].VirtualAddress:=PECOFFDirectoryEntry^.Section.VirtualAddress+PECOFFDirectoryEntry^.Offset;
+     ImageNTHeaders.OptionalHeader.DataDirectory[Index].Size:=PECOFFDirectoryEntry^.Size;
     end else begin
-     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].VirtualAddress:=0;
-     ImageNTHeaders.OptionalHeader64.DataDirectory[Index].Size:=0;
+     ImageNTHeaders.OptionalHeader.DataDirectory[Index].VirtualAddress:=0;
+     ImageNTHeaders.OptionalHeader.DataDirectory[Index].Size:=0;
     end;
    end;
    Stream.Write(ImageNTHeaders.OptionalHeader,SizeOf(TImageOptionalHeader));
