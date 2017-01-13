@@ -1562,7 +1562,17 @@ var Relocations:TRelocations;
       ((Symbol.SymbolKind=plcpskUndefined) or
        ((Symbol.SymbolKind=plcpskNormal) and not assigned(Symbol.Section))) and
        not assigned(Symbol.Alias) then begin
-    Entity:=fImportSymbolNameHashMap.Get(Symbol.Name,false);
+    if (length(Symbol.Name)>6) and
+       (Symbol.Name[1]='_') and
+       (Symbol.Name[2]='_') and
+       (Symbol.Name[3]='i') and
+       (Symbol.Name[4]='m') and
+       (Symbol.Name[5]='p') and
+       (Symbol.Name[6]='_') then begin
+     Entity:=fImportSymbolNameHashMap.Get(copy(Symbol.Name,7,length(Symbol.Name)-6),false);
+    end else begin
+     Entity:=fImportSymbolNameHashMap.Get(Symbol.Name,false);
+    end;
     if assigned(Entity) then begin
      Import_:=@fImports[TPACCPtrUInt(Entity.Value)];
      Import_^.Used:=true;
@@ -1726,18 +1736,26 @@ var Relocations:TRelocations;
      end;
 
      for LibraryIndex:=0 to CountLibraries-1 do begin
+
       Library_:=@Libraries[LibraryIndex];
+
       Library_^.NameOffset:=ImportSection.Stream.Position;
       ImportSection.Stream.WriteBuffer(Library_^.Name[1],length(Library_^.Name));
       ImportSection.Stream.WriteBuffer(NullBytes[0],SizeOf(TPACCUInt8));
+
       for LibraryImportIndex:=0 to Library_^.CountImports-1 do begin
+
        LibraryImport:=@Library_^.Imports[LibraryImportIndex];
+
        LibraryImport^.NameOffset:=ImportSection.Stream.Position;
        ImportSection.Stream.WriteBuffer(LibraryImport^.Name[1],length(LibraryImport^.Name));
        ImportSection.Stream.WriteBuffer(NullBytes[0],SizeOf(TPACCUInt8));
+
        LibraryImport^.CodeOffset:=CodeSection.Stream.Position;
        CodeSection.Stream.WriteBuffer(ImportThunkX86,SizeOf(ImportThunkX86));
+
       end;
+
      end;
 
     end;
