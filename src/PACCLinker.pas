@@ -165,7 +165,63 @@ begin
 end;
 
 procedure TPACCLinker.AddExports(const AInput:TPACCRawByteString;const AFileName:TPUCUUTF8String='');
+const WhiteSpaceChars=[#0..#32];
+      IdentChars=['a'..'z','A'..'Z','0'..'9','_','@','$','.',#$80..#$ff{UTF-8}];
+var Index,Len,StartIndex:TPACCInt32;
+    SymbolName,ExportName:TPACCRawByteString;
 begin
+ Len:=length(AInput);
+
+ Index:=1;
+ while Index<=Len do begin
+
+  while (Index<=Len) and (AInput[Index] in WhiteSpaceChars) do begin
+   inc(Index);
+  end;
+
+  StartIndex:=Index;
+  while (Index<=Len) and (AInput[Index] in IdentChars) do begin
+   inc(Index);
+  end;
+  if StartIndex<Index then begin
+
+   SymbolName:=copy(AInput,StartIndex,Index-StartIndex);
+
+   ExportName:=SymbolName;
+
+   while (Index<=Len) and (AInput[Index] in WhiteSpaceChars) do begin
+    inc(Index);
+   end;
+
+   if (Index<=Len) and (AInput[Index]='=') then begin
+    inc(Index);
+
+    while (Index<=Len) and (AInput[Index] in WhiteSpaceChars) do begin
+     inc(Index);
+    end;
+
+    StartIndex:=Index;
+    while (Index<=Len) and (AInput[Index] in IdentChars) do begin
+     inc(Index);
+    end;
+    if StartIndex<Index then begin
+     ExportName:=copy(AInput,StartIndex,Index-StartIndex);
+     while (Index<=Len) and (AInput[Index] in WhiteSpaceChars) do begin
+      inc(Index);
+     end;
+    end else begin
+     TPACCInstance(Instance).AddError('Import file syntax error',nil,true);
+    end;
+
+    AddExport(SymbolName,ExportName);
+
+   end;
+
+  end else begin
+   TPACCInstance(Instance).AddError('Import file syntax error',nil,true);
+  end;
+
+ end;
 end;
 
 procedure TPACCLinker.AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String='');
