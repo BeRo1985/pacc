@@ -471,16 +471,6 @@ type TBytes=array of TPACCUInt8;
      PLongWordArray=^TLongWordArray;
      TLongWordArray=array [0..(2147483647 div SizeOf(TPACCUInt32))-1] of TPACCUInt32;
 
-     PPECOFFDirectoryEntry=^TPECOFFDirectoryEntry;
-     TPECOFFDirectoryEntry=record
-      Data:TBytes;
-      Position:TPACCUInt64;
-      Size:TPACCUInt64;
-     end;
-
-     PPECOFFDirectoryEntries=^TPECOFFDirectoryEntries;
-     TPECOFFDirectoryEntries=array[0..IMAGE_NUMBEROF_DIRECTORY_ENTRIES-1] of TPECOFFDirectoryEntry;
-
      TMZEXEHeader=packed record
       Signature:TPACCUInt16; // 00
       PartPag:TPACCUInt16;   // 02
@@ -828,6 +818,12 @@ type TBytes=array of TPACCUInt8;
        IMAGE_SYM_CLASS_CLR_TOKEN:(
        );
      end;
+
+     PPECOFFDirectoryEntry=^TPECOFFDirectoryEntry;
+     TPECOFFDirectoryEntry=TImageDataDirectory;
+
+     PPECOFFDirectoryEntries=^TPECOFFDirectoryEntries;
+     TPECOFFDirectoryEntries=array[0..IMAGE_NUMBEROF_DIRECTORY_ENTRIES-1] of TPECOFFDirectoryEntry;
 
 var NullBytes:array[0..65535] of TPACCUInt8;
 
@@ -1290,6 +1286,8 @@ type PRelocationNode=^TRelocationNode;
       RootNode,LastNode:PRelocationNode;
      end;
 var Relocations:TRelocations;
+    LastVirtualAddress:TPACCUInt64;
+    PECOFFDirectoryEntries:PPECOFFDirectoryEntries;
  procedure RelocationsInit(out Instance:TRelocations);
  begin
   FillChar(Instance,SizeOf(TRelocations),#0);
@@ -1605,13 +1603,12 @@ var Relocations:TRelocations;
  var SectionIndex,RelocationIndex:TPACCInt32;
      Section:TPACCLinker_COFF_PESection;
      Relocation:PPACCLinker_COFF_PERelocation;
-     VirtualAddress:TPACCInt64;
  begin
-  VirtualAddress:=PECOFFSectionAlignment;
+  LastVirtualAddress:=PECOFFSectionAlignment;
   for SectionIndex:=0 to Sections.Count-1 do begin
    Section:=Sections[SectionIndex];
-   VirtualAddress:=(VirtualAddress+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
-   Section.VirtualAddress:=VirtualAddress;
+   LastVirtualAddress:=(LastVirtualAddress+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
+   Section.VirtualAddress:=LastVirtualAddress;
    Section.VirtualSize:=(Section.Stream.Size+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
    Section.RawSize:=Section.Stream.Size;
    while (Section.RawSize>0) and (TPACCUInt8(PAnsiChar(Section.Stream.Memory)[Section.RawSize-1])=0) do begin
@@ -1619,9 +1616,9 @@ var Relocations:TRelocations;
    end;
    for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
     Relocation:=@Section.Relocations[RelocationIndex];
-    inc(Relocation^.VirtualAddress,VirtualAddress);
+    inc(Relocation^.VirtualAddress,LastVirtualAddress);
    end;
-   inc(VirtualAddress,Section.VirtualSize);
+   inc(LastVirtualAddress,Section.VirtualSize);
   end;
  end;
  procedure ResolveSymbols;
@@ -1853,61 +1850,55 @@ var Relocations:TRelocations;
     end;
    end;
   end;
-  if assigned(Relocations.RootNode) then begin
+ end;
+ procedure GenerateRelocationSection;
+ var SectionIndex,RelocationIndex:TPACCInt32;
+     Section:TPACCLinker_COFF_PESection;
+     Relocations:TRelocations;
+     Size:TPACCUInt32;
+     Data:pointer;
+     PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
+ begin
+  if TPACCInstance(Instance).Options.CreateSharedLibrary and assigned(Relocations.RootNode) then begin
    RelocationsSort(Relocations);
-  end;
- end;              
-{procedure WritePE;
-  function WriteRelocations:boolean;
-  var SectionIndex,RelocationIndex:TPACCInt32;
-      Relocations:TRelocations;
-      Relocation:PPACCLinker_COFF_PERelocation;
-      Section:TPACCLinker_COFF_PESection;
-      Size:TPACCUInt32;
-      Data:pointer;
-  begin
-   result:=false;
-   begin
-    RelocationsInit(Relocations);
-    try
-     if assigned(Relocations.RootNode) then begin
-      RelocationsSort(Relocations);
-      Size:=RelocationsSize(Relocations);
-      Section:=GetSectionPerName('.reloc');
-      Section^.Position:=0;
-      Section^.Data.Clear;
-      Section^.Data.Seek(0,soBeginning);
-      IntegerValueSetQWord(Section^.FreezedFlags,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ);
-      GetMem(Data,Size);
-      try
-       RelocationsBuild(Relocations,Data,0);
-       Section^.Data.Seek(Section^.Data.Size,soBeginning);
-       Section^.Data.Write(Data^,Size);
-      finally
-       FreeMem(Data);
-      end;
-      inc(Section^.Position,Size);
-      PECOFFDirectoryEntry:=@PECOFFDirectoryEntries[IMAGE_DIRECTORY_ENTRY_BASERELOC];
-      PECOFFDirectoryEntry^.Section:=Section;
-      PECOFFDirectoryEntry^.Position:=0;
-      PECOFFDirectoryEntry^.Size:=Size;
-      result:=true;
-     end;
-    finally
-     RelocationsDone(Relocations);
+   Size:=RelocationsSize(Relocations);
+   for SectionIndex:=0 to Sections.Count-1 do begin
+    Section:=Sections[SectionIndex];
+    if Section.Name='.reloc' then begin
+     TPACCInstance(Instance).AddError('Section ".reloc" already exist',nil,true);
     end;
    end;
+   Section:=TPACCLinker_COFF_PESection.Create(self,'.reloc',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ);
+   LastVirtualAddress:=(LastVirtualAddress+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
+   Section.VirtualAddress:=LastVirtualAddress;
+   Section.Stream.SetSize(Size);
+   RelocationsBuild(Relocations,Section.Stream.Memory,0);
+   Section.VirtualSize:=(Section.Stream.Size+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
+   Section.RawSize:=Section.Stream.Size;
+   while (Section.RawSize>0) and (TPACCUInt8(PAnsiChar(Section.Stream.Memory)[Section.RawSize-1])=0) do begin
+    Section.RawSize:=Section.RawSize-1;
+   end;
+   inc(LastVirtualAddress,Section.VirtualSize);
+   PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+   PECOFFDirectoryEntry^.VirtualAddress:=Section.VirtualAddress;
+   PECOFFDirectoryEntry^.Size:=Size;
   end;
- begin
- end;}
+ end;
 begin
  RelocationsInit(Relocations);
  try
-  SortSections;
-  MergeDuplicateAndDeleteUnusedSections;
-  PositionAndSizeSections;
-  ResolveSymbols;
-  ResolveRelocations;
+  GetMem(PECOFFDirectoryEntries,SizeOf(TPECOFFDirectoryEntries));
+  try
+   FillChar(PECOFFDirectoryEntries^,SizeOf(TPECOFFDirectoryEntries),#0);
+   SortSections;
+   MergeDuplicateAndDeleteUnusedSections;
+   PositionAndSizeSections;
+   ResolveSymbols;
+   ResolveRelocations;
+   GenerateRelocationSection;
+  finally
+   FreeMem(PECOFFDirectoryEntries);
+  end;
  finally
   RelocationsDone(Relocations);
  end;
