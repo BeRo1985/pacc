@@ -1400,6 +1400,7 @@ var Relocations:TRelocations;
     LastVirtualAddress:TPACCUInt64;
     PECOFFDirectoryEntries:PPECOFFDirectoryEntries;
     Is64Bit:boolean;
+    ExternalAvailableSymbolHashMap:TPACCRawByteStringHashMap;
  procedure RelocationsInit(out Instance:TRelocations);
  begin
   FillChar(Instance,SizeOf(TRelocations),#0);
@@ -2061,43 +2062,37 @@ var Relocations:TRelocations;
  end;
  procedure ResolveSymbols;
  var SymbolIndex:TPACCInt32;
-     ExternalAvailableSymbolHashMap:TPACCRawByteStringHashMap;
      Symbol:TPACCLinker_COFF_PESymbol;
      UnresolvableExternalSymbols:boolean;
  begin
-  ExternalAvailableSymbolHashMap:=TPACCRawByteStringHashMap.Create;
-  try
-   UnresolvableExternalSymbols:=false;
-   for SymbolIndex:=0 to Symbols.Count-1 do begin
-    Symbol:=Symbols[SymbolIndex];
-    if Symbol.Active and (Symbol.Class_=IMAGE_SYM_CLASS_EXTERNAL) and (Symbol.SymbolKind=plcpskNormal) and assigned(Symbol.Section) then begin
-     if assigned(ExternalAvailableSymbolHashMap[Symbol.Name]) then begin
-      if Symbol.Name<>'@feat.00' then begin
-       TPACCInstance(Instance).AddWarning('Duplicate public symbol "'+Symbol.Name+'"',nil);
-      end;
-     end else begin
-      ExternalAvailableSymbolHashMap[Symbol.Name]:=Symbol;
+  UnresolvableExternalSymbols:=false;
+  for SymbolIndex:=0 to Symbols.Count-1 do begin
+   Symbol:=Symbols[SymbolIndex];
+   if Symbol.Active and (Symbol.Class_=IMAGE_SYM_CLASS_EXTERNAL) and (Symbol.SymbolKind=plcpskNormal) and assigned(Symbol.Section) then begin
+    if assigned(ExternalAvailableSymbolHashMap[Symbol.Name]) then begin
+     if Symbol.Name<>'@feat.00' then begin
+      TPACCInstance(Instance).AddWarning('Duplicate public symbol "'+Symbol.Name+'"',nil);
      end;
+    end else begin
+     ExternalAvailableSymbolHashMap[Symbol.Name]:=Symbol;
     end;
    end;
-   for SymbolIndex:=0 to Symbols.Count-1 do begin
-    Symbol:=Symbols[SymbolIndex];
-    if Symbol.Active and (Symbol.Class_=IMAGE_SYM_CLASS_EXTERNAL) and
-       ((Symbol.SymbolKind=plcpskUndefined) or
-        ((Symbol.SymbolKind=plcpskNormal) and not assigned(Symbol.Section))) and
-        not assigned(Symbol.Alias) then begin
-     Symbol.Alias:=ExternalAvailableSymbolHashMap[Symbol.Name];
-     if not assigned(Symbol.Alias) then begin
-      UnresolvableExternalSymbols:=true;
-      TPACCInstance(Instance).AddError('Unresolvable external symbol "'+Symbol.Name+'"',nil,false);
-     end;
+  end;
+  for SymbolIndex:=0 to Symbols.Count-1 do begin
+   Symbol:=Symbols[SymbolIndex];
+   if Symbol.Active and (Symbol.Class_=IMAGE_SYM_CLASS_EXTERNAL) and
+      ((Symbol.SymbolKind=plcpskUndefined) or
+       ((Symbol.SymbolKind=plcpskNormal) and not assigned(Symbol.Section))) and
+       not assigned(Symbol.Alias) then begin
+    Symbol.Alias:=ExternalAvailableSymbolHashMap[Symbol.Name];
+    if not assigned(Symbol.Alias) then begin
+     UnresolvableExternalSymbols:=true;
+     TPACCInstance(Instance).AddError('Unresolvable external symbol "'+Symbol.Name+'"',nil,false);
     end;
    end;
-   if UnresolvableExternalSymbols then begin
-    TPACCInstance(Instance).AddError('Unresolvable external symbols',nil,true);
-   end;
-  finally
-   ExternalAvailableSymbolHashMap.Free;
+  end;
+  if UnresolvableExternalSymbols then begin
+   TPACCInstance(Instance).AddError('Unresolvable external symbols',nil,true);
   end;
  end;
  procedure ResolveRelocations;
@@ -2336,6 +2331,7 @@ var Relocations:TRelocations;
      FileOffset,TotalFileOffset,CountBytes:TPACCInt64;
      Section:TPACCLinker_COFF_PESection;
      ImageSectionHeader:TImageSectionHeader;
+     StartSymbol:TPACCLinker_COFF_PESymbol;
  begin
 
   Characteristics:=IMAGE_FILE_EXECUTABLE_IMAGE or IMAGE_FILE_LINE_NUMS_STRIPPED or IMAGE_FILE_LOCAL_SYMS_STRIPPED or IMAGE_FILE_DEBUG_STRIPPED;
@@ -2350,7 +2346,12 @@ var Relocations:TRelocations;
 
   TotalImageSize:=LastVirtualAddress;
 
-  AddressOfEntryPoint:=0;
+  StartSymbol:=ExternalAvailableSymbolHashMap['_start'];
+  if assigned(StartSymbol) and assigned(StartSymbol.Section) then begin
+   AddressOfEntryPoint:=StartSymbol.Section.VirtualAddress+StartSymbol.Value;
+  end else begin
+   AddressOfEntryPoint:=0;
+  end;
 
   CodeBase:=PECOFFSectionAlignment;
 
@@ -2574,10 +2575,15 @@ begin
    SortSections;
    MergeDuplicateAndDeleteUnusedSections;
    PositionAndSizeSections;
-   ResolveSymbols;
-   ResolveRelocations;
-   GenerateRelocationSection;
-   GenerateImage(AOutputStream);
+   ExternalAvailableSymbolHashMap:=TPACCRawByteStringHashMap.Create;
+   try
+    ResolveSymbols;
+    ResolveRelocations;
+    GenerateRelocationSection;
+    GenerateImage(AOutputStream);
+   finally
+    ExternalAvailableSymbolHashMap.Free;
+   end;
   finally
    FreeMem(PECOFFDirectoryEntries);
   end;
