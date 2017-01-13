@@ -109,6 +109,25 @@ type TPACCLinker_COFF_PE=class;
        property Items[const Index:TPACCInt]:TPACCLinker_COFF_PESymbol read GetItem write SetItem; default;
      end;
 
+     PPACCLinker_COFF_PEImport=^TPACCLinker_COFF_PEImport;
+     TPACCLinker_COFF_PEImport=record
+      Used:boolean;
+      SymbolName:TPUCUUTF8String;
+      ImportLibraryName:TPUCUUTF8String;
+      ImportName:TPUCUUTF8String;
+     end;
+
+     TPACCLinker_COFF_PEImports=array of TPACCLinker_COFF_PEImport;
+
+     PPACCLinker_COFF_PEExport=^TPACCLinker_COFF_PEExport;
+     TPACCLinker_COFF_PEExport=record
+      Used:boolean;
+      SymbolName:TPUCUUTF8String;
+      ExportName:TPUCUUTF8String;
+     end;
+
+     TPACCLinker_COFF_PEExports=array of TPACCLinker_COFF_PEExport;
+
      TPACCLinker_COFF_PE=class(TPACCLinker)
       private
 
@@ -118,12 +137,22 @@ type TPACCLinker_COFF_PE=class;
 
        fSymbols:TPACCLinker_COFF_PESymbolList;
 
+       fImports:TPACCLinker_COFF_PEImports;
+       fCountImports:TPACCInt32;
+
+       fExports:TPACCLinker_COFF_PEImports;
+       fCountExports:TPACCInt32;
+
        fImageBase:TPACCUInt64;
 
       public
 
        constructor Create(const AInstance:TObject); override;
        destructor Destroy; override;
+
+       procedure AddImport(const ASymbolName,AImportLibraryName,AImportName:TPUCUUTF8String); override;
+
+       procedure AddExport(const ASymbolName,AExportName:TPUCUUTF8String); override;
 
        procedure AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String=''); override;
 
@@ -969,7 +998,13 @@ begin
 
  fSymbols:=TPACCLinker_COFF_PESymbolList.Create;
 
- ImageBase:=$400000;
+ fImports:=nil;
+ fCountImports:=0;
+
+ fExports:=nil;
+ fCountExports:=0;
+
+ fImageBase:=$400000;
 
 end;
 
@@ -988,7 +1023,42 @@ begin
  end;
  fSections.Free;
 
+ fImports:=nil;
+
+ fExports:=nil;
+
  inherited Destroy;
+end;
+
+procedure TPACCLinker_COFF_PE.AddImport(const ASymbolName,AImportLibraryName,AImportName:TPUCUUTF8String);
+var Index:TPACCInt32;
+    Import_:PPACCLinker_COFF_PEImport;
+begin
+ Index:=fCountImports;
+ inc(fCountImports);
+ if length(fImports)<fCountImports then begin
+  SetLength(fImports,fCountImports*2);
+ end;
+ Import_:=@fImports[Index];
+ Import_^.Used:=false;
+ Import_^.SymbolName:=ASymbolName;
+ Import_^.ImportLibraryName:=AImportLibraryName;
+ Import_^.ImportName:=AImportName;
+end;
+
+procedure TPACCLinker_COFF_PE.AddExport(const ASymbolName,AExportName:TPUCUUTF8String);
+var Index:TPACCInt32;
+    Export_:PPACCLinker_COFF_PEExport;
+begin
+ Index:=fCountExports;
+ inc(fCountExports);
+ if length(fExports)<fCountExports then begin
+  SetLength(fExports,fCountExports*2);
+ end;
+ Export_:=@fExports[Index];
+ Export_^.Used:=false;
+ Export_^.SymbolName:=ASymbolName;
+ Export_^.ExportName:=AExportName;
 end;
 
 procedure TPACCLinker_COFF_PE.AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String='');

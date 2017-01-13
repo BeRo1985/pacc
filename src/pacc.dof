@@ -100,7 +100,7 @@ Conditionals=
 DebugSourceDirs=
 UsePackages=0
 [Parameters]
-RunParams=coff32.o windows.imp
+RunParams=helloworld_win32.asm windows.imp
 HostApplication=
 Launcher=
 UseLauncher=0
