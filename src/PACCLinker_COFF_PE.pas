@@ -33,6 +33,8 @@ type TPACCLinker_COFF_PE=class;
        fActive:boolean;
       protected
        Relocations:TPACCLinker_COFF_PERelocations;
+       CountRelocations:TPACCInt32;
+       function NewRelocation:PPACCLinker_COFF_PERelocation;
       public
        constructor Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32); reintroduce;
        destructor Destroy; override;
@@ -896,6 +898,7 @@ begin
  fActive:=true;
 
  Relocations:=nil;
+ CountRelocations:=0;
 
 end;
 
@@ -905,6 +908,17 @@ begin
  fSymbols.Free;
  fStream.Free;
  inherited Destroy;
+end;
+
+function TPACCLinker_COFF_PESection.NewRelocation:PPACCLinker_COFF_PERelocation;
+var Index:TPACCInt32;
+begin
+ Index:=CountRelocations;
+ inc(CountRelocations);
+ if length(Relocations)<CountRelocations then begin
+  SetLength(Relocations,CountRelocations*2);
+ end;
+ result:=@Relocations[Index];
 end;
 
 constructor TPACCLinker_COFF_PESectionList.Create;
@@ -1218,7 +1232,8 @@ begin
         end;
         AObjectStream.ReadBuffer(COFFRelocations[0],NumberOfRelocations*SizeOf(TCOFFRelocation));
         SetLength(Section.Relocations,NumberOfRelocations);
-        for RelocationIndex:=0 to NumberOfRelocations-1 do begin
+        Section.CountRelocations:=NumberOfRelocations;
+        for RelocationIndex:=0 to Section.CountRelocations-1 do begin
          COFFRelocation:=@COFFRelocations[RelocationIndex];
          Relocation:=@Section.Relocations[RelocationIndex];
          Relocation^.VirtualAddress:=COFFRelocation^.VirtualAddress+Section.VirtualAddress;
@@ -1337,7 +1352,7 @@ begin
    // Correct symbol indices at section relocations
    for SectionIndex:=SectionStartIndex to Sections.Count-1 do begin
     Section:=Sections[SectionIndex];
-    for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
+    for RelocationIndex:=0 to Section.CountRelocations-1 do begin
      Relocation:=@Section.Relocations[RelocationIndex];
      Assert(Relocation^.Symbol<TPACCUInt32(length(SymbolRemap)));
      Relocation^.Symbol:=SymbolRemap[Relocation^.Symbol];
@@ -1582,7 +1597,9 @@ var Relocations:TRelocations;
  end;
  procedure GenerateImports;
  const ImportThunkX86:array[0..7] of TPACCUInt8=($ff,$25,$00,$00,$00,$00,$8b,$c0);
- type PImportLibraryImport=^TImportLibraryImport;
+ type PSectionBytes=^TSectionBytes;
+      TSectionBytes=array[0..65535] of TPACCUInt8;
+      PImportLibraryImport=^TImportLibraryImport;
       TImportLibraryImport=record
        SymbolName:TPACCRawByteString;
        Name:TPACCRawByteString;
@@ -1600,10 +1617,13 @@ var Relocations:TRelocations;
        CountImports:longint;
       end;
       TImportLibraries=array of TImportLibrary;
- var ImportIndex,SectionIndex,LibraryIndex,CountLibraries,LibraryImportIndex,PassIndex:TPACCInt32;
+ var ImportIndex,SectionIndex,LibraryIndex,CountLibraries,LibraryImportIndex,PassIndex,
+     ImportSectionSymbolIndex,CodeSectionSymbolIndex,OriginalFirstThunkSymbolIndex,
+     LibraryNameSymbolIndex:TPACCInt32;
      Import_:PPACCLinker_COFF_PEImport;
      OK:boolean;
      Section,CodeSection,ImportSection:TPACCLinker_COFF_PESection;
+     Relocation:PPACCLinker_COFF_PERelocation;
      Libraries:TImportLibraries;
      Library_:PImportLibrary;
      LibraryImport:PImportLibraryImport;
@@ -1613,6 +1633,7 @@ var Relocations:TRelocations;
      Size:TPACCUInt64;
      v32:TPACCUInt32;
      v64:TPACCUInt64;
+     ImportSectionSymbol,CodeSectionSymbol,OriginalFirstThunkSymbol,LibraryNameSymbol:TPACCLinker_COFF_PESymbol;
  begin
 
   OK:=false;
@@ -1695,13 +1716,61 @@ var Relocations:TRelocations;
      ImportSection.Stream.Seek(0,soBeginning);
      CodeSection.Stream.Seek(0,soBeginning);
 
+     if PassIndex=1 then begin
+      ImportSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_data_section',ImportSection,0,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      ImportSectionSymbolIndex:=Symbols.Add(ImportSectionSymbol);
+      ImportSection.Symbols.Add(ImportSectionSymbol);
+      CodeSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_code_section',CodeSection,0,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      CodeSectionSymbolIndex:=Symbols.Add(CodeSectionSymbol);
+      CodeSection.Symbols.Add(CodeSectionSymbol);
+     end;
+
      for LibraryIndex:=0 to CountLibraries-1 do begin
+
       Library_:=@Libraries[LibraryIndex];
       Library_^.DescriptorOffset:=ImportSection.Stream.Position;
+
+      if PassIndex=1 then begin
+
+       begin
+        OriginalFirstThunkSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_library_'+IntToStr(LibraryIndex)+'_thunk',ImportSection,Library_^.ThunkOffset,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+        OriginalFirstThunkSymbolIndex:=Symbols.Add(OriginalFirstThunkSymbol);
+        ImportSection.Symbols.Add(OriginalFirstThunkSymbol);
+        Relocation:=ImportSection.NewRelocation;
+        Relocation^.VirtualAddress:=TPACCPtrUInt(pointer(@PImageImportDescriptor(@PSectionBytes(ImportSection.Stream.Memory)^[ImportSection.Stream.Position])^.OriginalFirstThunk))-TPACCPtrUInt(pointer(@PSectionBytes(ImportSection.Stream.Memory)^[ImportSection.Stream.Position]));
+        Relocation^.Symbol:=OriginalFirstThunkSymbolIndex;
+        case fMachine of
+         IMAGE_FILE_MACHINE_I386:begin
+          Relocation^.RelocationType:=IMAGE_REL_I386_DIR32;
+         end;
+         else begin
+          Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR64;
+         end;
+        end;
+       end;
+
+       begin
+        LibraryNameSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_library_'+IntToStr(LibraryIndex)+'_name',ImportSection,Library_^.NameOffset,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+        LibraryNameSymbolIndex:=Symbols.Add(LibraryNameSymbol);
+        ImportSection.Symbols.Add(LibraryNameSymbol);
+        Relocation:=ImportSection.NewRelocation;
+        Relocation^.VirtualAddress:=TPACCPtrUInt(pointer(@PImageImportDescriptor(@PSectionBytes(ImportSection.Stream.Memory)^[ImportSection.Stream.Position])^.Name))-TPACCPtrUInt(pointer(@PSectionBytes(ImportSection.Stream.Memory)^[ImportSection.Stream.Position]));
+        Relocation^.Symbol:=LibraryNameSymbolIndex;
+        case fMachine of
+         IMAGE_FILE_MACHINE_I386:begin
+          Relocation^.RelocationType:=IMAGE_REL_I386_DIR32;
+         end;
+         else begin
+          Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR64;
+         end;
+        end;
+       end;
+
+      end;
+
       FillChar(ImageImportDescriptor,SizeOf(TImageImportDescriptor),#0);
-      ImageImportDescriptor.OriginalFirstThunk:=Library_^.ThunkOffset;
-      ImageImportDescriptor.Name:=Library_^.NameOffset;
       ImportSection.Stream.WriteBuffer(ImageImportDescriptor,SizeOf(TImageImportDescriptor));
+
      end;
 
      FillChar(ImageImportDescriptor,SizeOf(TImageImportDescriptor),#0);
@@ -1858,10 +1927,13 @@ var Relocations:TRelocations;
 
        VirtualAddressDelta:=(DestinationSection.VirtualAddress+StartOffset)-Section.VirtualAddress;
 
-       RelocationStartIndex:=length(DestinationSection.Relocations);
-       SetLength(DestinationSection.Relocations,RelocationStartIndex+length(Section.Relocations));
-       
-       for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
+       RelocationStartIndex:=DestinationSection.CountRelocations;
+       inc(DestinationSection.CountRelocations,Section.CountRelocations);
+       if length(DestinationSection.Relocations)<DestinationSection.CountRelocations then begin
+        SetLength(DestinationSection.Relocations,DestinationSection.CountRelocations*2);
+       end;
+
+       for RelocationIndex:=0 to Section.CountRelocations-1 do begin
         Relocation:=@DestinationSection.Relocations[RelocationStartIndex+RelocationIndex];
         Relocation^:=Section.Relocations[RelocationIndex];
         inc(Relocation^.VirtualAddress,VirtualAddressDelta);
@@ -1921,7 +1993,7 @@ var Relocations:TRelocations;
    while (Section.RawSize>0) and (TPACCUInt8(PAnsiChar(Section.Stream.Memory)[Section.RawSize-1])=0) do begin
     Section.RawSize:=Section.RawSize-1;
    end;
-   for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
+   for RelocationIndex:=0 to Section.CountRelocations-1 do begin
     Relocation:=@Section.Relocations[RelocationIndex];
     inc(Relocation^.VirtualAddress,LastVirtualAddress);
    end;
@@ -1982,7 +2054,7 @@ var Relocations:TRelocations;
   for SectionIndex:=0 to Sections.Count-1 do begin
    Section:=Sections[SectionIndex];
    SectionData:=Section.Stream.Memory;
-   for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
+   for RelocationIndex:=0 to Section.CountRelocations-1 do begin
     Relocation:=@Section.Relocations[RelocationIndex];
     Offset:=Relocation^.VirtualAddress-Section.VirtualAddress;
     VirtualAddress:=Relocation^.VirtualAddress;
@@ -2215,4 +2287,4 @@ end;
 
 initialization
  FillChar(NullBytes,SizeOf(NullBytes),#0);
-end.                                                  
+end.
