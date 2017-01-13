@@ -115,6 +115,8 @@ type TPACCLinker_COFF_PE=class;
       SymbolName:TPUCUUTF8String;
       ImportLibraryName:TPUCUUTF8String;
       ImportName:TPUCUUTF8String;
+      CodeSectionOffset:TPACCUInt64;
+      NameOffset:TPACCUInt64;
      end;
 
      TPACCLinker_COFF_PEImports=array of TPACCLinker_COFF_PEImport;
@@ -139,9 +141,11 @@ type TPACCLinker_COFF_PE=class;
 
        fImports:TPACCLinker_COFF_PEImports;
        fCountImports:TPACCInt32;
+       fImportSymbolNameHashMap:TPACCRawByteStringHashMap;
 
        fExports:TPACCLinker_COFF_PEImports;
        fCountExports:TPACCInt32;
+       fExportSymbolNameHashMap:TPACCRawByteStringHashMap;
 
        fImageBase:TPACCUInt64;
 
@@ -686,6 +690,9 @@ type TBytes=array of TPACCUInt8;
       FirstThunk:TPACCUInt32;
      end;
 
+     PImageImportDescriptors=^TImageImportDescriptors;
+     TImageImportDescriptors=array[0..65535] of TImageImportDescriptor;
+
      PImageBaseRelocation=^TImageBaseRelocation;
      TImageBaseRelocation=packed record
       VirtualAddress:TPACCUInt32;
@@ -1000,9 +1007,11 @@ begin
 
  fImports:=nil;
  fCountImports:=0;
+ fImportSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
 
  fExports:=nil;
  fCountExports:=0;
+ fExportSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
 
  fImageBase:=$400000;
 
@@ -1024,8 +1033,10 @@ begin
  fSections.Free;
 
  fImports:=nil;
+ fImportSymbolNameHashMap.Free;
 
  fExports:=nil;
+ fExportSymbolNameHashMap.Free;
 
  inherited Destroy;
 end;
@@ -1034,31 +1045,41 @@ procedure TPACCLinker_COFF_PE.AddImport(const ASymbolName,AImportLibraryName,AIm
 var Index:TPACCInt32;
     Import_:PPACCLinker_COFF_PEImport;
 begin
- Index:=fCountImports;
- inc(fCountImports);
- if length(fImports)<fCountImports then begin
-  SetLength(fImports,fCountImports*2);
+ if assigned(fImportSymbolNameHashMap.Get(ASymbolName,false)) then begin
+  TPACCInstance(Instance).AddWarning('Duplicate import symbol name "'+ASymbolName+'"',nil);
+ end else begin
+  Index:=fCountImports;
+  inc(fCountImports);
+  if length(fImports)<fCountImports then begin
+   SetLength(fImports,fCountImports*2);
+  end;
+  Import_:=@fImports[Index];
+  Import_^.Used:=false;
+  Import_^.SymbolName:=ASymbolName;
+  Import_^.ImportLibraryName:=AImportLibraryName;
+  Import_^.ImportName:=AImportName;
+  fImportSymbolNameHashMap[ASymbolName]:=pointer(TPACCPtrUInt(Index));
  end;
- Import_:=@fImports[Index];
- Import_^.Used:=false;
- Import_^.SymbolName:=ASymbolName;
- Import_^.ImportLibraryName:=AImportLibraryName;
- Import_^.ImportName:=AImportName;
 end;
 
 procedure TPACCLinker_COFF_PE.AddExport(const ASymbolName,AExportName:TPUCUUTF8String);
 var Index:TPACCInt32;
     Export_:PPACCLinker_COFF_PEExport;
 begin
- Index:=fCountExports;
- inc(fCountExports);
- if length(fExports)<fCountExports then begin
-  SetLength(fExports,fCountExports*2);
+ if assigned(fExportSymbolNameHashMap.Get(ASymbolName,false)) then begin
+  TPACCInstance(Instance).AddWarning('Duplicate export symbol name "'+ASymbolName+'"',nil);
+ end else begin
+  Index:=fCountExports;
+  inc(fCountExports);
+  if length(fExports)<fCountExports then begin
+   SetLength(fExports,fCountExports*2);
+  end;
+  Export_:=@fExports[Index];
+  Export_^.Used:=false;
+  Export_^.SymbolName:=ASymbolName;
+  Export_^.ExportName:=AExportName;
+  fExportSymbolNameHashMap[ASymbolName]:=pointer(TPACCPtrUInt(Index));
  end;
- Export_:=@fExports[Index];
- Export_^.Used:=false;
- Export_^.SymbolName:=ASymbolName;
- Export_^.ExportName:=AExportName;
 end;
 
 procedure TPACCLinker_COFF_PE.AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String='');
@@ -1529,6 +1550,204 @@ var Relocations:TRelocations;
    end;
   end;
  end;
+ procedure ScanImports;
+ var SymbolIndex:TPACCInt32;
+     Symbol:TPACCLinker_COFF_PESymbol;
+     Entity:PPACCRawByteStringHashMapEntity;
+     Import_:PPACCLinker_COFF_PEImport;
+ begin
+  for SymbolIndex:=0 to Symbols.Count-1 do begin
+   Symbol:=Symbols[SymbolIndex];
+   if Symbol.Active and (Symbol.Class_=IMAGE_SYM_CLASS_EXTERNAL) and
+      ((Symbol.SymbolKind=plcpskUndefined) or
+       ((Symbol.SymbolKind=plcpskNormal) and not assigned(Symbol.Section))) and
+       not assigned(Symbol.Alias) then begin
+    Entity:=fImportSymbolNameHashMap.Get(Symbol.Name,false);
+    if assigned(Entity) then begin
+     Import_:=@fImports[TPACCPtrUInt(Entity.Value)];
+     Import_^.Used:=true;
+    end;
+   end;
+  end;
+ end;
+ procedure GenerateImports;
+ const ImportThunkX86:array[0..7] of TPACCUInt8=($ff,$25,$00,$00,$00,$00,$8b,$c0);
+ type PImportLibraryImport=^TImportLibraryImport;
+      TImportLibraryImport=record
+       SymbolName:TPACCRawByteString;
+       Name:TPACCRawByteString;
+       NameOffset:TPACCUInt64;
+       CodeOffset:TPACCUInt64;
+      end;
+      TImportLibraryImports=array of TImportLibraryImport;
+      PImportLibrary=^TImportLibrary;
+      TImportLibrary=record
+       Name:TPACCRawByteString;
+       DescriptorOffset:TPACCUInt64;
+       NameOffset:TPACCUInt64;
+       ThunkOffset:TPACCUInt64;
+       Imports:TImportLibraryImports;
+       CountImports:longint;
+      end;
+      TImportLibraries=array of TImportLibrary;
+ var ImportIndex,SectionIndex,LibraryIndex,CountLibraries,LibraryImportIndex,PassIndex:TPACCInt32;
+     Import_:PPACCLinker_COFF_PEImport;
+     OK:boolean;
+     Section,CodeSection,ImportSection:TPACCLinker_COFF_PESection;
+     Libraries:TImportLibraries;
+     Library_:PImportLibrary;
+     LibraryImport:PImportLibraryImport;
+     LibraryStringHashMap:TPACCRawByteStringHashMap;
+     Entity:PPACCRawByteStringHashMapEntity;
+     ImageImportDescriptor:TImageImportDescriptor;
+     Size:TPACCUInt64;
+     v32:TPACCUInt32;
+     v64:TPACCUInt64;
+ begin
+
+  OK:=false;
+  for ImportIndex:=0 to fCountImports-1 do begin
+   Import_:=@fImports[ImportIndex];
+   if Import_^.Used then begin
+    OK:=true;
+    break;
+   end;
+  end;
+
+  if OK then begin
+
+   for SectionIndex:=0 to Sections.Count-1 do begin
+    Section:=Sections[SectionIndex];
+    if Section.Name='.idata' then begin
+     TPACCInstance(Instance).AddError('Section ".idata" already exist',nil,true);
+    end else if (Section.Name='.text') and (Section.fOrdering='imports') then begin
+     TPACCInstance(Instance).AddError('Section ".text" with ordering "imports" already exist',nil,true);
+    end;
+   end;
+
+   CodeSection:=TPACCLinker_COFF_PESection.Create(self,'.text$imports',0,IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_16BYTES);
+   Sections.Add(CodeSection);
+
+   ImportSection:=TPACCLinker_COFF_PESection.Create(self,'.idata',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_ALIGN_16BYTES);
+   Sections.Add(ImportSection);
+
+   Libraries:=nil;
+   CountLibraries:=0;
+   try
+
+    LibraryStringHashMap:=TPACCRawByteStringHashMap.Create;
+    try
+
+     for ImportIndex:=0 to fCountImports-1 do begin
+      Import_:=@fImports[ImportIndex];
+      if Import_^.Used then begin
+       Entity:=LibraryStringHashMap.Get(Import_^.ImportLibraryName,false);
+       if assigned(Entity) then begin
+        LibraryIndex:=TPACCPtrUInt(pointer(Entity.Value));
+       end else begin
+        LibraryIndex:=CountLibraries;
+        inc(CountLibraries);
+        if length(Libraries)<CountLibraries then begin
+         SetLength(Libraries,CountLibraries*2);
+        end;
+        LibraryStringHashMap[Import_^.ImportLibraryName]:=pointer(TPACCPtrUInt(LibraryIndex));
+        Library_:=@Libraries[LibraryIndex];
+        Library_^.Name:=Import_^.ImportLibraryName;
+        Library_^.DescriptorOffset:=0;
+        Library_^.NameOffset:=0;
+        Library_^.ThunkOffset:=0;
+        Library_^.Imports:=nil;
+        Library_^.CountImports:=0;
+       end;
+       Library_:=@Libraries[LibraryIndex];
+       LibraryImportIndex:=Library_^.CountImports;
+       inc(Library_^.CountImports);
+       if length(Library_^.Imports)<Library_^.CountImports then begin
+        SetLength(Library_^.Imports,Library_^.CountImports*2);
+       end;
+       LibraryImport:=@Library_^.Imports[LibraryImportIndex];
+       LibraryImport^.SymbolName:=Import_^.SymbolName;
+       LibraryImport^.Name:=Import_^.ImportName;
+       LibraryImport^.NameOffset:=0;
+       LibraryImport^.CodeOffset:=0;
+      end;
+     end;
+    finally
+     LibraryStringHashMap.Free;
+    end;
+    SetLength(Libraries,CountLibraries);
+    for LibraryIndex:=0 to length(Libraries)-1 do begin
+     SetLength(Libraries[LibraryIndex].Imports,Libraries[LibraryIndex].CountImports);
+    end;
+
+    for PassIndex:=0 to 1 do begin
+
+     ImportSection.Stream.Seek(0,soBeginning);
+     CodeSection.Stream.Seek(0,soBeginning);
+
+     for LibraryIndex:=0 to CountLibraries-1 do begin
+      Library_:=@Libraries[LibraryIndex];
+      Library_^.DescriptorOffset:=ImportSection.Stream.Position;
+      FillChar(ImageImportDescriptor,SizeOf(TImageImportDescriptor),#0);
+      ImageImportDescriptor.OriginalFirstThunk:=Library_^.ThunkOffset;
+      ImageImportDescriptor.Name:=Library_^.NameOffset;
+      ImportSection.Stream.WriteBuffer(ImageImportDescriptor,SizeOf(TImageImportDescriptor));
+     end;
+
+     FillChar(ImageImportDescriptor,SizeOf(TImageImportDescriptor),#0);
+     ImportSection.Stream.WriteBuffer(ImageImportDescriptor,SizeOf(TImageImportDescriptor));
+
+     for LibraryIndex:=0 to CountLibraries-1 do begin
+      Library_:=@Libraries[LibraryIndex];
+      Library_^.ThunkOffset:=ImportSection.Stream.Position;
+      for LibraryImportIndex:=0 to Library_^.CountImports-1 do begin
+       LibraryImport:=@Library_^.Imports[LibraryImportIndex];
+       case fMachine of
+        IMAGE_FILE_MACHINE_I386:begin
+         v32:=LibraryImport^.NameOffset;
+         ImportSection.Stream.WriteBuffer(v32,SizeOf(TPACCUInt32));
+        end;
+        else begin
+         v64:=LibraryImport^.NameOffset;
+         ImportSection.Stream.WriteBuffer(v64,SizeOf(TPACCUInt64));
+        end;
+       end;
+      end;
+      case fMachine of
+       IMAGE_FILE_MACHINE_I386:begin
+        v32:=0;
+        ImportSection.Stream.WriteBuffer(v32,SizeOf(TPACCUInt32));
+       end;
+       else begin
+        v64:=0;
+        ImportSection.Stream.WriteBuffer(v64,SizeOf(TPACCUInt64));
+       end;
+      end;
+     end;
+
+     for LibraryIndex:=0 to CountLibraries-1 do begin
+      Library_:=@Libraries[LibraryIndex];
+      Library_^.NameOffset:=ImportSection.Stream.Position;
+      ImportSection.Stream.WriteBuffer(Library_^.Name[1],length(Library_^.Name));
+      ImportSection.Stream.WriteBuffer(NullBytes[0],SizeOf(TPACCUInt8));
+      for LibraryImportIndex:=0 to Library_^.CountImports-1 do begin
+       LibraryImport:=@Library_^.Imports[LibraryImportIndex];
+       LibraryImport^.NameOffset:=ImportSection.Stream.Position;
+       ImportSection.Stream.WriteBuffer(LibraryImport^.Name[1],length(LibraryImport^.Name));
+       ImportSection.Stream.WriteBuffer(NullBytes[0],SizeOf(TPACCUInt8));
+       LibraryImport^.CodeOffset:=CodeSection.Stream.Position;
+       CodeSection.Stream.WriteBuffer(ImportThunkX86,SizeOf(ImportThunkX86));
+      end;
+     end;
+
+    end;
+
+   finally
+    Libraries:=nil;
+   end;
+
+  end;
+ end;
  procedure SortSections;
 {$ifdef Debug_UseBubbleSortForSortingSections}
  var SectionIndex:TPACCInt32;
@@ -1960,6 +2179,8 @@ begin
   GetMem(PECOFFDirectoryEntries,SizeOf(TPECOFFDirectoryEntries));
   try
    FillChar(PECOFFDirectoryEntries^,SizeOf(TPECOFFDirectoryEntries),#0);
+   ScanImports;
+   GenerateImports;
    SortSections;
    MergeDuplicateAndDeleteUnusedSections;
    PositionAndSizeSections;
@@ -1976,4 +2197,4 @@ end;
 
 initialization
  FillChar(NullBytes,SizeOf(NullBytes),#0);
-end.
+end.                                                  
