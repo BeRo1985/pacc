@@ -23,6 +23,7 @@ type TPACCLinker_COFF_PE=class;
        fLinker:TPACCLinker_COFF_PE;
        fName:TPACCRawByteString;
        fOrdering:TPACCRawByteString;
+       fOrder:TPACCInt32;
        fStream:TMemoryStream;
        fAlignment:TPACCInt32;
        fVirtualAddress:TPACCUInt64;
@@ -43,6 +44,7 @@ type TPACCLinker_COFF_PE=class;
        property Linker:TPACCLinker_COFF_PE read fLinker;
        property Name:TPACCRawByteString read fName write fName;
        property Ordering:TPACCRawByteString read fOrdering write fOrdering;
+       property Order:TPACCInt32 read fOrder write fOrder;
        property Stream:TMemoryStream read fStream;
        property Alignment:TPACCInt32 read fAlignment write fAlignment;
        property VirtualAddress:TPACCUInt64 read fVirtualAddress write fVirtualAddress;
@@ -1369,10 +1371,11 @@ end;
 
 function CompareSections(a,b:pointer):TPACCInt32;
 begin
- if TPACCLinker_COFF_PESection(a).fName=TPACCLinker_COFF_PESection(b).fName then begin
-  result:=CompareStr(TPACCLinker_COFF_PESection(a).fOrdering,TPACCLinker_COFF_PESection(b).fOrdering);
- end else begin
-  result:=0;
+ result:=TPACCLinker_COFF_PESection(a).Order-TPACCLinker_COFF_PESection(b).Order;
+ if result=0 then begin
+  if TPACCLinker_COFF_PESection(a).Name=TPACCLinker_COFF_PESection(b).Name then begin
+   result:=CompareStr(TPACCLinker_COFF_PESection(a).Ordering,TPACCLinker_COFF_PESection(b).Ordering);
+  end;
  end;
 end;
 
@@ -1899,28 +1902,34 @@ var Relocations:TRelocations;
   end;
  end;
  procedure SortSections;
-{$ifdef Debug_UseBubbleSortForSortingSections}
  var SectionIndex:TPACCInt32;
-{$endif}
+     Section:TPACCLinker_COFF_PESection;
+     SectionOrder:TStringList;
  begin
-{$ifdef Debug_UseBubbleSortForSortingSections}
-  SectionIndex:=0;
-  while (SectionIndex+1)<Sections.Count do begin
-   if (Sections[SectionIndex].Name=Sections[SectionIndex+1].Name) and
-      (Sections[SectionIndex].Ordering>Sections[SectionIndex+1].Ordering) then begin
-    Sections.Exchange(SectionIndex,SectionIndex+1);
-    if SectionIndex>0 then begin
-     dec(SectionIndex);
-    end else begin
-     inc(SectionIndex);
+  SectionOrder:=TStringList.Create;
+  try
+   SectionOrder.Add('.text');
+   SectionOrder.Add('.data');
+   SectionOrder.Add('.bss');
+   SectionOrder.Add('.didat');
+   SectionOrder.Add('.edata');
+   SectionOrder.Add('.idata');
+   SectionOrder.Add('.tls');
+   SectionOrder.Add('.rdata');
+   SectionOrder.Add('.pdata');
+   SectionOrder.Add('.reloc');
+   SectionOrder.Add('.rsrc');
+   for SectionIndex:=0 to Sections.Count-1 do begin
+    Section:=Sections[SectionIndex];
+    Section.Order:=SectionOrder.IndexOf(Section.Name);
+    if Section.Order<0 then begin
+     Section.Order:=SectionOrder.Count;
     end;
-   end else begin
-    inc(SectionIndex);
    end;
+  finally
+   SectionOrder.Free;
   end;
-{$else}
   Sections.Sort(CompareSections);
-{$endif}
  end;
  procedure MergeDuplicateAndDeleteUnusedSections;
   procedure AdjustSymbolsForSectionIndexToDelete(ToDeleteSectionIndex,NewSectionIndex:TPACCInt32);
