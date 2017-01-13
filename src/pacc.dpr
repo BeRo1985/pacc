@@ -478,10 +478,27 @@ begin
      try
       OutputStream:=TMemoryStream.Create;
       try
-       Instance.Target.LinkCode(AssembledCodeStreams,AssembledCodeFileNames,OutputStream,OutputFiles[0]);
-       OutputStream.SaveToFile(OutputFiles[0]);
+       try
+        Instance.Target.LinkCode(AssembledCodeStreams,AssembledCodeFileNames,OutputStream,OutputFiles[0]);
+        OutputStream.SaveToFile(OutputFiles[0]);
+       except
+       end;
       finally
-       OutputStream.Free;                                                                      
+       OutputStream.Free;
+      end;
+      if Instance.HasWarnings or Instance.HasErrors then begin
+       OutputLock.Acquire;
+       try
+        if Instance.HasWarnings then begin
+         write(ErrOutput,Instance.Warnings.Text);
+        end;
+        if Instance.HasErrors then begin
+         write(ErrOutput,Instance.Errors.Text);
+         TPasMPInterlocked.Write(HasErrors,true);
+        end;
+       finally
+        OutputLock.Release;
+       end;
       end;
      finally
       Instance.Free;

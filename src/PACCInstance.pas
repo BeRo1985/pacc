@@ -216,7 +216,11 @@ begin
  end else begin
   CurrentSourceLocation:=@SourceLocation;
  end;
- Errors.Add(Preprocessor.SourceFiles[CurrentSourceLocation^.Source]+':'+IntToStr(CurrentSourceLocation^.Line+1)+':'+IntToStr(CurrentSourceLocation^.Column+1)+': error: '+Msg);
+ if CurrentSourceLocation^.Source>=0 then begin
+  Errors.Add(Preprocessor.SourceFiles[CurrentSourceLocation^.Source]+':'+IntToStr(CurrentSourceLocation^.Line+1)+':'+IntToStr(CurrentSourceLocation^.Column+1)+': error: '+Msg);
+ end else begin
+  Errors.Add('?:'+IntToStr(CurrentSourceLocation^.Line+1)+':'+IntToStr(CurrentSourceLocation^.Column+1)+': error: '+Msg);
+ end;
  HasErrors:=true;
  if DoAbort then begin
   e:=EPACCError.Create(Msg);
@@ -241,7 +245,11 @@ begin
    end else begin
     CurrentSourceLocation:=@SourceLocation;
    end;
-   Warnings.Add(Preprocessor.SourceFiles[CurrentSourceLocation^.Source]+':'+IntToStr(CurrentSourceLocation^.Line+1)+':'+IntToStr(CurrentSourceLocation^.Column+1)+': warning: '+Msg);
+   if CurrentSourceLocation^.Source>=0 then begin
+    Warnings.Add(Preprocessor.SourceFiles[CurrentSourceLocation^.Source]+':'+IntToStr(CurrentSourceLocation^.Line+1)+':'+IntToStr(CurrentSourceLocation^.Column+1)+': warning: '+Msg);
+   end else begin
+    Warnings.Add('?:'+IntToStr(CurrentSourceLocation^.Line+1)+':'+IntToStr(CurrentSourceLocation^.Column+1)+': warning: '+Msg);
+   end;
    HasWarnings:=true;
   end;
  end;

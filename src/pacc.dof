@@ -100,7 +100,7 @@ Conditionals=
 DebugSourceDirs=
 UsePackages=0
 [Parameters]
-RunParams=coff32.o
+RunParams=coff32.o coff32b.o
 HostApplication=
 Launcher=
 UseLauncher=0

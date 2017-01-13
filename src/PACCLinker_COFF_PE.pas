@@ -26,8 +26,11 @@ type TPACCLinker_COFF_PE=class;
        fStream:TMemoryStream;
        fAlignment:TPACCInt32;
        fVirtualAddress:TPACCUInt64;
+       fVirtualSize:TPACCUInt64;
+       fRawSize:TPACCUInt64;
        fCharacteristics:TPACCUInt32;
        fSymbols:TPACCLinker_COFF_PESymbolList;
+       fActive:boolean;
       protected
        Relocations:TPACCLinker_COFF_PERelocations;
       public
@@ -40,8 +43,11 @@ type TPACCLinker_COFF_PE=class;
        property Stream:TMemoryStream read fStream;
        property Alignment:TPACCInt32 read fAlignment write fAlignment;
        property VirtualAddress:TPACCUInt64 read fVirtualAddress write fVirtualAddress;
+       property VirtualSize:TPACCUInt64 read fVirtualSize write fVirtualSize;
+       property RawSize:TPACCUInt64 read fRawSize write fRawSize;
        property Characteristics:TPACCUInt32 read fCharacteristics write fCharacteristics;
        property Symbols:TPACCLinker_COFF_PESymbolList read fSymbols;
+       property Active:boolean read fActive write fActive;
      end;
 
      TPACCLinker_COFF_PESectionList=class(TList)
@@ -54,6 +60,15 @@ type TPACCLinker_COFF_PE=class;
        property Items[const Index:TPACCInt]:TPACCLinker_COFF_PESection read GetItem write SetItem; default;
      end;
 
+     PPACCLinker_COFF_PESymbolKind=^TPACCLinker_COFF_PESymbolKind;
+     TPACCLinker_COFF_PESymbolKind=
+      (
+       plcpskUndefined,
+       plcpskAbsolute,
+       plcpskDebug,
+       plcpskNormal
+      );
+
      TPACCLinker_COFF_PESymbol=class
       private
        fLinker:TPACCLinker_COFF_PE;
@@ -62,10 +77,12 @@ type TPACCLinker_COFF_PE=class;
        fValue:TPACCInt64;
        fType:TPACCInt32;
        fClass:TPACCInt32;
+       fSymbolKind:TPACCLinker_COFF_PESymbolKind;
        fSubSymbols:TPACCLinker_COFF_PESymbolList;
        fAuxData:TMemoryStream;
+       fActive:boolean;
       public
-       constructor Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32); reintroduce;
+       constructor Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32;const ASymbolKind:TPACCLinker_COFF_PESymbolKind); reintroduce;
        destructor Destroy; override;
       published
        property Linker:TPACCLinker_COFF_PE read fLinker;
@@ -74,8 +91,10 @@ type TPACCLinker_COFF_PE=class;
        property Value:TPACCInt64 read fValue write fValue;
        property Type_:TPACCInt32 read fType;
        property Class_:TPACCInt32 read fClass;
+       property SymbolKind:TPACCLinker_COFF_PESymbolKind read fSymbolKind write fSymbolKind;
        property SubSymbols:TPACCLinker_COFF_PESymbolList read fSubSymbols;
        property AuxData:TMemoryStream read fAuxData write fAuxData;
+       property Active:boolean read fActive write fActive;
      end;
 
      TPACCLinker_COFF_PESymbolList=class(TList)
@@ -97,6 +116,8 @@ type TPACCLinker_COFF_PE=class;
 
        fSymbols:TPACCLinker_COFF_PESymbolList;
 
+       fImageBase:TPACCUInt64;
+
       public
 
        constructor Create(const AInstance:TObject); override;
@@ -109,10 +130,12 @@ type TPACCLinker_COFF_PE=class;
       published
 
        property Machine:TPACCUInt16 read fMachine;
-       
+
        property Sections:TPACCLinker_COFF_PESectionList read fSections;
 
        property Symbols:TPACCLinker_COFF_PESymbolList read fSymbols;
+
+       property ImageBase:TPACCUInt64 read fImageBase write fImageBase;
 
      end;
 
@@ -257,7 +280,7 @@ const MZEXEHeaderSize=128;
       IMAGE_SCN_MEM_EXECUTE=$20000000;
       IMAGE_SCN_MEM_READ=$40000000;
       IMAGE_SCN_MEM_WRITE=TPACCUInt32($80000000);
-      IMAGE_SCN_CNT_RESOURCE:int64=$100000000;
+      IMAGE_SCN_CNT_RESOURCE:TPACCInt64=$100000000;
 
       IMAGE_SCN_MAX_RELOC=$ffff;
 
@@ -419,6 +442,10 @@ const MZEXEHeaderSize=128;
       PE_SCN_MEM_EXECUTE=$20000000;
       PE_SCN_MEM_READ=$40000000;
       PE_SCN_MEM_WRITE=TPACCUInt32($80000000);
+
+      IMAGE_SYM_UNDEFINED=0;
+      IMAGE_SYM_ABSOLUTE=$ffff;
+      IMAGE_SYM_DEBUG=$fffe;
 
       PECOFFSectionAlignment=$1000;
       PECOFFFileAlignment=$200;
@@ -800,6 +827,8 @@ type TBytes=array of TPACCUInt8;
        );
      end;
 
+var NullBytes:array[0..65535] of TPACCUInt8;
+
 constructor TPACCLinker_COFF_PESection.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32);
 var Index:TPACCInt32;
 begin
@@ -822,9 +851,15 @@ begin
 
  fVirtualAddress:=AVirtualAddress;
 
+ fVirtualSize:=0;
+
+ fRawSize:=0;
+
  fCharacteristics:=ACharacteristics;
 
  fSymbols:=TPACCLinker_COFF_PESymbolList.Create;
+
+ fActive:=true;
 
  Relocations:=nil;
 
@@ -858,7 +893,7 @@ begin
  inherited Items[Index]:=pointer(Node);
 end;
 
-constructor TPACCLinker_COFF_PESymbol.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32);
+constructor TPACCLinker_COFF_PESymbol.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32;const ASymbolKind:TPACCLinker_COFF_PESymbolKind);
 begin
  inherited Create;
 
@@ -874,9 +909,13 @@ begin
 
  fClass:=AClass;
 
+ fSymbolKind:=ASymbolKind;
+
  fSubSymbols:=TPACCLinker_COFF_PESymbolList.Create;
 
  fAuxData:=nil;
+
+ fActive:=true;
 
 end;
 
@@ -930,6 +969,8 @@ begin
 
  fSymbols:=TPACCLinker_COFF_PESymbolList.Create;
 
+ ImageBase:=$400000;
+
 end;
 
 destructor TPACCLinker_COFF_PE.Destroy;
@@ -967,9 +1008,14 @@ var SectionIndex,RelocationIndex,NumberOfRelocations,SymbolIndex,SectionStartInd
     Symbol:TPACCLinker_COFF_PESymbol;
     Name:TPACCRawByteString;
     c:ansichar;
+    SymbolKind:TPACCLinker_COFF_PESymbolKind;
+    SymbolRemap:array of TPACCUInt32;
 begin
 
  COFFSectionHeaders:=nil;
+
+ SymbolRemap:=nil;
+
  try
 
   if AObjectStream.Seek(0,soBeginning)<>0 then begin
@@ -1016,13 +1062,15 @@ begin
   AObjectStream.ReadBuffer(COFFSectionHeaders[0],COFFFileHeader.NumberOfSections*SizeOf(TCOFFSectionHeader));
 
   SectionStartIndex:=Sections.Count;
+  SymbolStartIndex:=Symbols.Count;
 
   LocalSections:=TPACCLinker_COFF_PESectionList.Create;
   try
 
+   // Load sections
    for SectionIndex:=0 to COFFFileHeader.NumberOfSections-1 do begin
     COFFSectionHeader:=@COFFSectionHeaders[SectionIndex];
-    if COFFSectionHeader^.VirtualSize>0 then begin
+    if (COFFSectionHeader^.VirtualSize>0) or (COFFSectionHeader^.SizeOfRawData>0) then begin
      Section:=TPACCLinker_COFF_PESection.Create(self,COFFSectionHeader^.Name,COFFSectionHeader^.VirtualAddress,COFFSectionHeader^.Characteristics);
      Sections.Add(Section);
      LocalSections.Add(Section);
@@ -1031,7 +1079,8 @@ begin
      end;
      if (COFFSectionHeader^.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)=0 then begin
       if COFFSectionHeader^.SizeOfRawData>0 then begin
-       if COFFSectionHeader^.SizeOfRawData>COFFSectionHeader^.VirtualSize then begin
+       if (COFFSectionHeader^.VirtualSize>0) and
+          (COFFSectionHeader^.SizeOfRawData>COFFSectionHeader^.VirtualSize) then begin
         TPACCInstance(Instance).AddError('SizeOfRawData is larger than VirtualSize at section "'+Section.Name+'"',nil,true);
        end;
        if AObjectStream.Seek(COFFSectionHeader^.PointerToRawData,soBeginning)<>COFFSectionHeader^.PointerToRawData then begin
@@ -1081,7 +1130,7 @@ begin
         for RelocationIndex:=0 to NumberOfRelocations-1 do begin
          COFFRelocation:=@COFFRelocations[RelocationIndex];
          Relocation:=@Section.Relocations[RelocationIndex];
-         Relocation^.VirtualAddress:=COFFRelocation^.VirtualAddress;
+         Relocation^.VirtualAddress:=COFFRelocation^.VirtualAddress+Section.VirtualAddress;
          Relocation^.Symbol:=COFFRelocation^.Symbol;
          Relocation^.RelocationType:=COFFRelocation^.RelocationType;
         end;
@@ -1090,11 +1139,19 @@ begin
        end;
       end;
      end;
+     Section.VirtualAddress:=0;
     end else begin
      LocalSections.Add(nil);
     end;
    end;
 
+   // Allocate symbol index remap array
+   SetLength(SymbolRemap,COFFFileHeader.NumberOfSymbols);
+   for SymbolIndex:=0 to length(SymbolRemap)-1 do begin
+    SymbolRemap[SymbolIndex]:=0;
+   end;
+
+   // Load symbols
    if (COFFFileHeader.PointerToSymbolTable>0) and (COFFFileHeader.NumberOfSymbols>0) then begin
     COFFSymbols:=nil;
     try
@@ -1103,11 +1160,9 @@ begin
       TPACCInstance(Instance).AddError('Stream seek error',nil,true);
      end;
      AObjectStream.ReadBuffer(COFFSymbols[0],COFFFileHeader.NumberOfSymbols*SizeOf(TCOFFSymbol));
-     SymbolStartIndex:=Symbols.Count;
      SymbolIndex:=0;
      while TPACCUInt32(SymbolIndex)<COFFFileHeader.NumberOfSymbols do begin
       COFFSymbol:=@COFFSymbols[SymbolIndex];
-      inc(SymbolIndex);
       if COFFSymbol^.Name.Zero=0 then begin
        Offset:=COFFFileHeader.PointerToSymbolTable+(COFFFileHeader.NumberOfSymbols*SizeOf(TCOFFSymbol))+COFFSymbol^.Name.PointerToString;
        if AObjectStream.Seek(Offset,soBeginning)<>Offset then begin
@@ -1131,13 +1186,29 @@ begin
         end;
        end;
       end;
-      if (COFFSymbol^.Section>0) and (COFFSymbol^.Section<=LocalSections.Count) then begin
-       Section:=LocalSections[COFFSymbol^.Section-1];
-      end else begin
-       Section:=nil;
+      Section:=nil;
+      case COFFSymbol^.Section of
+       IMAGE_SYM_UNDEFINED:begin
+        SymbolKind:=plcpskUndefined;
+       end;
+       IMAGE_SYM_ABSOLUTE:begin
+        SymbolKind:=plcpskAbsolute;
+       end;
+       IMAGE_SYM_DEBUG:begin
+        SymbolKind:=plcpskDebug;
+       end;
+       else begin
+        if (COFFSymbol^.Section>0) and (COFFSymbol^.Section<=LocalSections.Count) then begin
+         Section:=LocalSections[COFFSymbol^.Section-1];
+         SymbolKind:=plcpskNormal;
+        end else begin
+         SymbolKind:=plcpskUndefined;
+        end;
+       end;
       end;
-      Symbol:=TPACCLinker_COFF_PESymbol.Create(self,Name,Section,COFFSymbol^.Value,COFFSymbol^.SymbolType,COFFSymbol^.SymbolClass);
-      Symbols.Add(Symbol);
+      Symbol:=TPACCLinker_COFF_PESymbol.Create(self,Name,Section,COFFSymbol^.Value,COFFSymbol^.SymbolType,COFFSymbol^.SymbolClass,SymbolKind);
+      SymbolRemap[SymbolIndex]:=Symbols.Add(Symbol);
+      inc(SymbolIndex);
       if assigned(Section) then begin
        Section.Symbols.Add(Symbol);
       end;
@@ -1172,18 +1243,84 @@ begin
     end;
    end;
 
+   // Correct symbol indices at section relocations
+   for SectionIndex:=SectionStartIndex to Sections.Count-1 do begin
+    Section:=Sections[SectionIndex];
+    for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
+     Relocation:=@Section.Relocations[RelocationIndex];
+     Assert(Relocation^.Symbol<TPACCUInt32(length(SymbolRemap)));
+     Relocation^.Symbol:=SymbolRemap[Relocation^.Symbol];
+    end;
+   end;
+
   finally
    LocalSections.Free;
   end;
 
  finally
   COFFSectionHeaders:=nil;
+  SymbolRemap:=nil;
+ end;
+
+end;
+
+function CompareSections(a,b:pointer):TPACCInt32;
+begin
+ if TPACCLinker_COFF_PESection(a).fName=TPACCLinker_COFF_PESection(b).fName then begin
+  result:=CompareStr(TPACCLinker_COFF_PESection(a).fOrdering,TPACCLinker_COFF_PESection(b).fOrdering);
+ end else begin
+  result:=0;
  end;
 end;
 
 procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
- procedure MergeDuplicateSections;
- var SectionIndex,RelocationIndex,RelocationStartIndex,SymbolIndex:TPACCInt32;
+ procedure SortSections;
+{$ifdef Debug_UseBubbleSortForSortingSections}
+ var SectionIndex:TPACCInt32;
+{$endif}
+ begin
+{$ifdef Debug_UseBubbleSortForSortingSections}
+  SectionIndex:=0;
+  while (SectionIndex+1)<Sections.Count do begin
+   if (Sections[SectionIndex].Name=Sections[SectionIndex+1].Name) and
+      (Sections[SectionIndex].Ordering>Sections[SectionIndex+1].Ordering) then begin
+    Sections.Exchange(SectionIndex,SectionIndex+1);
+    if SectionIndex>0 then begin
+     dec(SectionIndex);
+    end else begin
+     inc(SectionIndex);
+    end;
+   end else begin
+    inc(SectionIndex);
+   end;
+  end;
+{$else}
+  Sections.Sort(CompareSections);
+{$endif}
+ end;
+ procedure MergeDuplicateAndDeleteUnusedSections;
+  procedure AdjustSymbolsForSectionIndexToDelete(ToDeleteSectionIndex,NewSectionIndex:TPACCInt32);
+  var SymbolIndex:TPACCInt32;
+      Symbol:TPACCLinker_COFF_PESymbol;
+  begin
+   for SymbolIndex:=0 to Symbols.Count-1 do begin
+    Symbol:=Symbols[SymbolIndex];
+    if assigned(Symbol.fAuxData) and (Symbol.fAuxData.Size>0) then begin
+     case Symbol.Class_ of
+      IMAGE_SYM_CLASS_STATIC,IMAGE_SYM_CLASS_SECTION:begin
+       if PImageAuxSymbol(Symbol.fAuxData.Memory)^.Section.Number>0 then begin
+        if PImageAuxSymbol(Symbol.fAuxData.Memory)^.Section.Number=(ToDeleteSectionIndex+1) then begin
+         PImageAuxSymbol(Symbol.fAuxData.Memory)^.Section.Number:=NewSectionIndex+1;
+        end else if PImageAuxSymbol(Symbol.fAuxData.Memory)^.Section.Number>(ToDeleteSectionIndex+1) then begin
+         dec(PImageAuxSymbol(Symbol.fAuxData.Memory)^.Section.Number);
+        end;
+       end;
+      end;
+     end;
+    end;
+   end;
+  end;
+ var SectionIndex,RelocationIndex,RelocationStartIndex,SymbolIndex,DestinationSectionIndex:TPACCInt32;
      FillUpCount,StartOffset,VirtualAddressDelta:TPACCInt64;
      SectionNameHashMap:TPACCRawByteStringHashMap;
      Section,DestinationSection:TPACCLinker_COFF_PESection;
@@ -1196,80 +1333,78 @@ procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFile
   try
 
    SectionIndex:=0;
-   while (SectionIndex+1)<Sections.Count do begin
-    if (Sections[SectionIndex].Name=Sections[SectionIndex+1].Name) and
-       (Sections[SectionIndex].Ordering>Sections[SectionIndex+1].Ordering) then begin
-     Sections.Exchange(SectionIndex,SectionIndex+1);
-     if SectionIndex>0 then begin
-      dec(SectionIndex);
-     end else begin
-      inc(SectionIndex);
-     end;
-    end else begin
-     inc(SectionIndex);
-    end;
-   end;
-
-   SectionIndex:=0;
    while SectionIndex<Sections.Count do begin
 
     Section:=Sections[SectionIndex];
 
-    DestinationSection:=SectionNameHashMap[Section.Name];
+    if Section.Active then begin
 
-    if assigned(DestinationSection) then begin
+     DestinationSection:=SectionNameHashMap[Section.Name];
 
-     try
+     if assigned(DestinationSection) then begin
 
-      DestinationSection.Stream.Seek(DestinationSection.Stream.Size,soBeginning);
-      Section.Stream.Seek(0,soBeginning);
-      StartOffset:=DestinationSection.Stream.Size;
+      try
 
-      if DestinationSection.Alignment<>0 then begin
-       FillUpCount:=((DestinationSection.Stream.Size+Section.Alignment) and (Section.Alignment-1))-DestinationSection.Stream.Size;
-       if FillUpCount>0 then begin
-        DestinationSection.Stream.SetSize(StartOffset+FillUpCount);
-        FillChar(PAnsiChar(DestinationSection.Stream.Memory)[StartOffset],FillUpCount,#0);
-        StartOffset:=DestinationSection.Stream.Size;
-       end;
-      end;
+       DestinationSection.Stream.Seek(DestinationSection.Stream.Size,soBeginning);
+       Section.Stream.Seek(0,soBeginning);
+       StartOffset:=DestinationSection.Stream.Size;
 
-      DestinationSection.Alignment:=Max(DestinationSection.Alignment,Section.Alignment);
-
-      DestinationSection.Characteristics:=DestinationSection.Characteristics or Section.Characteristics;
-
-      DestinationSection.Stream.CopyFrom(Section.Stream,Section.Stream.Size);
-
-      RelocationStartIndex:=length(DestinationSection.Relocations);
-      SetLength(DestinationSection.Relocations,RelocationStartIndex+length(Section.Relocations));
-
-      VirtualAddressDelta:=(DestinationSection.VirtualAddress+StartOffset)-Section.VirtualAddress;
-
-      for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
-       Relocation:=@DestinationSection.Relocations[RelocationStartIndex+RelocationIndex];
-       Relocation^:=Section.Relocations[RelocationStartIndex+RelocationIndex];
-       inc(Relocation^.VirtualAddress,VirtualAddressDelta);
-      end;
-
-      for SymbolIndex:=0 to Section.Symbols.Count-1 do begin
-       Symbol:=Section.Symbols[SymbolIndex];
-       DestinationSection.Symbols.Add(Symbol);
-       Symbol.Section:=DestinationSection;
-       case Symbol.Class_ of
-        IMAGE_SYM_CLASS_EXTERNAL,IMAGE_SYM_CLASS_STATIC:begin
-         Symbol.Value:=Symbol.Value+StartOffset;
+       if Section.Alignment<>0 then begin
+        FillUpCount:=((DestinationSection.Stream.Size+(Section.Alignment-1)) and not (Section.Alignment-1))-DestinationSection.Stream.Size;
+        if FillUpCount>0 then begin
+         DestinationSection.Stream.SetSize(StartOffset+FillUpCount);
+         FillChar(PAnsiChar(DestinationSection.Stream.Memory)[StartOffset],FillUpCount,#0);
+         StartOffset:=DestinationSection.Stream.Size;
         end;
        end;
+
+       DestinationSection.Alignment:=Max(DestinationSection.Alignment,Section.Alignment);
+
+       DestinationSection.Characteristics:=DestinationSection.Characteristics or Section.Characteristics;
+
+       DestinationSection.Stream.CopyFrom(Section.Stream,Section.Stream.Size);
+
+       VirtualAddressDelta:=(DestinationSection.VirtualAddress+StartOffset)-Section.VirtualAddress;
+
+       RelocationStartIndex:=length(DestinationSection.Relocations);
+       SetLength(DestinationSection.Relocations,RelocationStartIndex+length(Section.Relocations));
+       
+       for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
+        Relocation:=@DestinationSection.Relocations[RelocationStartIndex+RelocationIndex];
+        Relocation^:=Section.Relocations[RelocationIndex];
+        inc(Relocation^.VirtualAddress,VirtualAddressDelta);
+       end;
+
+       for SymbolIndex:=0 to Section.Symbols.Count-1 do begin
+        Symbol:=Section.Symbols[SymbolIndex];
+        DestinationSection.Symbols.Add(Symbol);
+        Symbol.Section:=DestinationSection;
+        case Symbol.Class_ of
+         IMAGE_SYM_CLASS_EXTERNAL,IMAGE_SYM_CLASS_STATIC:begin
+          Symbol.Value:=Symbol.Value+StartOffset;
+         end;
+        end;
+       end;
+
+      finally
+       DestinationSectionIndex:=Sections.IndexOf(DestinationSection);
+       AdjustSymbolsForSectionIndexToDelete(SectionIndex,DestinationSectionIndex);
+       Section.Free;
+       Sections.Delete(SectionIndex);
       end;
 
-     finally
-      Section.Free;
-      Sections.Delete(SectionIndex);
+     end else begin
+      inc(SectionIndex);
+      SectionNameHashMap[Section.Name]:=Section;
      end;
 
     end else begin
-     inc(SectionIndex);
-     SectionNameHashMap[Section.Name]:=Section;
+     AdjustSymbolsForSectionIndexToDelete(SectionIndex,-1);
+     for SymbolIndex:=0 to Section.Symbols.Count-1 do begin
+      Section.Symbols[SymbolIndex].Active:=false;
+     end;
+     Section.Free;
+     Sections.Delete(SectionIndex);
     end;
 
    end;
@@ -1279,9 +1414,629 @@ procedure TPACCLinker_COFF_PE.Link(const AOutputStream:TStream;const AOutputFile
   end;
 
  end;
+ procedure PositionAndSizeSections;
+ var SectionIndex,RelocationIndex:TPACCInt32;
+     Section:TPACCLinker_COFF_PESection;
+     Relocation:PPACCLinker_COFF_PERelocation;
+     VirtualAddress:TPACCInt64;
+ begin
+  VirtualAddress:=PECOFFSectionAlignment;
+  for SectionIndex:=0 to Sections.Count-1 do begin
+   Section:=Sections[SectionIndex];
+   VirtualAddress:=(VirtualAddress+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
+   Section.VirtualAddress:=VirtualAddress;
+   Section.VirtualSize:=(Section.Stream.Size+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
+   Section.RawSize:=Section.Stream.Size;
+   while (Section.RawSize>0) and (TPACCUInt8(PAnsiChar(Section.Stream.Memory)[Section.RawSize-1])=0) do begin
+    Section.RawSize:=Section.RawSize-1;
+   end;
+   for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
+    Relocation:=@Section.Relocations[RelocationIndex];
+    inc(Relocation^.VirtualAddress,VirtualAddress);
+   end;
+   inc(VirtualAddress,Section.VirtualSize);
+  end;
+ end;
+ procedure ResolveRelocations;
+ type PSectionBytes=^TSectionBytes;
+      TSectionBytes=array[0..65535] of TPACCUInt8;
+ var SectionIndex,RelocationIndex,SymbolIndex:TPACCInt32;
+     Relocation:PPACCLinker_COFF_PERelocation;
+     Section:TPACCLinker_COFF_PESection;
+     Symbol:TPACCLinker_COFF_PESymbol;
+     SymbolRVA,Offset,VirtualAddress:TPACCUInt64;
+     SectionData:PSectionBytes;
+ begin
+  for SectionIndex:=0 to Sections.Count-1 do begin
+   Section:=Sections[SectionIndex];
+   SectionData:=Section.Stream.Memory;
+   for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
+    Relocation:=@Section.Relocations[RelocationIndex];
+    Offset:=Relocation^.VirtualAddress-Section.VirtualAddress;
+    VirtualAddress:=Relocation^.VirtualAddress;
+    SymbolRVA:=0;
+    SymbolIndex:=Relocation^.Symbol;
+    if (SymbolIndex>=0) and (SymbolIndex<Symbols.Count) then begin
+     Symbol:=Symbols[SymbolIndex];
+     if Symbol.Active then begin
+      case Symbol.Class_ of
+       IMAGE_SYM_CLASS_EXTERNAL:begin
+        if assigned(Symbol.Section) then begin
+         SymbolRVA:=Symbol.Section.VirtualAddress+Symbol.Value;
+        end else begin
+         TPACCInstance(Instance).AddError('Unsupported symbol type "'+Symbol.Name+'" for relocation',nil,true);
+        end;
+       end;
+       IMAGE_SYM_CLASS_STATIC:begin
+        case Symbol.SymbolKind of
+         plcpskUndefined:begin
+          TPACCInstance(Instance).AddError('Unsupported symbol type "'+Symbol.Name+'" for relocation',nil,true);
+         end;
+         plcpskAbsolute:begin
+          SymbolRVA:=Symbol.Value;
+         end;
+         plcpskDebug:begin
+          TPACCInstance(Instance).AddError('Unsupported symbol type "'+Symbol.Name+'" for relocation',nil,true);
+         end;
+         plcpskNormal:begin
+          if assigned(Symbol.Section) then begin
+           SymbolRVA:=Symbol.Section.VirtualAddress+Symbol.Value;
+          end else begin
+           TPACCInstance(Instance).AddError('Invalid symbol "'+Symbol.Name+'"',nil,true);
+          end;
+         end;
+        end;
+       end;
+       else begin
+        TPACCInstance(Instance).AddError('Unsupported symbol type "'+Symbol.Name+'" for relocation',nil,true);
+       end;
+      end;
+     end else begin
+      TPACCInstance(Instance).AddError('Invalid symbol "'+Symbol.Name+'"',nil,true);
+     end;
+    end else begin
+     Symbol:=nil;
+    end;
+    case fMachine of
+     IMAGE_FILE_MACHINE_I386:begin
+      case Relocation^.RelocationType of
+       IMAGE_REL_I386_ABSOLUTE:begin
+        // ignore
+       end;
+       IMAGE_REL_I386_DIR16:begin
+        inc(PPACCUInt16(pointer(@SectionData^[Offset]))^,(ImageBase+SymbolRVA) shr 16);
+       end;
+       IMAGE_REL_I386_REL16:begin
+        inc(PPACCUInt16(pointer(@SectionData^[Offset]))^,(SymbolRVA-(VirtualAddress+4)) shr 16);
+       end;
+       IMAGE_REL_I386_DIR32:begin
+        inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,ImageBase+SymbolRVA);
+       end;
+       IMAGE_REL_I386_DIR32NB:begin
+        inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA);
+       end;
+       IMAGE_REL_I386_SEG12:begin
+        TPACCInstance(Instance).AddError('Unsupported relocation',nil,true);
+       end;
+       IMAGE_REL_I386_SECTION:begin
+        if assigned(Symbol) and assigned(Symbol.Section) then begin
+         inc(PPACCUInt16(pointer(@SectionData^[Offset]))^,Sections.IndexOf(Symbol.Section));
+        end else begin
+         TPACCInstance(Instance).AddError('SECTION relocation points to a non-regular symbol',nil,true);
+        end;
+       end;
+       IMAGE_REL_I386_SECREL:begin
+        if assigned(Symbol) and assigned(Symbol.Section) then begin
+         inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA-Symbol.Section.VirtualAddress);
+        end else begin
+         TPACCInstance(Instance).AddError('SECREL relocation points to a non-regular symbol',nil,true);
+        end;
+       end;
+       IMAGE_REL_I386_TOKEN:begin
+        TPACCInstance(Instance).AddError('Unsupported relocation',nil,true);
+       end;
+       IMAGE_REL_I386_SECREL7:begin
+        if assigned(Symbol) and assigned(Symbol.Section) then begin
+         PPACCUInt8(pointer(@SectionData^[Offset]))^:=(((PPACCUInt8(pointer(@SectionData^[Offset]))^ and $7f)+(SymbolRVA-Symbol.Section.VirtualAddress)) and $7f) or (PPACCUInt8(pointer(@SectionData^[Offset]))^ and $80);
+        end else begin
+         TPACCInstance(Instance).AddError('SECREL7 relocation points to a non-regular symbol',nil,true);
+        end;
+       end;
+       IMAGE_REL_I386_REL32:begin
+        inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA-(VirtualAddress+4));
+       end;
+       else begin
+        writeln(Relocation^.RelocationType);
+        TPACCInstance(Instance).AddError('Unsupported relocation',nil,true);
+       end;
+      end;
+     end;
+     IMAGE_FILE_MACHINE_AMD64:begin
+      case Relocation^.RelocationType of
+       IMAGE_REL_AMD64_ABSOLUTE:begin
+       end;
+       IMAGE_REL_AMD64_ADDR64:begin
+        inc(PPACCUInt64(pointer(@SectionData^[Offset]))^,ImageBase+SymbolRVA);
+       end;
+       IMAGE_REL_AMD64_ADDR32:begin
+        inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,ImageBase+SymbolRVA);
+       end;
+       IMAGE_REL_AMD64_ADDR32NB:begin
+        inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA);
+       end;
+       IMAGE_REL_AMD64_REL32:begin
+        inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA-(VirtualAddress+4));
+       end;
+       IMAGE_REL_AMD64_REL32_1:begin
+        inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA-(VirtualAddress+5));
+       end;
+       IMAGE_REL_AMD64_REL32_2:begin
+        inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA-(VirtualAddress+6));
+       end;
+       IMAGE_REL_AMD64_REL32_3:begin
+        inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA-(VirtualAddress+7));
+       end;
+       IMAGE_REL_AMD64_REL32_4:begin
+        inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA-(VirtualAddress+8));
+       end;
+       IMAGE_REL_AMD64_REL32_5:begin
+        inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA-(VirtualAddress+9));
+       end;
+       IMAGE_REL_AMD64_SECTION:begin
+        if assigned(Symbol) and assigned(Symbol.Section) then begin
+         inc(PPACCUInt16(pointer(@SectionData^[Offset]))^,Sections.IndexOf(Symbol.Section));
+        end else begin
+         TPACCInstance(Instance).AddError('SECTION relocation points to a non-regular symbol',nil,true);
+        end;
+       end;
+       IMAGE_REL_AMD64_SECREL:begin
+        if assigned(Symbol) and assigned(Symbol.Section) then begin
+         inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA-Symbol.Section.VirtualAddress);
+        end else begin
+         TPACCInstance(Instance).AddError('SECREL relocation points to a non-regular symbol',nil,true);
+        end;
+       end;
+       IMAGE_REL_AMD64_SECREL7:begin
+        if assigned(Symbol) and assigned(Symbol.Section) then begin
+         PPACCUInt8(pointer(@SectionData^[Offset]))^:=(((PPACCUInt8(pointer(@SectionData^[Offset]))^ and $7f)+(SymbolRVA-Symbol.Section.VirtualAddress)) and $7f) or (PPACCUInt8(pointer(@SectionData^[Offset]))^ and $80);
+        end else begin
+         TPACCInstance(Instance).AddError('SECREL7 relocation points to a non-regular symbol',nil,true);
+        end;
+       end;
+       IMAGE_REL_AMD64_TOKEN:begin
+        TPACCInstance(Instance).AddError('Unsupported relocation',nil,true);
+       end;
+       IMAGE_REL_AMD64_SREL32:begin
+        if assigned(Symbol) and assigned(Symbol.Section) then begin
+         inc(PPACCUInt32(pointer(@SectionData^[Offset]))^,SymbolRVA-Symbol.Section.VirtualAddress);
+        end else begin
+         TPACCInstance(Instance).AddError('SREL32 relocation points to a non-regular symbol',nil,true);
+        end;
+       end;
+       IMAGE_REL_AMD64_PAIR:begin
+        TPACCInstance(Instance).AddError('Unsupported relocation',nil,true);
+       end;
+       IMAGE_REL_AMD64_SSPAN32:begin
+        TPACCInstance(Instance).AddError('Unsupported relocation',nil,true);
+       end;
+       else begin
+        TPACCInstance(Instance).AddError('Unsupported relocation',nil,true);
+       end;
+      end;
+     end;
+    end;
+   end;
+  end;
+ end;
+{procedure WritePE;
+  function SectionSizeAlign(Size:TPACCInt64):TPACCInt64;
+  begin
+   result:=Size;
+   if (result and (PECOFFSectionAlignment-1))<>0 then begin
+    result:=(result+(PECOFFSectionAlignment-1)) and not (PECOFFSectionAlignment-1);
+   end;
+  end;
+  function FileSizeAlign(Size:TPACCInt64):TPACCInt64;
+  begin
+   result:=Size;
+   if (result and (PECOFFFileAlignment-1))<>0 then begin
+    result:=(result+(PECOFFFileAlignment-1)) and not (PECOFFFileAlignment-1);
+   end;
+  end;
+  procedure DoAlign;
+  var Position,FillUpCount,ToDoCount:TPACCInt64;
+  begin
+   Position:=AOutputStream.Position;
+   if (Position and (PECOFFFileAlignment-1))<>0 then begin
+    FillUpCount:=((Position+(PECOFFFileAlignment-1)) and not (PECOFFFileAlignment-1))-Position;
+    while FillUpCount>0 do begin
+     ToDoCount:=Min(FillUpCount,SizeOf(NullBytes));
+     AOutputStream.WriteBuffer(NullBytes[0],ToDoCount);
+     dec(FillUpCount,ToDoCount);
+    end;
+   end;
+  end;
+  procedure ProcessRelocations;
+  var SectionIndex,RelocationIndex:TPACCInt32;
+      Relocation:PPACCLinker_COFF_PERelocation;
+      Section:TPACCLinker_COFF_PESection;
+  begin
+   for SectionIndex:=0 to Sections.Count-1 do begin
+    Section:=Sections[SectionIndex];
+    for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
+     Relocation:=@Section.Relocations[RelocationIndex];
+     case fMachine of
+      IMAGE_FILE_MACHINE_I386:begin
+       case Relocation^.RelocationType of
+        IMAGE_REL_I386_ABSOLUTE:begin
+         // ignore
+        end;
+        IMAGE_REL_I386_DIR16:begin
+        end;
+        IMAGE_REL_I386_REL16:begin
+        end;
+        IMAGE_REL_I386_DIR32:begin
+        end;
+        IMAGE_REL_I386_DIR32NB:begin
+        end;
+        IMAGE_REL_I386_SEG12:begin
+        end;
+        IMAGE_REL_I386_SECTION:begin
+         // ignore
+        end;
+        IMAGE_REL_I386_SECREL:begin
+        end;
+        IMAGE_REL_I386_TOKEN:begin
+        end;
+        IMAGE_REL_I386_SECREL7:begin
+        end;
+        IMAGE_REL_I386_REL32:begin
+        end;
+       end;
+      end;
+      IMAGE_FILE_MACHINE_AMD64:begin
+       case Relocation^.RelocationType of
+        IMAGE_REL_AMD64_ABSOLUTE:begin
+        end;
+        IMAGE_REL_AMD64_ADDR64:begin
+        end;
+        IMAGE_REL_AMD64_ADDR32:begin
+        end;
+        IMAGE_REL_AMD64_ADDR32NB:begin
+        end;
+        IMAGE_REL_AMD64_REL32:begin
+        end;
+        IMAGE_REL_AMD64_REL32_1:begin
+        end;
+        IMAGE_REL_AMD64_REL32_2:begin
+        end;
+        IMAGE_REL_AMD64_REL32_3:begin
+        end;
+        IMAGE_REL_AMD64_REL32_4:begin
+        end;
+        IMAGE_REL_AMD64_REL32_5:begin
+        end;
+        IMAGE_REL_AMD64_SECTION:begin
+        end;
+        IMAGE_REL_AMD64_SECREL:begin
+        end;
+        IMAGE_REL_AMD64_SECREL7:begin
+        end;
+        IMAGE_REL_AMD64_TOKEN:begin
+        end;
+        IMAGE_REL_AMD64_SREL32:begin
+        end;
+        IMAGE_REL_AMD64_PAIR:begin
+        end;
+        IMAGE_REL_AMD64_SSPAN32:begin
+        end;
+       end;
+      end;
+     end;
+    end;
+   end;
+  end;
+  function WriteRelocations:boolean;
+  type PRelocationNode=^TRelocationNode;
+       TRelocationNode=packed record
+        Next:PRelocationNode;
+        Previous:PRelocationNode;
+        VirtualAddress:TPACCUInt32;
+        RelocationType:TPACCUInt32;
+       end;
+       PRelocations=^TRelocations;
+       TRelocations=packed record
+        RootNode,LastNode:PRelocationNode;
+       end;
+   procedure RelocationsInit(var Instance:TRelocations);
+   begin
+    FillChar(Instance,SizeOf(TRelocations),#0);
+   end;
+   procedure RelocationsDone(var Instance:TRelocations);
+   var CurrentNode,NextNode:PRelocationNode;
+   begin
+    CurrentNode:=Instance.RootNode;
+    Instance.RootNode:=nil;
+    Instance.LastNode:=nil;
+    while assigned(CurrentNode) do begin
+     NextNode:=CurrentNode^.Next;
+     FreeMem(CurrentNode);
+     CurrentNode:=NextNode;
+    end;
+   end;
+   procedure RelocationsAdd(var Instance:TRelocations;const VirtualAddress,RelocationType:TPACCUInt32);
+   var NewNode:PRelocationNode;
+   begin
+    GetMem(NewNode,SizeOf(TRelocationNode));
+    FillChar(NewNode^,SizeOf(TRelocationNode),#0);
+    NewNode^.VirtualAddress:=VirtualAddress;
+    NewNode^.RelocationType:=RelocationType;
+    if assigned(Instance.LastNode) then begin
+     Instance.LastNode^.Next:=NewNode;
+     NewNode^.Previous:=Instance.LastNode;
+    end else begin
+     Instance.RootNode:=NewNode;
+    end;
+    Instance.LastNode:=NewNode;
+   end;
+   procedure RelocationsSort(var Instance:TRelocations);
+   var PartA,PartB,Node:PRelocationNode;
+       InSize,PartASize,PartBSize,Merges:longint;
+   begin
+    if assigned(Instance.RootNode) then begin
+     InSize:=1;
+     while true do begin
+      PartA:=Instance.RootNode;
+      Instance.RootNode:=nil;
+      Instance.LastNode:=nil;
+      Merges:=0;
+      while assigned(PartA) do begin
+       inc(Merges);
+       PartB:=PartA;
+       PartASize:=0;
+       while PartASize<InSize do begin
+        inc(PartASize);
+        PartB:=PartB^.Next;
+        if not assigned(PartB) then begin
+         break;
+        end;
+       end;
+       PartBSize:=InSize;
+       while (PartASize>0) or ((PartBSize>0) and assigned(PartB)) do begin
+        if PartASize=0 then begin
+         Node:=PartB;
+         PartB:=PartB^.Next;
+         dec(PartBSize);
+        end else if (PartBSize=0) or not assigned(PartB) then begin
+         Node:=PartA;
+         PartA:=PartA^.Next;
+         dec(PartASize);
+        end else if PartA^.VirtualAddress<=PartB^.VirtualAddress then begin
+         Node:=PartA;
+         PartA:=PartA^.Next;
+         dec(PartASize);
+        end else begin
+         Node:=PartB;
+         PartB:=PartB^.Next;
+         dec(PartBSize);
+        end;
+        if assigned(Instance.LastNode) then begin
+         Instance.LastNode^.Next:=Node;
+        end else begin
+         Instance.RootNode:=Node;
+        end;
+        Node^.Previous:=Instance.LastNode;
+        Instance.LastNode:=Node;
+       end;
+       PartA:=PartB;
+      end;
+      Instance.LastNode^.Next:=nil;
+      if Merges<=1 then begin
+       break;
+      end;
+      inc(InSize,InSize);
+     end;
+    end;
+   end;
+   function RelocationsSize(var Instance:TRelocations):TPACCUInt32;
+   var CurrentNode,OldNode:PRelocationNode;
+   begin
+    RelocationsSort(Instance);
+    result:=0;
+    CurrentNode:=Instance.RootNode;
+    OldNode:=CurrentNode;
+    while assigned(CurrentNode) do begin
+     if (CurrentNode=OldNode) or ((CurrentNode^.VirtualAddress-OldNode^.VirtualAddress)>=$1000) then begin
+      inc(result,sizeof(TImageBaseRelocation));
+     end;
+     inc(result,sizeof(word));
+     OldNode:=CurrentNode;
+     CurrentNode:=CurrentNode^.Next;
+    end;
+    inc(result,sizeof(TImageBaseRelocation));
+   end;
+   procedure RelocationsBuild(var Instance:TRelocations;NewBase:pointer;VirtualAddress:TPACCUInt32);
+   var CurrentNode,OldNode:PRelocationNode;
+       CurrentPointer:pchar;
+       BaseRelocation:PImageBaseRelocation;
+   begin
+    RelocationsSort(Instance);
+    CurrentPointer:=NewBase;
+    BaseRelocation:=pointer(CurrentPointer);
+    CurrentNode:=Instance.RootNode;
+    OldNode:=CurrentNode;
+    while assigned(CurrentNode) do begin
+     if (CurrentNode=OldNode) or ((CurrentNode^.VirtualAddress-OldNode^.VirtualAddress)>=$1000) then begin
+      BaseRelocation:=pointer(CurrentPointer);
+      inc(CurrentPointer,sizeof(TImageBaseRelocation));
+      BaseRelocation^.VirtualAddress:=CurrentNode^.VirtualAddress;
+      BaseRelocation^.SizeOfBlock:=sizeof(TImageBaseRelocation);
+     end;
+     pword(CurrentPointer)^:=(CurrentNode^.RelocationType shl 12) or ((CurrentNode^.VirtualAddress-BaseRelocation^.VirtualAddress) and $fff);
+     inc(CurrentPointer,sizeof(word));
+     inc(BaseRelocation^.SizeOfBlock,sizeof(word));
+     OldNode:=CurrentNode;
+     CurrentNode:=CurrentNode^.Next;
+    end;
+    BaseRelocation:=pointer(CurrentPointer);
+    inc(CurrentPointer,sizeof(TImageBaseRelocation));
+    BaseRelocation^.VirtualAddress:=0;
+    BaseRelocation^.SizeOfBlock:=0;
+   end;
+   procedure RelocationsDump(var Instance:TRelocations);
+   var CurrentNode:PRelocationNode;
+   begin
+    CurrentNode:=Instance.RootNode;
+    while assigned(CurrentNode) do begin
+     writeln(CurrentNode^.VirtualAddress);
+     CurrentNode:=CurrentNode^.Next;
+    end;
+   end;
+  var SectionIndex,RelocationIndex:TPACCInt32;
+      Relocations:TRelocations;
+      Relocation:PPACCLinker_COFF_PERelocation;
+      Section:TPACCLinker_COFF_PESection;
+      Size:TPACCUInt32;
+      Data:pointer;
+  begin
+   result:=false;
+   begin
+    RelocationsInit(Relocations);
+    try
+     for SectionIndex:=0 to Sections.Count-1 do begin
+      Section:=Sections[SectionIndex];
+      for RelocationIndex:=0 to length(Section.Relocations)-1 do begin
+       Relocation:=@Section.Relocations[RelocationIndex];
+       case fMachine of
+        IMAGE_FILE_MACHINE_I386:begin
+         case Relocation^.RelocationType of
+          IMAGE_REL_I386_ABSOLUTE:begin
+           // ignore
+          end;
+          IMAGE_REL_I386_DIR16:begin
+          end;
+          IMAGE_REL_I386_REL16:begin
+          end;
+          IMAGE_REL_I386_DIR32:begin
+          end;
+          IMAGE_REL_I386_DIR32NB:begin
+          end;
+          IMAGE_REL_I386_SEG12:begin
+          end;
+          IMAGE_REL_I386_SECTION:begin
+           // ignore
+          end;
+          IMAGE_REL_I386_SECREL:begin
+          end;
+          IMAGE_REL_I386_TOKEN:begin
+          end;
+          IMAGE_REL_I386_SECREL7:begin
+          end;
+          IMAGE_REL_I386_REL32:begin
+          end;
+         end;
+        end;
+        IMAGE_FILE_MACHINE_AMD64:begin
+         case Relocation^.RelocationType of
+          IMAGE_REL_AMD64_ABSOLUTE:begin
+          end;
+          IMAGE_REL_AMD64_ADDR64:begin
+          end;
+          IMAGE_REL_AMD64_ADDR32:begin
+          end;
+          IMAGE_REL_AMD64_ADDR32NB:begin
+          end;
+          IMAGE_REL_AMD64_REL32:begin
+          end;
+          IMAGE_REL_AMD64_REL32_1:begin
+          end;
+          IMAGE_REL_AMD64_REL32_2:begin
+          end;
+          IMAGE_REL_AMD64_REL32_3:begin
+          end;
+          IMAGE_REL_AMD64_REL32_4:begin
+          end;
+          IMAGE_REL_AMD64_REL32_5:begin
+          end;
+          IMAGE_REL_AMD64_SECTION:begin
+          end;
+          IMAGE_REL_AMD64_SECREL:begin
+          end;
+          IMAGE_REL_AMD64_SECREL7:begin
+          end;
+          IMAGE_REL_AMD64_TOKEN:begin
+          end;
+          IMAGE_REL_AMD64_SREL32:begin
+          end;
+          IMAGE_REL_AMD64_PAIR:begin
+          end;
+          IMAGE_REL_AMD64_SSPAN32:begin
+          end;
+         end;
+        end;
+       end;
+      end;
+     end;
+     FixUpExpression:=StartFixUpExpression;
+     while assigned(FixUpExpression) do begin
+      if assigned(FixUpExpression^.Expression) and not FixUpExpression^.Relative then begin
+       Symbol:=FixUpExpression^.Expression.GetFixUpSymbol(self);
+       if assigned(Symbol) and ((Symbol.SymbolType in [ustLABEL,ustIMPORT]) and Symbol.Used) then begin
+        if assigned(FixUpExpression^.Section) then begin
+         case FixUpExpression^.Bits of
+          16:begin
+           RelocationsAdd(Relocations,FixUpExpression^.Position+FixUpExpression^.Section^.Offset,IMAGE_REL_BASED_LOW);
+          end;
+          32:begin
+           RelocationsAdd(Relocations,FixUpExpression^.Position+FixUpExpression^.Section^.Offset,IMAGE_REL_BASED_HIGHLOW);
+          end;
+          64:begin
+           RelocationsAdd(Relocations,FixUpExpression^.Position+FixUpExpression^.Section^.Offset,IMAGE_REL_BASED_DIR64);
+          end;
+         end;
+        end;
+       end;
+      end;
+      FixUpExpression:=FixUpExpression^.Next;
+     end;
+     if assigned(Relocations.RootNode) then begin
+      RelocationsSort(Relocations);
+      Size:=RelocationsSize(Relocations);
+      Section:=GetSectionPerName('.reloc');
+      Section^.Position:=0;
+      Section^.Data.Clear;
+      Section^.Data.Seek(0,soBeginning);
+      IntegerValueSetQWord(Section^.FreezedFlags,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ);
+      GetMem(Data,Size);
+      try
+       RelocationsBuild(Relocations,Data,0);
+       Section^.Data.Seek(Section^.Data.Size,soBeginning);
+       Section^.Data.Write(Data^,Size);
+      finally
+       FreeMem(Data);
+      end;
+      inc(Section^.Position,Size);
+      PECOFFDirectoryEntry:=@PECOFFDirectoryEntries[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+      PECOFFDirectoryEntry^.Section:=Section;
+      PECOFFDirectoryEntry^.Position:=0;
+      PECOFFDirectoryEntry^.Size:=Size;
+      result:=true;
+     end;
+    finally
+     RelocationsDone(Relocations);
+    end;
+   end;
+  end;
+ begin
+ end;}
 begin
- MergeDuplicateSections;
+ SortSections;
+ MergeDuplicateAndDeleteUnusedSections;
+ PositionAndSizeSections;
+ ResolveRelocations;
+//WritePE;
 end;
 
-
+initialization
+ FillChar(NullBytes,SizeOf(NullBytes),#0);
 end.
