@@ -1953,13 +1953,14 @@ var Relocations:TRelocations;
     end;
    end;
   end;
- var SectionIndex,RelocationIndex,RelocationStartIndex,SymbolIndex,DestinationSectionIndex:TPACCInt32;
+ var SectionIndex,RelocationIndex,RelocationStartIndex,SymbolIndex,DestinationSectionIndex,Index:TPACCInt32;
      FillUpCount,StartOffset,VirtualAddressDelta:TPACCInt64;
      SectionNameHashMap:TPACCRawByteStringHashMap;
      Section,DestinationSection:TPACCLinker_COFF_PESection;
      Relocation:PPACCLinker_COFF_PERelocation;
      Symbol:TPACCLinker_COFF_PESymbol;
      Name:TPACCRawByteString;
+     PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
  begin
 
   SectionNameHashMap:=TPACCRawByteStringHashMap.Create;
@@ -2022,6 +2023,15 @@ var Relocations:TRelocations;
         end;
        end;
 
+       for Index:=0 to IMAGE_NUMBEROF_DIRECTORY_ENTRIES-1 do begin
+        PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[Index];
+        if PECOFFDirectoryEntry^.Section=Section then begin
+         PECOFFDirectoryEntry^.Section:=DestinationSection;
+         inc(PECOFFDirectoryEntry^.Offset,StartOffset);
+         PECOFFDirectoryEntry^.Size:=0;
+        end;
+       end;
+
       finally
        DestinationSectionIndex:=Sections.IndexOf(DestinationSection);
        AdjustSymbolsForSectionIndexToDelete(SectionIndex,DestinationSectionIndex);
@@ -2036,6 +2046,14 @@ var Relocations:TRelocations;
 
     end else begin
      AdjustSymbolsForSectionIndexToDelete(SectionIndex,-1);
+     for Index:=0 to IMAGE_NUMBEROF_DIRECTORY_ENTRIES-1 do begin
+      PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[Index];
+      if PECOFFDirectoryEntry^.Section=Section then begin
+       PECOFFDirectoryEntry^.Section:=nil;
+       PECOFFDirectoryEntry^.Offset:=0;
+       PECOFFDirectoryEntry^.Size:=0;
+      end;
+     end;
      for SymbolIndex:=0 to Section.Symbols.Count-1 do begin
       Section.Symbols[SymbolIndex].Active:=false;
      end;
