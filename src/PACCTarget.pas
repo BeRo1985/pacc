@@ -51,6 +51,8 @@ type TPACCTarget=class
 
        class function GetName:TPACCRawByteString; virtual;
 
+       function GetDefaultOutputExtension:TPACCRawByteString; virtual;
+
        function CheckCallingConvention(const AName:TPACCRawByteString):TPACCInt32; virtual;
 
        procedure GenerateCode(const ARoot:TPACCAbstractSyntaxTreeNode;const AOutputStream:TStream); virtual;
@@ -160,6 +162,11 @@ end;
 class function TPACCTarget.GetName:TPACCRawByteString;
 begin
  result:='';
+end;
+
+function TPACCTarget.GetDefaultOutputExtension:TPACCRawByteString;
+begin
+ result:='.out';
 end;
 
 function TPACCTarget.CheckCallingConvention(const AName:TPACCRawByteString):TPACCInt32;

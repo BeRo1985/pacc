@@ -38,6 +38,8 @@ type TPACCTarget_x86_32=class(TPACCTarget)
 
        class function GetName:TPACCRawByteString; override;
 
+       function GetDefaultOutputExtension:TPACCRawByteString; override;
+
      end;
 
 implementation
@@ -173,6 +175,15 @@ end;
 class function TPACCTarget_x86_32_COFF_PE.GetName:TPACCRawByteString;
 begin
  result:='x86_32_coff_pe';
+end;
+
+function TPACCTarget_x86_32_COFF_PE.GetDefaultOutputExtension:TPACCRawByteString;
+begin
+ if TPACCInstance(Instance).Options.CreateSharedLibrary then begin
+  result:='.dll';
+ end else begin
+  result:='.exe';
+ end;
 end;
 
 initialization

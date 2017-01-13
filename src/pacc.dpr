@@ -454,42 +454,42 @@ begin
 
     TPasMP.CreateGlobalInstance;
 
-    if OnlyRunPreprocessStep or
-       OnlyRunPreprocessAndCompilationSteps or
-       OnlyRunPreprocessAndCompileAndAssembleSteps then begin
-     for Index:=OutputFiles.Count to InputFiles.Count-1 do begin
-      if OnlyRunPreprocessStep then begin
-       OutputFiles.Add(ChangeFileExt(InputFiles[Index],'.ppc'));
-      end else if OnlyRunPreprocessAndCompilationSteps then begin
-       OutputFiles.Add(ChangeFileExt(InputFiles[Index],'.s'));
-      end else if OnlyRunPreprocessAndCompileAndAssembleSteps then begin
-       OutputFiles.Add(ChangeFileExt(InputFiles[Index],'.o'));
-      end else begin
-       OutputFiles.Add(ChangeFileExt(InputFiles[Index],'.exe'));
-      end;
-     end;
-    end else begin
-     for Index:=0 to InputFiles.Count-1 do begin
-      AssembledCodeStreams.Add(nil);
-      AssembledCodeFileNames.Add('');
-     end;
-     if OutputFiles.Count>0 then begin
-      for Index:=OutputFiles.Count-1 downto 1 do begin
-       OutputFiles.Delete(Index);
+    Instance:=TPACCInstance.Create(TargetClass,Options);
+    try
+
+     if OnlyRunPreprocessStep or
+        OnlyRunPreprocessAndCompilationSteps or
+        OnlyRunPreprocessAndCompileAndAssembleSteps then begin
+      for Index:=OutputFiles.Count to InputFiles.Count-1 do begin
+       if OnlyRunPreprocessStep then begin
+        OutputFiles.Add(ChangeFileExt(InputFiles[Index],'.ppc'));
+       end else if OnlyRunPreprocessAndCompilationSteps then begin
+        OutputFiles.Add(ChangeFileExt(InputFiles[Index],'.s'));
+       end else if OnlyRunPreprocessAndCompileAndAssembleSteps then begin
+        OutputFiles.Add(ChangeFileExt(InputFiles[Index],'.o'));
+       end else begin
+        OutputFiles.Add(ChangeFileExt(InputFiles[Index],Instance.Target.GetDefaultOutputExtension));
+       end;
       end;
      end else begin
-      OutputFiles.Add(ChangeFileExt(InputFiles[0],'.exe'));
+      for Index:=0 to InputFiles.Count-1 do begin
+       AssembledCodeStreams.Add(nil);
+       AssembledCodeFileNames.Add('');
+      end;
+      if OutputFiles.Count>0 then begin
+       for Index:=OutputFiles.Count-1 downto 1 do begin
+        OutputFiles.Delete(Index);
+       end;
+      end else begin
+       OutputFiles.Add(ChangeFileExt(InputFiles[0],Instance.Target.GetDefaultOutputExtension));
+      end;
      end;
-    end;
 
-    GlobalPasMP.Invoke(GlobalPasMP.ParallelFor(nil,0,InputFiles.Count-1,ParallelFORCompileFunction));
+     GlobalPasMP.Invoke(GlobalPasMP.ParallelFor(nil,0,InputFiles.Count-1,ParallelFORCompileFunction));
 
-    if not (OnlyRunPreprocessStep or
-            OnlyRunPreprocessAndCompilationSteps or
-            OnlyRunPreprocessAndCompileAndAssembleSteps) then begin
-
-     Instance:=TPACCInstance.Create(TargetClass,Options);
-     try
+     if not (OnlyRunPreprocessStep or
+             OnlyRunPreprocessAndCompilationSteps or
+             OnlyRunPreprocessAndCompileAndAssembleSteps) then begin
 
       OutputStream:=TMemoryStream.Create;
       try
@@ -539,10 +539,11 @@ begin
         OutputLock.Release;
        end;
       end;
-     finally
-      Instance.Free;
+
      end;
 
+    finally
+     Instance.Free;
     end;
 
    end else begin
