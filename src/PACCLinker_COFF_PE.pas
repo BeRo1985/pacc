@@ -1814,10 +1814,10 @@ var Relocations:TRelocations;
         Relocation^.Symbol:=LibraryImportSymbolIndex;
         case fMachine of
          IMAGE_FILE_MACHINE_I386:begin
-          Relocation^.RelocationType:=IMAGE_REL_I386_REL32;
+          Relocation^.RelocationType:=IMAGE_REL_I386_DIR32;
          end;
          else begin
-          Relocation^.RelocationType:=IMAGE_REL_AMD64_REL32;
+          Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR32;
          end;
         end;
 
