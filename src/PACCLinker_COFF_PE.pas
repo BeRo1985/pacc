@@ -2328,7 +2328,7 @@ var Relocations:TRelocations;
      SizeOfHeapReserve,SizeOfHeapCommit,StackSize,HeapSize:TPACCUInt32;
      ImageNTHeaders:TImageNTHeaders;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
-     FileOffset,TotalFileOffset,CountBytes:TPACCInt64;
+     FileOffset,TotalFileOffset,CountBytes,TempSize:TPACCInt64;
      Section:TPACCLinker_COFF_PESection;
      ImageSectionHeader:TImageSectionHeader;
      StartSymbol:TPACCLinker_COFF_PESymbol;
@@ -2496,7 +2496,8 @@ var Relocations:TRelocations;
     Section.Characteristics:=(Section.Characteristics and not IMAGE_SCN_CNT_INITIALIZED_DATA) or IMAGE_SCN_CNT_UNINITIALIZED_DATA;
    end;
    if (Section.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)=0 then begin
-    while (Section.RawSize>0) and (TPACCUInt8(PAnsiChar(Section.Stream.Memory)[Section.RawSize-1])=0) do begin
+    TempSize:=FileSizeAlign(Section.RawSize);
+    while (Section.RawSize>TempSize) and (TPACCUInt8(PAnsiChar(Section.Stream.Memory)[Section.RawSize-1])=0) do begin
      Section.RawSize:=Section.RawSize-1;
     end;
     inc(FileOffset,Section.RawSize);
