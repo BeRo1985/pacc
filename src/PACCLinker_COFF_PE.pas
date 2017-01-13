@@ -1619,7 +1619,8 @@ var Relocations:TRelocations;
       TImportLibraries=array of TImportLibrary;
  var ImportIndex,SectionIndex,LibraryIndex,CountLibraries,LibraryImportIndex,PassIndex,
      ImportSectionSymbolIndex,CodeSectionSymbolIndex,OriginalFirstThunkSymbolIndex,
-     LibraryNameSymbolIndex,LibraryImportSymbolIndex,LibraryImportNameSymbolIndex:TPACCInt32;
+     LibraryNameSymbolIndex,LibraryImportSymbolIndex,LibraryImportNameSymbolIndex,
+     LibraryImportTrunkCodeSymbolIndex:TPACCInt32;
      Import_:PPACCLinker_COFF_PEImport;
      OK:boolean;
      Section,CodeSection,ImportSection:TPACCLinker_COFF_PESection;
@@ -1634,7 +1635,8 @@ var Relocations:TRelocations;
      v32:TPACCUInt32;
      v64:TPACCUInt64;
      ImportSectionSymbol,CodeSectionSymbol,OriginalFirstThunkSymbol,
-     LibraryNameSymbol,LibraryImportSymbol,LibraryImportNameSymbol:TPACCLinker_COFF_PESymbol;
+     LibraryNameSymbol,LibraryImportSymbol,LibraryImportNameSymbol,
+     LibraryImportTrunkCodeSymbol:TPACCLinker_COFF_PESymbol;
  begin
 
   OK:=false;
@@ -1787,6 +1789,12 @@ var Relocations:TRelocations;
        LibraryImport:=@Library_^.Imports[LibraryImportIndex];
 
        if PassIndex=1 then begin
+
+        LibraryImportTrunkCodeSymbol:=TPACCLinker_COFF_PESymbol.Create(self,LibraryImport^.SymbolName,CodeSection,LibraryImport^.CodeOffset,0,IMAGE_SYM_CLASS_EXTERNAL,plcpskNormal);
+        LibraryImportTrunkCodeSymbolIndex:=Symbols.Add(LibraryImportTrunkCodeSymbol);
+        CodeSection.Symbols.Add(LibraryImportTrunkCodeSymbol);
+        if LibraryImportTrunkCodeSymbolIndex<>0 then begin
+        end;
 
         LibraryImportSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'__imp_'+LibraryImport^.SymbolName,ImportSection,ImportSection.Stream.Position,0,IMAGE_SYM_CLASS_EXTERNAL,plcpskNormal);
         LibraryImportSymbolIndex:=Symbols.Add(LibraryImportSymbol);
