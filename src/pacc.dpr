@@ -465,7 +465,7 @@ begin
       end else if OnlyRunPreprocessAndCompileAndAssembleSteps then begin
        OutputFiles.Add(ChangeFileExt(InputFiles[Index],'.o'));
       end else begin
-       OutputFiles.Add(ChangeFileExt(InputFiles[Index],'.out'));
+       OutputFiles.Add(ChangeFileExt(InputFiles[Index],'.exe'));
       end;
      end;
     end else begin
@@ -478,7 +478,7 @@ begin
        OutputFiles.Delete(Index);
       end;
      end else begin
-      OutputFiles.Add(ChangeFileExt(InputFiles[0],'.out'));
+      OutputFiles.Add(ChangeFileExt(InputFiles[0],'.exe'));
      end;
     end;
 

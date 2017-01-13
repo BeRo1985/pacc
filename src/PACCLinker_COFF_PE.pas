@@ -2542,6 +2542,10 @@ var Relocations:TRelocations;
     end;
     Section.Stream.Seek(0,soBeginning);
     Stream.CopyFrom(Section.Stream,Section.RawSize);
+    CountBytes:=FileSizeAlign(Section.RawSize)-Section.RawSize;
+    if CountBytes>0 then begin
+     Stream.WriteBuffer(NullBytes[0],CountBytes);
+    end;
    end;
   end;
 
