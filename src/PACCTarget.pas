@@ -177,10 +177,12 @@ end;
 
 procedure TPACCTarget.LinkCode(const AInputStreams:TList;const AInputFileNames:TStringList;const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
 var Index:TPACCInt32;
+    Stream:TStream;
 begin
  for Index:=0 to AInputStreams.Count-1 do begin
-  if assigned(AInputStreams[Index]) then begin
-   TPACCInstance(Instance).Linker.AddObject(TStream(AInputStreams[Index]),AInputFileNames[Index]);
+  Stream:=AInputStreams[Index];
+  if assigned(Stream) then begin
+   TPACCInstance(Instance).Linker.AddObject(Stream,AInputFileNames[Index]);
   end;
  end;
  if assigned(AOutputStream) then begin

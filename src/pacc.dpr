@@ -354,7 +354,7 @@ begin
 end;
 
 var Instance:TPACCInstance;
-    OutputStream:TMemoryStream;
+    InputStream,OutputStream:TMemoryStream;
     InputFileName,Extension:TPUCUUTF8String;
 begin
 
@@ -491,23 +491,32 @@ begin
      Instance:=TPACCInstance.Create(TargetClass,Options);
      try
 
-      for Index:=0 to InputFiles.Count-1 do begin
-       InputFileName:=InputFiles[Index];
-       Extension:=LowerCase(ExtractFileExt(InputFileName));
-       if Extension='.exp' then begin
-        writeln('Loading exports from ',ExtractFileName(InputFileName),' . . .');
-        Instance.Linker.AddExports(GetFileContent(InputFileName),InputFileName);
-       end else if Extension='.imp' then begin
-        writeln('Loading imports from ',ExtractFileName(InputFileName),' . . .');
-        Instance.Linker.AddImports(GetFileContent(InputFileName),InputFileName);
-       end;
-      end;
-
-      writeln('Linking to ',ExtractFileName(OutputFiles[0]),' . . .');
-
       OutputStream:=TMemoryStream.Create;
       try
        try
+
+        for Index:=0 to InputFiles.Count-1 do begin
+         InputFileName:=InputFiles[Index];
+         Extension:=LowerCase(ExtractFileExt(InputFileName));
+         if (Extension='.a') or (Extension='.lib') then begin
+          writeln('Loading archive from ',ExtractFileName(InputFileName),' . . .');
+          InputStream:=TMemoryStream.Create;
+          try
+           InputStream.LoadFromFile(InputFileName);
+           Instance.Linker.AddArchive(InputStream,InputFileName);
+          finally
+           InputStream.Free;
+          end;
+         end else if Extension='.exp' then begin
+          writeln('Loading exports from ',ExtractFileName(InputFileName),' . . .');
+          Instance.Linker.AddExports(GetFileContent(InputFileName),InputFileName);
+         end else if Extension='.imp' then begin
+          writeln('Loading imports from ',ExtractFileName(InputFileName),' . . .');
+          Instance.Linker.AddImports(GetFileContent(InputFileName),InputFileName);
+         end;
+        end;
+
+        writeln('Linking to ',ExtractFileName(OutputFiles[0]),' . . .');
         Instance.Target.LinkCode(AssembledCodeStreams,AssembledCodeFileNames,OutputStream,OutputFiles[0]);
         OutputStream.SaveToFile(OutputFiles[0]);
        except
