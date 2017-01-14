@@ -567,9 +567,9 @@ type TBytes=array of TPACCUInt8;
       Base:TPACCUInt32;
       NumberOfFunctions:TPACCUInt32;
       NumberOfNames:TPACCUInt32;
-      AddressOfFunctions:PPPACCUInt32;
-      AddressOfNames:PPPACCUInt32;
-      AddressOfNameOrdinals:PPPACCUInt16;
+      AddressOfFunctions:TPACCUInt32;
+      AddressOfNames:TPACCUInt32;
+      AddressOfNameOrdinals:TPACCUInt32;
      end;
 
      PImageSectionHeader=^TImageSectionHeader;
@@ -874,7 +874,7 @@ begin
  Index:=pos('$',AName);
  if Index>0 then begin
   fName:=copy(AName,1,Index-1);
-  fOrdering:=copy(AName,Index+1,length(AName)-(Index+1));
+  fOrdering:=copy(AName,Index+1,length(AName)-Index);
  end else begin
   fName:=AName;
   fOrdering:='';
@@ -1562,6 +1562,239 @@ var Relocations:TRelocations;
    result:=(result+(PECOFFFileAlignment-1)) and not (PECOFFFileAlignment-1);
   end;
  end;
+ procedure WriteNullPadding(const Stream:TStream;Value:TPACCInt64);
+ var PartCount:TPACCInt64;
+ begin
+  while Value>0 do begin
+   if Value<SizeOf(NullBytes) then begin
+    PartCount:=Value;
+   end else begin
+    PartCount:=SizeOf(NullBytes);
+   end;
+   Stream.WriteBuffer(NullBytes[0],PartCount);
+  end;
+ end;
+ procedure WriteNOPPadding(const Stream:TStream;Value:TPACCInt64);
+  procedure WriteByte(const b:TPACCUInt8);
+  begin
+   Stream.WriteBuffer(b,SizeOf(TPACCUInt8));
+  end;
+  procedure WriteByteCount(const b:TPACCUInt8;c:TPACCInt64);
+  begin
+   while c>0 do begin
+    Stream.WriteBuffer(b,SizeOf(TPACCUInt8));
+    dec(c);
+   end;
+  end;
+ var PartCount:TPACCInt64;
+ begin
+  case fMachine of
+   IMAGE_FILE_MACHINE_I386:begin
+    while Value>0 do begin
+     if Value<16 then begin
+      PartCount:=Value;
+     end else begin
+      PartCount:=15;
+     end;
+     case PartCount of
+      1:begin
+       // nop
+       WriteByte($90);
+       dec(Value);
+      end;
+      2:begin
+       // xchg ax, ax (o16 nop)
+       WriteByte($66);
+       WriteByte($90);
+       dec(Value,2);
+      end;
+      3:begin
+       // lea esi,[esi+byte 0]
+       WriteByte($8d);
+       WriteByte($76);
+       WriteByte($00);
+       dec(Value,3);
+      end;
+      4:begin
+       // lea esi,[esi*1+byte 0]
+       WriteByte($8d);
+       WriteByte($74);
+       WriteByte($26);
+       WriteByte($00);
+       dec(Value,4);
+      end;
+      5:begin
+       // nop
+       WriteByte($90);
+       // lea esi,[esi*1+byte 0]
+       WriteByte($8d);
+       WriteByte($74);
+       WriteByte($26);
+       WriteByte($00);
+       dec(Value,5);
+      end;
+      6:begin
+       // lea esi,[esi+dword 0]
+       WriteByte($8d);
+       WriteByte($b6);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,6);
+      end;
+      7:begin
+       // lea esi,[esi*1+dword 0]
+       WriteByte($8d);
+       WriteByte($b4);
+       WriteByte($26);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,7);
+      end;
+      8:begin
+       // nop
+       WriteByte($90);
+       // lea esi,[esi*1+dword 0]
+       WriteByte($8d);
+       WriteByte($b4);
+       WriteByte($26);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,8);
+      end;
+      9..15:begin
+       // jmp $+9; nop fill .. jmp $+15; nop fill ..
+       WriteByte($eb);
+       WriteByte(PartCount-2);
+       WriteByteCount($90,PartCount-2);
+       dec(Value,PartCount);
+      end;
+     end;
+    end;
+   end;
+   IMAGE_FILE_MACHINE_AMD64:begin
+    while Value>0 do begin
+     if Value<16 then begin
+      PartCount:=Value;
+     end else begin
+      PartCount:=15;
+     end;
+     case PartCount of
+      1:begin
+       // nop
+       WriteByte($90);
+       dec(Value);
+      end;
+      2:begin
+       // xchg ax, ax (o16 nop)
+       WriteByte($66);
+       WriteByte($90);
+       dec(Value,2);
+      end;
+      3:begin
+       // nop(3)
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($00);
+       dec(Value,3);
+      end;
+      4:begin
+       // nop(4)
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($40);
+       WriteByte($00);
+       dec(Value,4);
+      end;
+      5:begin
+       // nop(5)
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($44);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,5);
+      end;
+      6:begin
+       // nop(6)
+       WriteByte($66);
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($44);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,6);
+      end;
+      7:begin
+       // nop(7)
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($80);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,7);
+      end;
+      8:begin
+       // nop(8)
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($84);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,8);
+      end;
+      9:begin
+       // nop(9)
+       WriteByte($66);
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($84);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,9);
+      end;
+      10..15:begin
+       // repeated-o16 cs: nop(10..15)
+       WriteByteCount($66,PartCount-9);
+       WriteByte($2e);
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($84);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,PartCount);
+      end;
+     end;
+    end;
+   end;
+   else begin
+    while Value>0 do begin
+     if Value<SizeOf(NullBytes) then begin
+      PartCount:=Value;
+     end else begin
+      PartCount:=SizeOf(NullBytes);
+     end;
+     Stream.WriteBuffer(NullBytes[0],PartCount);
+    end;
+   end;
+  end;
+ end;
  procedure DoAlign;
  var Position,FillUpCount,ToDoCount:TPACCInt64;
  begin
@@ -1901,6 +2134,244 @@ var Relocations:TRelocations;
 
   end;
  end;
+ procedure ScanExports;
+ var SymbolIndex:TPACCInt32;
+     Symbol:TPACCLinker_COFF_PESymbol;
+     Entity:PPACCRawByteStringHashMapEntity;
+     Import_:PPACCLinker_COFF_PEImport;
+ begin
+  for SymbolIndex:=0 to Symbols.Count-1 do begin
+   Symbol:=Symbols[SymbolIndex];
+   if Symbol.Active and (Symbol.Class_=IMAGE_SYM_CLASS_EXTERNAL) and (Symbol.SymbolKind=plcpskNormal) and assigned(Symbol.Section) then begin
+    if (length(Symbol.Name)>6) and
+       (Symbol.Name[1]='_') and
+       (Symbol.Name[2]='_') and
+       (Symbol.Name[3]='e') and
+       (Symbol.Name[4]='x') and
+       (Symbol.Name[5]='p') and
+       (Symbol.Name[6]='_') then begin
+     Entity:=fExportSymbolNameHashMap.Get(copy(Symbol.Name,7,length(Symbol.Name)-6),false);
+    end else begin
+     Entity:=fExportSymbolNameHashMap.Get(Symbol.Name,false);
+    end;
+    if assigned(Entity) then begin
+     Import_:=@fExports[TPACCPtrUInt(Entity.Value)];
+     Import_^.Used:=true;
+    end;
+   end;
+  end;
+ end;
+ procedure GenerateExports;
+ var ExportIndex,SectionIndex,PassIndex:TPACCInt32;
+     AddressOfName,AddressOfFunctions,AddressOfNames,AddressOfOrdinals,Value:TPACCUInt32;
+     Value16:TPACCUInt16;
+     Export_:PPACCLinker_COFF_PEExport;
+     Section,ExportSection:TPACCLinker_COFF_PESection;
+     PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
+     ImageExportDirectory:TImageExportDirectory;
+     Exports_:TStringList;
+     ExportName:TPACCRawByteString;
+     ExportSectionSymbol,TempSectionSymbol:TPACCLinker_COFF_PESymbol;
+     ExportSectionSymbolIndex,TempSectionSymbolIndex:TPACCInt32;
+     Relocation:PPACCLinker_COFF_PERelocation;
+ begin
+
+  Exports_:=TStringList.Create;
+  try
+
+   Exports_.NameValueSeparator:='=';
+   for ExportIndex:=0 to fCountExports-1 do begin
+    Export_:=@fExports[ExportIndex];
+    if Export_^.Used then begin
+     Exports_.Add(Export_^.ExportName+Exports_.NameValueSeparator+Export_^.SymbolName);
+    end;
+   end;
+
+   if Exports_.Count>0 then begin
+
+    Exports_.Sort;
+
+    ExportSection:=nil;
+    for SectionIndex:=0 to Sections.Count-1 do begin
+     Section:=Sections[SectionIndex];
+     if Section.Name='.edata' then begin
+      ExportSection:=Section;
+      break;
+     end;
+    end;
+    if assigned(ExportSection) then begin
+     ExportSection.Characteristics:=ExportSection.Characteristics or IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_ALIGN_16BYTES;
+     ExportSection.Alignment:=Max(ExportSection.Alignment,16);
+    end else begin
+     ExportSection:=TPACCLinker_COFF_PESection.Create(self,'.edata',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_ALIGN_16BYTES);
+     Sections.Add(ExportSection);
+    end;
+
+    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_EXPORT];
+    PECOFFDirectoryEntry^.Section:=ExportSection;
+    PECOFFDirectoryEntry^.Offset:=ExportSection.Stream.Size;
+
+    AddressOfName:=0;
+    AddressOfFunctions:=0;
+    AddressOfNames:=0;
+    AddressOfOrdinals:=0;
+
+    for PassIndex:=0 to 1 do begin
+
+     ExportSection.Stream.Seek(PECOFFDirectoryEntry^.Offset,soBeginning);
+
+     if PassIndex=1 then begin
+
+      ExportSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section',ExportSection,0,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      ExportSectionSymbolIndex:=Symbols.Add(ExportSectionSymbol);
+      ExportSection.Symbols.Add(ExportSectionSymbol);
+
+      TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section_addressof_AddressOfName',ExportSection,AddressOfName,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
+      ExportSection.Symbols.Add(TempSectionSymbol);
+      Relocation:=ExportSection.NewRelocation;
+      Relocation^.VirtualAddress:=ExportSection.Stream.Position+TPACCPtrUInt(pointer(@PImageExportDirectory(nil)^.Name));
+      Relocation^.Symbol:=TempSectionSymbolIndex;
+      case fMachine of
+       IMAGE_FILE_MACHINE_I386:begin
+        Relocation^.RelocationType:=IMAGE_REL_I386_DIR32NB;
+       end;
+       else begin
+        Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR32NB;
+       end;
+      end;
+
+      TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section_addressof_AddressOfFunctions',ExportSection,AddressOfFunctions,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
+      ExportSection.Symbols.Add(TempSectionSymbol);
+      Relocation:=ExportSection.NewRelocation;
+      Relocation^.VirtualAddress:=ExportSection.Stream.Position+TPACCPtrUInt(pointer(@PImageExportDirectory(nil)^.AddressOfFunctions));
+      Relocation^.Symbol:=TempSectionSymbolIndex;
+      case fMachine of
+       IMAGE_FILE_MACHINE_I386:begin
+        Relocation^.RelocationType:=IMAGE_REL_I386_DIR32NB;
+       end;
+       else begin
+        Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR32NB;
+       end;
+      end;
+
+      TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section_addressof_AddressOfNames',ExportSection,AddressOfNames,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
+      ExportSection.Symbols.Add(TempSectionSymbol);
+      Relocation:=ExportSection.NewRelocation;
+      Relocation^.VirtualAddress:=ExportSection.Stream.Position+TPACCPtrUInt(pointer(@PImageExportDirectory(nil)^.AddressOfNames));
+      Relocation^.Symbol:=TempSectionSymbolIndex;
+      case fMachine of
+       IMAGE_FILE_MACHINE_I386:begin
+        Relocation^.RelocationType:=IMAGE_REL_I386_DIR32NB;
+       end;
+       else begin
+        Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR32NB;
+       end;
+      end;
+
+      TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section_addressof_AddressOfNameOrdinals',ExportSection,AddressOfOrdinals,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
+      ExportSection.Symbols.Add(TempSectionSymbol);
+      Relocation:=ExportSection.NewRelocation;
+      Relocation^.VirtualAddress:=ExportSection.Stream.Position+TPACCPtrUInt(pointer(@PImageExportDirectory(nil)^.AddressOfNameOrdinals));
+      Relocation^.Symbol:=TempSectionSymbolIndex;
+      case fMachine of
+       IMAGE_FILE_MACHINE_I386:begin
+        Relocation^.RelocationType:=IMAGE_REL_I386_DIR32NB;
+       end;
+       else begin
+        Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR32NB;
+       end;
+      end;
+
+     end;
+
+     FillChar(ImageExportDirectory,SizeOf(TImageExportDirectory),#0);
+     ImageExportDirectory.Characteristics:=0;
+     ImageExportDirectory.TimeDateStamp:=0;
+     ImageExportDirectory.MajorVersion:=0;
+     ImageExportDirectory.MinorVersion:=0;
+     ImageExportDirectory.Name:=0;
+     ImageExportDirectory.Base:=1;
+     ImageExportDirectory.NumberOfFunctions:=Exports_.Count;
+     ImageExportDirectory.NumberOfNames:=Exports_.Count;
+     ImageExportDirectory.AddressOfFunctions:=0;
+     ImageExportDirectory.AddressOfNames:=0;
+     ImageExportDirectory.AddressOfNameOrdinals:=0;
+     ExportSection.Stream.WriteBuffer(ImageExportDirectory,SizeOf(TImageExportDirectory));
+
+     AddressOfFunctions:=ExportSection.Stream.Position;
+     for ExportIndex:=0 to Exports_.Count-1 do begin
+      if PassIndex=1 then begin
+       TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,Exports_.Values[Exports_.Names[ExportIndex]],ExportSection,0,0,IMAGE_SYM_CLASS_EXTERNAL,plcpskUndefined);
+       TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
+       ExportSection.Symbols.Add(TempSectionSymbol);
+       Relocation:=ExportSection.NewRelocation;
+       Relocation^.VirtualAddress:=ExportSection.Stream.Position;
+       Relocation^.Symbol:=TempSectionSymbolIndex;
+       case fMachine of
+        IMAGE_FILE_MACHINE_I386:begin
+         Relocation^.RelocationType:=IMAGE_REL_I386_DIR32NB;
+        end;
+        else begin
+         Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR32NB;
+        end;
+       end;
+      end;
+      Value:=0;
+      ExportSection.Stream.WriteBuffer(Value,SizeOf(TPACCUInt32));
+     end;
+
+     AddressOfNames:=ExportSection.Stream.Position;
+     Value:=ExportSection.Stream.Position+(Exports_.Count*SizeOf(TPACCUInt32));
+     for ExportIndex:=0 to Exports_.Count-1 do begin
+      if PassIndex=1 then begin
+       TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section_addressof_AddressOfName_'+IntToStr(ExportIndex),ExportSection,Value,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+       TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
+       ExportSection.Symbols.Add(TempSectionSymbol);
+       Relocation:=ExportSection.NewRelocation;
+       Relocation^.VirtualAddress:=ExportSection.Stream.Position;
+       Relocation^.Symbol:=TempSectionSymbolIndex;
+       case fMachine of
+        IMAGE_FILE_MACHINE_I386:begin
+         Relocation^.RelocationType:=IMAGE_REL_I386_DIR32NB;
+        end;
+        else begin
+         Relocation^.RelocationType:=IMAGE_REL_AMD64_ADDR32NB;
+        end;
+       end;
+      end;
+      ExportSection.Stream.WriteBuffer(NullBytes[0],SizeOf(TPACCUInt32));
+      inc(Value,length(Exports_.Names[ExportIndex])+1);
+     end;
+     for ExportIndex:=0 to Exports_.Count-1 do begin
+      ExportName:=Exports_.Names[ExportIndex];
+      ExportSection.Stream.WriteBuffer(ExportName[1],length(ExportName));
+      ExportSection.Stream.WriteBuffer(NullBytes[0],SizeOf(TPACCUInt8));
+     end;
+
+     AddressOfOrdinals:=ExportSection.Stream.Position;
+     for ExportIndex:=0 to Exports_.Count-1 do begin
+      Value16:=ExportIndex;
+      ExportSection.Stream.WriteBuffer(Value16,SizeOf(TPACCUInt16));
+     end;
+
+     AddressOfName:=ExportSection.Stream.Position;
+     ExportSection.Stream.WriteBuffer(NullBytes[0],SizeOf(TPACCUInt8));
+
+    end;
+
+    PECOFFDirectoryEntry^.Size:=ExportSection.Stream.Size-PECOFFDirectoryEntry^.Offset;
+
+   end;
+
+  finally
+   Exports_.Free;
+  end;
+
+ end;
  procedure SortSections;
  var SectionIndex:TPACCInt32;
      Section:TPACCLinker_COFF_PESection;
@@ -1986,8 +2457,11 @@ var Relocations:TRelocations;
        if Section.Alignment<>0 then begin
         FillUpCount:=((DestinationSection.Stream.Size+(Section.Alignment-1)) and not (Section.Alignment-1))-DestinationSection.Stream.Size;
         if FillUpCount>0 then begin
-         DestinationSection.Stream.SetSize(StartOffset+FillUpCount);
-         FillChar(PAnsiChar(DestinationSection.Stream.Memory)[StartOffset],FillUpCount,#0);
+         if ((DestinationSection.Characteristics or Section.Characteristics) and IMAGE_SCN_CNT_CODE)<>0 then begin
+          WriteNOPPadding(DestinationSection.Stream,FillUpCount);
+         end else begin
+          WriteNullPadding(DestinationSection.Stream,FillUpCount);
+         end;
          StartOffset:=DestinationSection.Stream.Size;
         end;
        end;
@@ -2000,17 +2474,24 @@ var Relocations:TRelocations;
 
        VirtualAddressDelta:=(DestinationSection.VirtualAddress+StartOffset)-Section.VirtualAddress;
 
+{$if true}
        RelocationStartIndex:=DestinationSection.CountRelocations;
        inc(DestinationSection.CountRelocations,Section.CountRelocations);
        if length(DestinationSection.Relocations)<DestinationSection.CountRelocations then begin
         SetLength(DestinationSection.Relocations,DestinationSection.CountRelocations*2);
        end;
-
        for RelocationIndex:=0 to Section.CountRelocations-1 do begin
         Relocation:=@DestinationSection.Relocations[RelocationStartIndex+RelocationIndex];
         Relocation^:=Section.Relocations[RelocationIndex];
         inc(Relocation^.VirtualAddress,VirtualAddressDelta);
        end;
+{$else}
+       for RelocationIndex:=0 to Section.CountRelocations-1 do begin
+        Relocation:=DestinationSection.NewRelocation;
+        Relocation^:=Section.Relocations[RelocationIndex];
+        inc(Relocation^.VirtualAddress,VirtualAddressDelta);
+       end;
+{$ifend}
 
        for SymbolIndex:=0 to Section.Symbols.Count-1 do begin
         Symbol:=Section.Symbols[SymbolIndex];
@@ -2018,7 +2499,9 @@ var Relocations:TRelocations;
         Symbol.Section:=DestinationSection;
         case Symbol.Class_ of
          IMAGE_SYM_CLASS_EXTERNAL,IMAGE_SYM_CLASS_STATIC:begin
-          Symbol.Value:=Symbol.Value+StartOffset;
+          if (Symbol.SymbolKind=plcpskNormal) and assigned(Symbol.Section) then begin
+           Symbol.Value:=Symbol.Value+StartOffset;
+          end;
          end;
         end;
        end;
@@ -2367,6 +2850,10 @@ var Relocations:TRelocations;
   end;
   if TPACCInstance(Instance).Options.CreateSharedLibrary then begin
    Characteristics:=Characteristics or IMAGE_FILE_DLL;
+   PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_EXPORT];
+   if not (assigned(PECOFFDirectoryEntry^.Section) and (PECOFFDirectoryEntry^.Size>0)) then begin
+    TPACCInstance(Instance).AddWarning('DLL without exports',nil);
+   end;
   end else begin
    Characteristics:=Characteristics or IMAGE_FILE_RELOCS_STRIPPED;
   end;
@@ -2382,7 +2869,12 @@ var Relocations:TRelocations;
 
   CodeBase:=PECOFFSectionAlignment;
 
-  SubSystem:=IMAGE_SUBSYSTEM_WINDOWS_CUI;
+  StartSymbol:=ExternalAvailableSymbolHashMap['WinMain'];
+  if assigned(StartSymbol) and assigned(StartSymbol.Section) then begin
+   SubSystem:=IMAGE_SUBSYSTEM_WINDOWS_GUI;
+  end else begin
+   SubSystem:=IMAGE_SUBSYSTEM_WINDOWS_CUI;
+  end;
 
   DLLCharacteristics:=0;
 
@@ -2601,20 +3093,34 @@ begin
      Is64Bit:=false;
     end;
    end;
+
    ScanImports;
    GenerateImports;
+
+   ScanExports;
+   GenerateExports;
+
    SortSections;
+
    MergeDuplicateAndDeleteUnusedSections;
+
    PositionAndSizeSections;
+
    ExternalAvailableSymbolHashMap:=TPACCRawByteStringHashMap.Create;
    try
+
     ResolveSymbols;
+
     ResolveRelocations;
+
     GenerateRelocationSection;
+
     GenerateImage(AOutputStream);
+
    finally
     ExternalAvailableSymbolHashMap.Free;
    end;
+
   finally
    FreeMem(PECOFFDirectoryEntries);
   end;

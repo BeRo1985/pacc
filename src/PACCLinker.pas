@@ -219,9 +219,9 @@ begin
      TPACCInstance(Instance).AddError('Import file syntax error',nil,true);
     end;
 
-    AddExport(SymbolName,ExportName);
-
    end;
+
+   AddExport(SymbolName,ExportName);
 
   end else begin
    TPACCInstance(Instance).AddError('Import file syntax error',nil,true);

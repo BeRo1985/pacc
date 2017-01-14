@@ -577,6 +577,7 @@ begin
    writeln('         -w                         Disable all warnings');
    writeln('         -Wall                      Enable all warnings');
    writeln('         -Werror                    Make all warnings into errors');
+   writeln('         -Xlinker <arg>             Pass <arg> on to the linker');
    if PACCRegisteredTargetClassList.Count>0 then begin
     TargetList:=TStringList.Create;
     try
