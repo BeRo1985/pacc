@@ -275,6 +275,8 @@ const MZEXEHeaderSize=128;
       IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG=10;
       IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT=11;
       IMAGE_DIRECTORY_ENTRY_IAT=12;
+      IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT_DESCRIPTOR=13;
+      IMAGE_DIRECTORY_ENTRY_CLR_RUNTIME_HEADER=14;
 
       IMAGE_SIZEOF_SHORT_NAME=8;
       
@@ -714,6 +716,26 @@ type TBytes=array of TPACCUInt8;
       Funktion:TPACCUInt32;
       Ordinal:TPACCUInt32;
       AddressOfData:TPACCUInt32;
+     end;
+
+     PImageTLSDirectory32=^TImageTLSDirectory32;
+     TImageTLSDirectory32=record
+      StartAddressOfRawData:TPACCUInt32;
+      EndAddressOfRawData:TPACCUInt32;
+      AddressOfIndex:TPACCUInt32;
+      AddressOfCallBacks:TPACCUInt32;
+      SizeOfZeroFill:TPACCUInt32;
+      Characteristics:TPACCUInt32;
+     end;
+
+     PImageTLSDirectory64=^TImageTLSDirectory64;
+     TImageTLSDirectory64=record
+      StartAddressOfRawData:TPACCUInt64;
+      EndAddressOfRawData:TPACCUInt64;
+      AddressOfIndex:TPACCUInt64;
+      AddressOfCallBacks:TPACCUInt64;
+      SizeOfZeroFill:TPACCUInt32;
+      Characteristics:TPACCUInt32;
      end;
 
      PCOFFFileHeader=^TCOFFFileHeader;
@@ -2851,7 +2873,7 @@ var Relocations:TRelocations;
      FileOffset,TotalFileOffset,CountBytes,TempSize:TPACCInt64;
      Section:TPACCLinker_COFF_PESection;
      ImageSectionHeader:TImageSectionHeader;
-     StartSymbol:TPACCLinker_COFF_PESymbol;
+     Symbol:TPACCLinker_COFF_PESymbol;
  begin
 
   Characteristics:=IMAGE_FILE_EXECUTABLE_IMAGE or IMAGE_FILE_LINE_NUMS_STRIPPED or IMAGE_FILE_LOCAL_SYMS_STRIPPED or IMAGE_FILE_DEBUG_STRIPPED;
@@ -2870,20 +2892,72 @@ var Relocations:TRelocations;
 
   TotalImageSize:=LastVirtualAddress;
 
-  StartSymbol:=ExternalAvailableSymbolHashMap['_start'];
-  if assigned(StartSymbol) and assigned(StartSymbol.Section) then begin
-   AddressOfEntryPoint:=StartSymbol.Section.VirtualAddress+StartSymbol.Value;
+  Symbol:=ExternalAvailableSymbolHashMap['_start'];
+  if assigned(Symbol) and assigned(Symbol.Section) then begin
+   AddressOfEntryPoint:=Symbol.Section.VirtualAddress+Symbol.Value;
   end else begin
    AddressOfEntryPoint:=0;
   end;
 
   CodeBase:=PECOFFSectionAlignment;
 
-  StartSymbol:=ExternalAvailableSymbolHashMap['WinMain'];
-  if assigned(StartSymbol) and assigned(StartSymbol.Section) then begin
+  Symbol:=ExternalAvailableSymbolHashMap['WinMain'];
+  if assigned(Symbol) and assigned(Symbol.Section) then begin
    SubSystem:=IMAGE_SUBSYSTEM_WINDOWS_GUI;
   end else begin
    SubSystem:=IMAGE_SUBSYSTEM_WINDOWS_CUI;
+  end;
+
+  for SectionIndex:=0 to Sections.Count-1 do begin
+   Section:=Sections[SectionIndex];
+   if (Section.Name='.edata') and (not assigned(PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_EXPORT].Section)) and (Section.RawSize>0) then begin
+    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_EXPORT];
+    PECOFFDirectoryEntry^.Section:=Section;
+    PECOFFDirectoryEntry^.Offset:=0;
+    PECOFFDirectoryEntry^.Size:=Section.Stream.Size;
+   end else if (Section.Name='.idata') and (not assigned(PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_IMPORT].Section)) and (Section.RawSize>0) then begin
+    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_IMPORT];
+    PECOFFDirectoryEntry^.Section:=Section;
+    PECOFFDirectoryEntry^.Offset:=0;
+    PECOFFDirectoryEntry^.Size:=Section.Stream.Size;
+   end else if (Section.Name='.didat') and (not assigned(PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT_DESCRIPTOR].Section)) and (Section.RawSize>0) then begin
+    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT_DESCRIPTOR];
+    PECOFFDirectoryEntry^.Section:=Section;             
+    PECOFFDirectoryEntry^.Offset:=0;
+    PECOFFDirectoryEntry^.Size:=Section.Stream.Size;
+   end else if (Section.Name='.dbgdata') and (not assigned(PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_DEBUG].Section)) and (Section.RawSize>0) then begin
+    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_DEBUG];
+    PECOFFDirectoryEntry^.Section:=Section;
+    PECOFFDirectoryEntry^.Offset:=0;
+    PECOFFDirectoryEntry^.Size:=Section.Stream.Size;
+   end else if (Section.Name='.rsrc') and (not assigned(PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_RESOURCE].Section)) and (Section.RawSize>0) then begin
+    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_RESOURCE];
+    PECOFFDirectoryEntry^.Section:=Section;
+    PECOFFDirectoryEntry^.Offset:=0;
+    PECOFFDirectoryEntry^.Size:=Section.Stream.Size;
+   end else if (Section.Name='.pdata') and (not assigned(PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_EXCEPTION].Section)) and (Section.RawSize>0) then begin
+    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_EXCEPTION];
+    PECOFFDirectoryEntry^.Section:=Section;
+    PECOFFDirectoryEntry^.Offset:=0;
+    PECOFFDirectoryEntry^.Size:=Section.Stream.Size;
+   end else if (Section.Name='.reloc') and (not assigned(PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_BASERELOC].Section)) and (Section.RawSize>0) then begin
+    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+    PECOFFDirectoryEntry^.Section:=Section;
+    PECOFFDirectoryEntry^.Offset:=0;
+    PECOFFDirectoryEntry^.Size:=Section.Stream.Size;
+   end;
+  end;
+
+  Symbol:=ExternalAvailableSymbolHashMap['_tls_used'];
+  if assigned(Symbol) and assigned(Symbol.Section) then begin
+   PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_TLS];
+   PECOFFDirectoryEntry^.Section:=Symbol.Section;
+   PECOFFDirectoryEntry^.Offset:=Symbol.Value;
+   if Is64Bit then begin
+    PECOFFDirectoryEntry^.Size:=SizeOf(TImageTLSDirectory64);
+   end else begin
+    PECOFFDirectoryEntry^.Size:=SizeOf(TImageTLSDirectory32);
+   end;
   end;
 
   DLLCharacteristics:=0;
