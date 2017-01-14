@@ -882,15 +882,19 @@ begin
 
  fStream:=TMemoryStream.Create;
 
- fAlignment:=1;
+ fCharacteristics:=ACharacteristics;
+
+ if (fCharacteristics and IMAGE_SCN_ALIGN_MASK)<>0 then begin
+  fAlignment:=1 shl (((fCharacteristics and IMAGE_SCN_ALIGN_MASK) shr IMAGE_SCN_ALIGN_SHIFT)-1);
+ end else begin
+  fAlignment:=1;
+ end;
 
  fVirtualAddress:=AVirtualAddress;
 
  fVirtualSize:=0;
 
  fRawSize:=0;
-
- fCharacteristics:=ACharacteristics;
 
  fSymbols:=TPACCLinker_COFF_PESymbolList.Create;
 
