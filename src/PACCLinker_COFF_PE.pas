@@ -719,7 +719,7 @@ type TBytes=array of TPACCUInt8;
      end;
 
      PImageTLSDirectory32=^TImageTLSDirectory32;
-     TImageTLSDirectory32=record
+     TImageTLSDirectory32=packed record
       StartAddressOfRawData:TPACCUInt32;
       EndAddressOfRawData:TPACCUInt32;
       AddressOfIndex:TPACCUInt32;
@@ -729,13 +729,61 @@ type TBytes=array of TPACCUInt8;
      end;
 
      PImageTLSDirectory64=^TImageTLSDirectory64;
-     TImageTLSDirectory64=record
+     TImageTLSDirectory64=packed record
       StartAddressOfRawData:TPACCUInt64;
       EndAddressOfRawData:TPACCUInt64;
       AddressOfIndex:TPACCUInt64;
       AddressOfCallBacks:TPACCUInt64;
       SizeOfZeroFill:TPACCUInt32;
       Characteristics:TPACCUInt32;
+     end;
+
+     PImageLoadConfiguration32=^TImageLoadConfiguration32;
+     TImageLoadConfiguration32=packed record
+      Characteristics:TPACCUInt32;
+      TimeDateStamp:TPACCUInt32;
+      MajorVersion:TPACCUInt16;
+      MinorVersion:TPACCUInt16;
+      GlobalFlagsClear:TPACCUInt32;
+      GlobalFlagsSet:TPACCUInt32;
+      CriticalSectionDefaultTimeout:TPACCUInt32;
+      DeCommitFreeBlockThreshold:TPACCUInt32;
+      DeCommitTotalFreeThreshold:TPACCUInt32;
+      LockPrefixTable:TPACCUInt32;
+      MaximumAllocationSize:TPACCUInt32;
+      VirtualMemoryThreshold:TPACCUInt32;
+      ProcessAffinityMask:TPACCUInt32;
+      ProcessHeapFlags:TPACCUInt32;
+      CSDVersion:TPACCUInt16;
+      Reserved:TPACCUInt16;
+      EditList:TPACCUInt32;
+      SecurityCookie:TPACCUInt32;
+      SEHandlerTable:TPACCUInt32;
+      SEHandlerCount:TPACCUInt32;
+     end;
+
+     PImageLoadConfiguration64=^TImageLoadConfiguration64;
+     TImageLoadConfiguration64=packed record
+      Characteristics:TPACCUInt32;
+      TimeDateStamp:TPACCUInt32;
+      MajorVersion:TPACCUInt16;
+      MinorVersion:TPACCUInt16;
+      GlobalFlagsClear:TPACCUInt32;
+      GlobalFlagsSet:TPACCUInt32;
+      CriticalSectionDefaultTimeout:TPACCUInt32;
+      DeCommitFreeBlockThreshold:TPACCUInt32;
+      DeCommitTotalFreeThreshold:TPACCUInt32;
+      LockPrefixTable:TPACCUInt32;
+      MaximumAllocationSize:TPACCUInt32;
+      VirtualMemoryThreshold:TPACCUInt32;
+      ProcessAffinityMask:TPACCUInt32;
+      ProcessHeapFlags:TPACCUInt32;
+      CSDVersion:TPACCUInt16;
+      Reserved:TPACCUInt16;
+      EditList:TPACCUInt32;
+      SecurityCookie:TPACCUInt64;
+      SEHandlerTable:TPACCUInt64;
+      SEHandlerCount:TPACCUInt64;
      end;
 
      PCOFFFileHeader=^TCOFFFileHeader;
@@ -2864,6 +2912,8 @@ var Relocations:TRelocations;
   end;
  end;
  procedure GenerateImage(const Stream:TStream);
+ type PSectionBytes=^TSectionBytes;
+      TSectionBytes=array[0..65535] of TPACCUInt8;
  var Index,HeaderSize,SectionIndex,Len:TPACCInt32;
      Characteristics,TotalImageSize,AddressOfEntryPoint,CodeBase,SubSystem,
      DLLCharacteristics,SizeOfStackReserve,SizeOfStackCommit,
@@ -2957,6 +3007,23 @@ var Relocations:TRelocations;
     PECOFFDirectoryEntry^.Size:=SizeOf(TImageTLSDirectory64);
    end else begin
     PECOFFDirectoryEntry^.Size:=SizeOf(TImageTLSDirectory32);
+   end;
+  end;
+
+  Symbol:=ExternalAvailableSymbolHashMap['_load_config_used'];
+  if assigned(Symbol) and assigned(Symbol.Section) then begin
+   PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG];
+   if (Symbol.Value+4)>Symbol.Section.Stream.Size then begin
+    TPACCInstance(Instance).AddError('_load_config_used is malformed',nil,true);
+   end else begin                             
+    TempSize:=PPACCUInt32(pointer(@PSectionBytes(Symbol.Section.Stream)^[Symbol.Value]))^;
+    if (Symbol.Value+TempSize)>Symbol.Section.Stream.Size then begin
+     TPACCInstance(Instance).AddError('_load_config_used is too large',nil,true);
+    end else begin
+     PECOFFDirectoryEntry^.Section:=Symbol.Section;
+     PECOFFDirectoryEntry^.Offset:=Symbol.Value;
+     PECOFFDirectoryEntry^.Size:=TempSize;
+    end;
    end;
   end;
 
