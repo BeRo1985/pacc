@@ -499,6 +499,28 @@ const MZEXEHeaderSize=128;
 
       COFF_SIZEOF_SHORT_NAME=8;
 
+      RT_CURSOR=1;
+      RT_BITMAP=2;
+      RT_ICON=3;
+      RT_MENU=4;
+      RT_DIALOG=5;
+      RT_STRING=6;
+      RT_FONTDIR=7;
+      RT_FONT=8;
+      RT_ACCELERATOR=9;
+      RT_RCDATA=10;
+      RT_MESSAGETABLE=11;
+      RT_DIFFERENCE=11;
+      RT_GROUP_CURSOR=RT_CURSOR+RT_DIFFERENCE;
+      RT_GROUP_ICON=RT_ICON+RT_DIFFERENCE;
+      RT_VERSION=16;
+      RT_DLGINCLUDE=17;
+      RT_PLUGPLAY=19;
+      RT_VXD=20;
+      RT_ANICURSOR=21;
+      RT_ANIICON=22;
+      RT_MANIFEST=24;
+
 type TBytes=array of TPACCUInt8;
 
      PPOINTER=^pointer;
@@ -719,6 +741,48 @@ type TBytes=array of TPACCUInt8;
       AddressOfData:TPACCUInt32;
      end;
 
+     PImageResourceDirectory=^TImageResourceDirectory;
+     TImageResourceDirectory=packed record 
+      Characteristics:TPACCUInt32;
+      TimeDateStamp:TPACCUInt32;
+      MajorVersion:TPACCUInt16;
+      MinorVersion:TPACCUInt16;            
+      NumberOfNamedEntries:TPACCUInt16;
+      NumberOfIdEntries:TPACCUInt16;
+     end;
+
+     PImageResourceDirectoryEntry=^TImageResourceDirectoryEntry;
+     TImageResourceDirectoryEntry=packed record
+      TypeNameLevel:TPACCUInt32;
+      OffsetToChildData:TPACCUInt32;
+     end;
+
+     PImageResourceDataEntry=^TImageResourceDataEntry;
+     TImageResourceDataEntry=packed record
+      OffsetToData:TPACCUInt32;
+      Size:TPACCUInt32;
+      CodePage:TPACCUInt32;
+      Reserved:TPACCUInt32;
+     end;
+
+     PImageResourceDirStringU=^TImageResourceDirStringU;
+     TImageResourceDirStringU=packed record
+      length:TPACCUInt16;
+      NameString:array[0..0] of WideChar;
+     end;
+
+     PImageDebugDirectory=^TImageDebugDirectory;
+     TImageDebugDirectory=packed record
+      Characteristics:TPACCUInt32;
+      TimeDateStamp:TPACCUInt32;
+      MajorVersion:TPACCUInt16;
+      MinorVersion:TPACCUInt16;
+      DebugType:TPACCUInt32;
+      SizeOfData:TPACCUInt32;
+      AddressOfRawData:TPACCUInt32;
+      PointerToRawData:TPACCUInt32;
+     end;
+
      PImageTLSDirectory32=^TImageTLSDirectory32;
      TImageTLSDirectory32=packed record
       StartAddressOfRawData:TPACCUInt32;
@@ -737,6 +801,18 @@ type TBytes=array of TPACCUInt8;
       AddressOfCallBacks:TPACCUInt64;
       SizeOfZeroFill:TPACCUInt32;
       Characteristics:TPACCUInt32;
+     end;
+
+     PImageDelayDescriptor=^TImageDelayDescriptor;
+     TImageDelayDescriptor=packed record
+      grArrs:TPACCUInt32;
+      rvaDLLName:TPACCUInt32;
+      rvaHmod:TPACCUInt32;
+      rvaIAT:TPACCUInt32;
+      rvaINT:TPACCUInt32;
+      rvaBoundIAT:TPACCUInt32;
+      rvaUnloadIAT:TPACCUInt32;
+      dwTimeStamp:TPACCUInt32;
      end;
 
      PImageLoadConfiguration32=^TImageLoadConfiguration32;
@@ -933,6 +1009,62 @@ type TBytes=array of TPACCUInt8;
        );
        IMAGE_SYM_CLASS_CLR_TOKEN:(
        );
+     end;
+
+     PResourceHeader=^TResourceHeader;
+     TResourceHeader=packed record
+      DataSize:TPACCUInt32;
+      HeaderSize:TPACCUInt32;
+      Type_:TPACCUInt32;
+      Name:TPACCUInt32;
+      DataVersion:TPACCUInt32;
+      MemoryFlags:TPACCUInt16;
+      LanguageID:TPACCUInt16;
+      Version:TPACCUInt32;
+      Characteristics:TPACCUInt32;
+     end;
+
+     PStrippedResourceHeader=^TStrippedResourceHeader;
+     TStrippedResourceHeader=packed record
+      DataSize:TPACCUInt32;
+      HeaderSize:TPACCUInt32;
+     end;
+
+     PPRsrcNode=^PRsrcNode;
+     PRsrcNode=^TRsrcNode;
+     TRsrcNode=record
+      Parent:PRsrcNode;
+      ID:TPACCUInt32;
+      Name:pointer;
+     end;
+
+     PPRsrcNodes=^TPRsrcNodes;
+     TPRsrcNodes=array[0..0] of PRsrcNode;
+
+     PRsrcBranch=^TRsrcBranch;
+     TRsrcBranch=record
+      Node:TRsrcNode;
+      NC:TPACCUInt32;
+      Children:PPRsrcNode;
+      Data:TImageResourceDirectory;
+     end;
+
+     PRsrcLeaf=^TRsrcLeaf;
+     TRsrcLeaf=record
+      Node:TRsrcNode;
+      Next:PRsrcLeaf;
+      NewOffset:TPACCUInt32;
+      Data:TImageResourceDataEntry;
+     end;
+
+     PRsrcData=^TRsrcData;
+     TRsrcData=record
+      Start:pointer;
+      NewStart:pointer;
+      Root:PRsrcNode;
+      Head,Current:PRsrcLeaf;
+      DSize,SSize:TPACCUInt32;
+      Error:boolean;
      end;
 
 var NullBytes:array[0..65535] of TPACCUInt8;
@@ -1447,7 +1579,84 @@ begin
 end;
 
 procedure TPACCLinker_COFF_PE.AddResources(const AResourcesStream:TStream;const AResourcesFileName:TPUCUUTF8String='');
+var Is16Bit:boolean;
+ procedure AddResource(const HeaderStream,DataStream:TStream);
+  function GetString:TPUCUUTF16String;
+  var Value:TPACCUInt16;
+  begin
+   HeaderStream.ReadBuffer(Value,SizeOf(TPACCUInt16));
+   if Value=$ffff then begin
+    HeaderStream.ReadBuffer(Value,SizeOf(TPACCUInt16));
+    result:=IntToStr(Value);
+   end else begin
+    result:=WideChar(Value);
+    while HeaderStream.Position<HeaderStream.Size do begin
+     HeaderStream.ReadBuffer(Value,SizeOf(TPACCUInt16));
+     if Value=0 then begin
+      break;
+     end else begin
+      result:=result+WideChar(Value);
+     end;
+    end;
+   end;
+  end;
+ var DataSize:TPACCUInt32;
+     HeaderSize:TPACCUInt32;
+     Type_:TPUCUUTF16String;
+     Name:TPUCUUTF16String;
+     DataVersion:TPACCUInt32;
+     MemoryFlags:TPACCUInt16;
+     LanguageID:TPACCUInt16;
+     Version:TPACCUInt32;
+     Characteristics:TPACCUInt32;
+ begin
+  HeaderStream.ReadBuffer(DataSize,SizeOf(TPACCUInt32));
+  HeaderStream.ReadBuffer(HeaderSize,SizeOf(TPACCUInt32));
+  Type_:=GetString;
+  Name:=GetString;
+  HeaderStream.Seek((HeaderStream.Position+3) and not TPACCInt64(3),soBeginning);
+  HeaderStream.ReadBuffer(DataVersion,SizeOf(TPACCUInt32));
+  HeaderStream.ReadBuffer(MemoryFlags,SizeOf(TPACCUInt16));
+  HeaderStream.ReadBuffer(LanguageID,SizeOf(TPACCUInt16));
+  HeaderStream.ReadBuffer(Version,SizeOf(TPACCUInt32));
+  HeaderStream.ReadBuffer(Characteristics,SizeOf(TPACCUInt32));
+  if (DataSize<>0) or (Name<>'0') then begin
+  end else begin
+   Is16Bit:=false;
+  end;
+ end;
+var StrippedResourceHeader:TStrippedResourceHeader;
+    HeaderStream,ResourceStream:TMemoryStream;
+    LastPosition:TPACCInt64;
 begin
+ Is16Bit:=true;
+ while (AResourcesStream.Position+SizeOf(TStrippedResourceHeader))<AResourcesStream.Size do begin
+  LastPosition:=AResourcesStream.Position;
+  AResourcesStream.ReadBuffer(StrippedResourceHeader,SizeOf(TStrippedResourceHeader));
+  HeaderStream:=TMemoryStream.Create;
+  try
+   HeaderStream.WriteBuffer(StrippedResourceHeader,SizeOf(StrippedResourceHeader));
+   if SizeOf(TStrippedResourceHeader)<StrippedResourceHeader.HeaderSize then begin
+    if HeaderStream.CopyFrom(AResourcesStream,StrippedResourceHeader.HeaderSize-SizeOf(TStrippedResourceHeader))<>(StrippedResourceHeader.HeaderSize-SizeOf(TStrippedResourceHeader)) then begin
+     raise EReadError.Create('Stream read error');
+    end;
+   end;
+   ResourceStream:=TMemoryStream.Create;
+   try
+    if StrippedResourceHeader.DataSize>0 then begin
+     ResourceStream.CopyFrom(AResourcesStream,StrippedResourceHeader.DataSize);
+    end;
+    HeaderStream.Seek(0,soBeginning);
+    ResourceStream.Seek(0,soBeginning);
+    AddResource(HeaderStream,ResourceStream);
+   finally
+    ResourceStream.Free;
+   end;
+  finally
+   HeaderStream.Free;
+  end;
+  AResourcesStream.Seek(LastPosition+(((StrippedResourceHeader.DataSize+StrippedResourceHeader.HeaderSize)+3) and not TPACCInt32(3)),soBeginning);
+ end;
 end;
 
 function CompareSections(a,b:pointer):TPACCInt32;
