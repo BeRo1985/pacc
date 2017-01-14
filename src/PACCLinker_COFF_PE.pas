@@ -115,6 +115,42 @@ type TPACCLinker_COFF_PE=class;
        property Items[const Index:TPACCInt]:TPACCLinker_COFF_PESymbol read GetItem write SetItem; default;
      end;
 
+     TPACCLinker_COFF_PEResource=class
+      private
+       fLinker:TPACCLinker_COFF_PE;
+       fType_:TPUCUUTF16String;
+       fName:TPUCUUTF16String;
+       fDataVersion:TPACCUInt32;
+       fMemoryFlags:TPACCUInt16;
+       fLanguageID:TPACCUInt16;
+       fVersion:TPACCUInt32;
+       fCharacteristics:TPACCUInt32;
+       fStream:TMemoryStream;
+      public
+       constructor Create(const ALinker:TPACCLinker_COFF_PE); reintroduce;
+       destructor Destroy; override;
+      published
+       property Linker:TPACCLinker_COFF_PE read fLinker;
+       property Type_:TPUCUUTF16String read fType_ write fType_;
+       property Name:TPUCUUTF16String read fName write fName;
+       property DataVersion:TPACCUInt32 read fDataVersion write fDataVersion;
+       property MemoryFlags:TPACCUInt16 read fMemoryFlags write fMemoryFlags;
+       property LanguageID:TPACCUInt16 read fLanguageID write fLanguageID;
+       property Version:TPACCUInt32 read fVersion write fVersion;
+       property Characteristics:TPACCUInt32 read fCharacteristics write fCharacteristics;
+       property Stream:TMemoryStream read fStream;
+     end;
+
+     TPACCLinker_COFF_PEResourceList=class(TList)
+      private
+       function GetItem(const Index:TPACCInt):TPACCLinker_COFF_PEResource;
+       procedure SetItem(const Index:TPACCInt;Node:TPACCLinker_COFF_PEResource);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const Index:TPACCInt]:TPACCLinker_COFF_PEResource read GetItem write SetItem; default;
+     end;
+
      PPACCLinker_COFF_PEImport=^TPACCLinker_COFF_PEImport;
      TPACCLinker_COFF_PEImport=record
       Used:boolean;
@@ -153,6 +189,8 @@ type TPACCLinker_COFF_PE=class;
        fCountExports:TPACCInt32;
        fExportSymbolNameHashMap:TPACCRawByteStringHashMap;
 
+       fResources:TPACCLinker_COFF_PEResourceList;
+
        fImageBase:TPACCUInt64;
 
       public
@@ -177,6 +215,8 @@ type TPACCLinker_COFF_PE=class;
        property Sections:TPACCLinker_COFF_PESectionList read fSections;
 
        property Symbols:TPACCLinker_COFF_PESymbolList read fSymbols;
+
+       property Resources:TPACCLinker_COFF_PEResourceList read fResources;
 
        property ImageBase:TPACCUInt64 read fImageBase write fImageBase;
 
@@ -1211,6 +1251,62 @@ begin
  inherited Items[Index]:=pointer(Node);
 end;
 
+constructor TPACCLinker_COFF_PEResource.Create(const ALinker:TPACCLinker_COFF_PE);
+begin
+ inherited Create;
+
+ fLinker:=ALInker;
+
+ fType_:='';
+
+ fName:='';
+
+ fDataVersion:=0;
+
+ fMemoryFlags:=0;
+
+ fLanguageID:=0;
+
+ fVersion:=0;
+
+ fCharacteristics:=0;
+
+ fStream:=TMemoryStream.Create;
+
+end;
+
+destructor TPACCLinker_COFF_PEResource.Destroy;
+begin
+ fType_:='';
+ fName:='';
+ fStream.Free;
+ inherited Destroy;
+end;
+
+constructor TPACCLinker_COFF_PEResourceList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCLinker_COFF_PEResourceList.Destroy;
+begin
+ while Count>0 do begin
+  Items[Count-1].Free;
+  Delete(Count-1);
+ end;
+ inherited Destroy;
+end;
+
+function TPACCLinker_COFF_PEResourceList.GetItem(const Index:TPACCInt):TPACCLinker_COFF_PEResource;
+begin
+ result:=pointer(inherited Items[Index]);
+end;
+
+procedure TPACCLinker_COFF_PEResourceList.SetItem(const Index:TPACCInt;Node:TPACCLinker_COFF_PEResource);
+begin
+ inherited Items[Index]:=pointer(Node);
+end;
+
 constructor TPACCLinker_COFF_PE.Create(const AInstance:TObject);
 begin
  inherited Create(AInstance);
@@ -1227,6 +1323,8 @@ begin
 
  fSymbols:=TPACCLinker_COFF_PESymbolList.Create;
 
+ fResources:=TPACCLinker_COFF_PEResourceList.Create;
+
  fImports:=nil;
  fCountImports:=0;
  fImportSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
@@ -1242,6 +1340,8 @@ end;
 destructor TPACCLinker_COFF_PE.Destroy;
 begin
 
+ fResources.Free;
+ 
  while fSymbols.Count>0 do begin
   fSymbols[fSymbols.Count-1].Free;
   fSymbols.Delete(fSymbols.Count-1);
@@ -1589,13 +1689,13 @@ var Is16Bit:boolean;
     HeaderStream.ReadBuffer(Value,SizeOf(TPACCUInt16));
     result:=IntToStr(Value);
    end else begin
-    result:=WideChar(Value);
+    result:=TPUCUUTF16Char(Value);
     while HeaderStream.Position<HeaderStream.Size do begin
      HeaderStream.ReadBuffer(Value,SizeOf(TPACCUInt16));
      if Value=0 then begin
       break;
      end else begin
-      result:=result+WideChar(Value);
+      result:=result+TPUCUUTF16Char(Value);
      end;
     end;
    end;
@@ -1609,6 +1709,7 @@ var Is16Bit:boolean;
      LanguageID:TPACCUInt16;
      Version:TPACCUInt32;
      Characteristics:TPACCUInt32;
+     Resource:TPACCLinker_COFF_PEResource;
  begin
   HeaderStream.ReadBuffer(DataSize,SizeOf(TPACCUInt32));
   HeaderStream.ReadBuffer(HeaderSize,SizeOf(TPACCUInt32));
@@ -1621,6 +1722,18 @@ var Is16Bit:boolean;
   HeaderStream.ReadBuffer(Version,SizeOf(TPACCUInt32));
   HeaderStream.ReadBuffer(Characteristics,SizeOf(TPACCUInt32));
   if (DataSize<>0) or (Name<>'0') then begin
+   Resource:=TPACCLinker_COFF_PEResource.Create(self);
+   Resources.Add(Resource);
+   Resource.Type_:=Type_;
+   Resource.Name:=Name;
+   Resource.DataVersion:=DataVersion;
+   Resource.MemoryFlags:=MemoryFlags;
+   Resource.LanguageID:=LanguageID;
+   Resource.Version:=Version;
+   Resource.Characteristics:=Characteristics;
+   DataStream.Seek(0,soBeginning);
+   Resource.Stream.LoadFromStream(DataStream);
+   Resource.Stream.Seek(0,soBeginning);
   end else begin
    Is16Bit:=false;
   end;
