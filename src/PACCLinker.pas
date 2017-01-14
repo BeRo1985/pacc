@@ -29,6 +29,8 @@ type TPACCLinker=class;
 
        procedure AddArchive(const AArchiveStream:TStream;const AArchiveFileName:TPUCUUTF8String=''); virtual;
 
+       procedure AddResources(const AResourcesStream:TStream;const AResourcesFileName:TPUCUUTF8String=''); virtual;
+
        procedure Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String=''); virtual;
 
       published
@@ -306,7 +308,7 @@ begin
        if (Stream.Size>SizeOf(TImportHeader)) and
           (PImportHeader(Stream.Memory)^.Sig1=IMAGE_FILE_MACHINE_UNKNOWN) and
           (PImportHeader(Stream.Memory)^.Sig2=$ffff) then begin
-        // TODO: Short import library parsing 
+        // TODO: Short import library parsing
        end else begin
         AddObject(Stream,Name);
        end;
@@ -320,6 +322,10 @@ begin
    end;
   end;
  end;
+end;
+
+procedure TPACCLinker.AddResources(const AResourcesStream:TStream;const AResourcesFileName:TPUCUUTF8String='');
+begin
 end;
 
 procedure TPACCLinker.Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');

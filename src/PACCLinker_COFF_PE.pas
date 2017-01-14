@@ -166,6 +166,8 @@ type TPACCLinker_COFF_PE=class;
 
        procedure AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String=''); override;
 
+       procedure AddResources(const AResourcesStream:TStream;const AResourcesFileName:TPUCUUTF8String=''); override;
+
        procedure Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String=''); override;
 
       published
@@ -1371,6 +1373,10 @@ begin
   SymbolRemap:=nil;
  end;
 
+end;
+
+procedure TPACCLinker_COFF_PE.AddResources(const AResourcesStream:TStream;const AResourcesFileName:TPUCUUTF8String='');
+begin
 end;
 
 function CompareSections(a,b:pointer):TPACCInt32;

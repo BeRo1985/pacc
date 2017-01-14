@@ -495,6 +495,25 @@ begin
       try
        try
 
+        if (OutputFiles.Count=1) and (InputFiles.Count>0) then begin
+
+         InputFileName:=ChangeFileExt(InputFiles[0],'.imp');
+         if FileExists(InputFileName) and (InputFiles.IndexOf(InputFileName)<0) then begin
+          InputFiles.Add(InputFileName);
+         end;
+
+         InputFileName:=ChangeFileExt(InputFiles[0],'.exp');
+         if FileExists(InputFileName) and (InputFiles.IndexOf(InputFileName)<0) then begin
+          InputFiles.Add(InputFileName);
+         end;
+
+         InputFileName:=ChangeFileExt(InputFiles[0],'.res');
+         if FileExists(InputFileName) and (InputFiles.IndexOf(InputFileName)<0) then begin
+          InputFiles.Add(InputFileName);
+         end;
+
+        end;
+
         for Index:=0 to InputFiles.Count-1 do begin
          InputFileName:=InputFiles[Index];
          Extension:=LowerCase(ExtractFileExt(InputFileName));
@@ -513,6 +532,15 @@ begin
          end else if Extension='.imp' then begin
           writeln('Loading imports from ',ExtractFileName(InputFileName),' . . .');
           Instance.Linker.AddImports(GetFileContent(InputFileName),InputFileName);
+         end else if Extension='.res' then begin
+          writeln('Loading resources from ',ExtractFileName(InputFileName),' . . .');
+          InputStream:=TMemoryStream.Create;
+          try
+           InputStream.LoadFromFile(InputFileName);
+           Instance.Linker.AddResources(InputStream,InputFileName);
+          finally
+           InputStream.Free;
+          end;
          end;
         end;
 
@@ -577,7 +605,7 @@ begin
    writeln('         -w                         Disable all warnings');
    writeln('         -Wall                      Enable all warnings');
    writeln('         -Werror                    Make all warnings into errors');
-   writeln('         -Xlinker <arg>             Pass <arg> on to the linker');
+// writeln('         -Xlinker <arg>             Pass <arg> on to the linker');
    if PACCRegisteredTargetClassList.Count>0 then begin
     TargetList:=TStringList.Create;
     try
