@@ -5,33 +5,6 @@ interface
 
 uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCRawByteStringHashMap,PACCPointerHashMap,PACCLinker;
 
-type TPACCLinker_ELF_ELF=class;
-
-     TPACCLinker_ELF_ELF=class(TPACCLinker)
-      private
-      public
-
-       constructor Create(const AInstance:TObject); override;
-       destructor Destroy; override;
-
-       procedure AddImport(const ASymbolName,AImportLibraryName,AImportName:TPUCUUTF8String); override;
-
-       procedure AddExport(const ASymbolName,AExportName:TPUCUUTF8String); override;
-
-       procedure AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String=''); override;
-
-       procedure AddResources(const AResourcesStream:TStream;const AResourcesFileName:TPUCUUTF8String=''); override;
-
-       procedure Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String=''); override;
-
-      published
-
-     end;
-
-implementation
-
-uses PACCInstance;
-
 const ET_NONE=0;
       ET_REL=1;
       ET_EXEC=2;
@@ -39,8 +12,8 @@ const ET_NONE=0;
       ET_CORE=4; 
       ET_LOOS=$fe00; 
       ET_HIOS=$feff; 
-      ET_LOPROC=$ff00; 
-      ET_HIPROC=$ffff; 
+      ET_LOPROC=$ff00;
+      ET_HIPROC=$ffff;
 
       EM_NONE=0; // No machine
       EM_M32=1; // AT&T WE 32100
@@ -281,7 +254,7 @@ const ET_NONE=0;
       EV_CURRENT=1; 
 
       // Identification index
-      EI_MAG0=0; 
+      EI_MAG0=0;
       EI_MAG1=1; 
       EI_MAG2=2; 
       EI_MAG3=3; 
@@ -291,7 +264,7 @@ const ET_NONE=0;
       EI_OSABI=7; 
       EI_ABIVERSION=8; 
       EI_PAD=9; 
-      EI_NIDENT=16; 
+      EI_NIDENT=16;
 
       // Magic number
       ELFMAG0=$7f; 
@@ -327,8 +300,6 @@ const ET_NONE=0;
       ELFOSABI_FENIXOS=16; // The FenixOS highly scalable multi-core OS
       //                       64-255 Architecture-specific value range
 
-
-
       /////////////////////
       // Sections constants
 
@@ -347,7 +318,7 @@ const ET_NONE=0;
       // Section types
       SHT_NULL=0; 
       SHT_PROGBITS=1; 
-      SHT_SYMTAB=2; 
+      SHT_SYMTAB=2;
       SHT_STRTAB=3; 
       SHT_RELA=4; 
       SHT_HASH=5; 
@@ -363,9 +334,9 @@ const ET_NONE=0;
       SHT_GROUP=17; 
       SHT_SYMTAB_SHNDX=18; 
       SHT_LOOS=$60000000; 
-      SHT_HIOS=$6fffffff; 
+      SHT_HIOS=$6fffffff;
       SHT_LOPROC=$70000000; 
-      SHT_HIPROC=$7fffffff; 
+      SHT_HIPROC=$7fffffff;
       SHT_LOUSER=$80000000; 
       SHT_HIUSER=$ffffffff; 
 
@@ -379,7 +350,7 @@ const ET_NONE=0;
       SHF_LINK_ORDER=$80; 
       SHF_OS_NONCONFORMING=$100; 
       SHF_GROUP=$200; 
-      SHF_TLS=$400; 
+      SHF_TLS=$400;
       SHF_MASKOS=$0ff00000; 
       SHF_MASKPROC=$f0000000; 
 
@@ -395,13 +366,13 @@ const ET_NONE=0;
       STB_LOOS=10; 
       STB_HIOS=12; 
       STB_MULTIDEF=13;
-      STB_LOPROC=13; 
+      STB_LOPROC=13;
       STB_HIPROC=15; 
 
       // Symbol types
       STT_NOTYPE=0; 
       STT_OBJECT=1; 
-      STT_FUNC=2; 
+      STT_FUNC=2;
       STT_SECTION=3; 
       STT_FILE=4; 
       STT_COMMON=5; 
@@ -427,7 +398,7 @@ const ET_NONE=0;
       R_X86_64_64=1; 
       R_386_PC32=2; 
       R_X86_64_PC32=2; 
-      R_386_GOT32=3; 
+      R_386_GOT32=3;
       R_X86_64_GOT32=3; 
       R_386_PLT32=4; 
       R_X86_64_PLT32=4;
@@ -437,13 +408,13 @@ const ET_NONE=0;
       R_X86_64_GLOB_DAT=6; 
       R_386_JMP_SLOT=7; 
       R_X86_64_JUMP_SLOT=7; 
-      R_386_RELATIVE=8; 
+      R_386_RELATIVE=8;
       R_X86_64_RELATIVE=8; 
       R_386_GOTOFF=9; 
       R_X86_64_GOTPCREL=9; 
       R_386_GOTPC=10; 
       R_X86_64_32=10; 
-      R_X86_64_32S=11; 
+      R_X86_64_32S=11;
       R_X86_64_16=12; 
       R_X86_64_PC16=13; 
       R_X86_64_8=14; 
@@ -459,7 +430,7 @@ const ET_NONE=0;
       R_X86_64_PC64=24; 
       R_X86_64_GOTOFF64=25; 
       R_X86_64_GOTPC32=26; 
-      R_X86_64_GOT64=27; 
+      R_X86_64_GOT64=27;
       R_X86_64_GOTPCREL64=28; 
       R_X86_64_GOTPC64=29; 
       R_X86_64_GOTPLT64=30; 
@@ -473,9 +444,9 @@ const ET_NONE=0;
 
       // Segment types
       PT_NULL=0; 
-      PT_LOAD=1; 
+      PT_LOAD=1;
       PT_DYNAMIC=2; 
-      PT_INTERP=3; 
+      PT_INTERP=3;
       PT_NOTE=4; 
       PT_SHLIB=5; 
       PT_PHDR=6; 
@@ -507,9 +478,9 @@ const ET_NONE=0;
       DT_SYMENT=11; 
       DT_INIT=12; 
       DT_FINI=13; 
-      DT_SONAME=14; 
+      DT_SONAME=14;
       DT_RPATH=15; 
-      DT_SYMBOLIC=16; 
+      DT_SYMBOLIC=16;
       DT_REL=17; 
       DT_RELSZ=18; 
       DT_RELENT=19; 
@@ -523,7 +494,7 @@ const ET_NONE=0;
       DT_INIT_ARRAYSZ=27; 
       DT_FINI_ARRAYSZ=28; 
       DT_RUNPATH=29; 
-      DT_FLAGS=30; 
+      DT_FLAGS=30;
       DT_ENCODING=32; 
       DT_PREINIT_ARRAY=32; 
       DT_PREINIT_ARRAYSZ=33; 
@@ -584,6 +555,259 @@ type PELFHalf=^TELFHalf;
 
      PELF64SWord=^TELF64SWord;
      TELF64SWord=TELFSWord;
+
+type // File header
+     PELF32EHdr=^TELF32EHdr;
+     TELF32EHdr=packed record
+      e_ident:array[0..EI_NIDENT-1] of AnsiChar;
+      e_type:TELFHalf;
+      e_machine:TELFHalf;
+      e_version:TELFWord;
+      e_entry:TELF32Addr;
+      e_phoff:TELF32Off;
+      e_shoff:TELF32Off;
+      e_flags:TELFWord;
+      e_ehsize:TELFHalf;
+      e_phentsize:TELFHalf;
+      e_phnum:TELFHalf;
+      e_shentsize:TELFHalf;
+      e_shnum:TELFHalf;
+      e_shstrndx:TELFHalf;
+     end;
+
+     PELF64EHdr=^TELF64EHdr;
+     TELF64EHdr=packed record
+      e_ident:array[0..EI_NIDENT-1] of AnsiChar;
+      e_type:TELFHalf;
+      e_machine:TELFHalf;
+      e_version:TELFWord;
+      e_entry:TELF64Addr;
+      e_phoff:TELF64Off;
+      e_shoff:TELF64Off;
+      e_flags:TELFWord;
+      e_ehsize:TELFHalf;
+      e_phentsize:TELFHalf;
+      e_phnum:TELFHalf;
+      e_shentsize:TELFHalf;
+      e_shnum:TELFHalf;
+      e_shstrndx:TELFHalf;
+     end;
+
+     // Section header
+     PELF32SHdr=^TELF32SHdr;
+     TELF32SHdr=packed record
+      sh_name:TELFWord;
+      sh_type:TELFWord;
+      sh_flags:TELFWord;
+      sh_addr:TELF32Addr;
+      sh_offset:TELF32Off;
+      sh_size:TELFWord;
+      sh_link:TELFWord;
+      sh_info:TELFWord;
+      sh_addralign:TELFWord;
+      sh_entsize:TELFWord;
+     end;
+
+     PELF64SHdr=^TELF64SHdr;
+     TELF64SHdr=packed record
+      sh_name:TELFWord;
+      sh_type:TELFWord;
+      sh_flags:TELFXWord;
+      sh_addr:TELF64Addr;
+      sh_offset:TELF64Off;
+      sh_size:TELFXWord;
+      sh_link:TELFWord;
+      sh_info:TELFWord;
+      sh_addralign:TELFXWord;
+      sh_entsize:TELFXWord;
+     end;
+
+     // Segment header
+     PELF32PHdr=^TELF32PHdr;
+     TELF32PHdr=packed record
+      p_type:TELFWord;
+      p_offset:TELF32Off;
+      p_vaddr:TELF32Addr;
+      p_paddr:TELF32Addr;
+      p_filesz:TELFWord;
+      p_memsz:TELFWord;
+      p_flags:TELFWord;
+      p_align:TELFWord;
+     end;
+
+     PELF64PHdr=^TELF64PHdr;
+     TELF64PHdr=packed record
+      p_type:TELFWord;
+      p_flags:TELFWord;
+      p_offset:TELF64Off;
+      p_vaddr:TELF64Addr;
+      p_paddr:TELF64Addr;
+      p_filesz:TELFXWord;
+      p_memsz:TELFXWord;
+      p_align:TELFXWord;
+     end;
+
+     // Symbol table entry
+     PELF32Sym=^TELF32Sym;
+     TELF32Sym=packed record
+      st_name:TELFWord;
+      st_value:TELF32Addr;
+      st_size:TELFWord;
+      st_info:TPACCUInt8;
+      st_other:TPACCUInt8;
+      st_shndx:TELFHalf;
+     end;
+
+     PELF64Sym=^TELF64Sym;
+     TELF64Sym=packed record
+      st_name:TELFWord;
+      st_info:TPACCUInt8;
+      st_other:TPACCUInt8;
+      st_shndx:TELFHalf;
+      st_value:TELF64Addr;
+      st_size:TELFXWord;
+     end;
+
+     // Relocation entries
+     PELF32Rel=^TELF32Rel;
+     TELF32Rel=packed record
+      r_offset:TELF32Addr;
+      r_info:TELFWord;
+     end;
+
+     PELF32Rela=^TELF32Rela;
+     TELF32Rela=packed record
+      r_offset:TELF32Addr;
+      r_info:TELFWord;
+      r_addend:TELFSWord;
+     end;
+
+     PELF64Rel=^TELF64Rel;
+     TELF64Rel=packed record
+      r_offset:TELF64Addr;
+      r_info:TELFXWord;
+     end;
+
+     PELF64Rela=^TELF64Rela;
+     TELF64Rela=packed record
+      r_offset:TELF64Addr;
+      r_info:TELFXWord;
+      r_addend:TELFSXWord;
+     end;
+
+     // Dynamic structure
+     PELF32Dyn=^TELF32Dyn;
+     TELF32Dyn=packed record
+      case d_tag:TELFSWord of
+       0:(
+        d_val:TELFWord;
+       );
+       1:(
+        d_ptr:TELF32Addr;
+       );
+     end;
+
+     PELF64Dyn=^TELF64Dyn;
+     TELF64Dyn=packed record
+      case d_tag:TELFSXWord of
+       0:(
+        d_val:TELFXWord;
+       );
+       1:(
+        d_ptr:TELF64Addr;
+       );
+     end;
+
+type TPACCLinker_ELF_ELF=class;
+
+     TPACCLinker_ELF_ELF=class(TPACCLinker)
+      private
+      public
+
+       constructor Create(const AInstance:TObject); override;
+       destructor Destroy; override;
+
+       procedure AddImport(const ASymbolName,AImportLibraryName,AImportName:TPUCUUTF8String); override;
+
+       procedure AddExport(const ASymbolName,AExportName:TPUCUUTF8String); override;
+
+       procedure AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String=''); override;
+
+       procedure AddResources(const AResourcesStream:TStream;const AResourcesFileName:TPUCUUTF8String=''); override;
+
+       procedure Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String=''); override;
+
+      published
+
+     end;
+
+function ELF_ST_BIND(const i:TELFWord):TELFWord;
+function ELF_ST_TYPE(const i:TELFWord):TELFWord;
+function ELF_ST_INFO(const b,t:TELFWord):TELFWord;
+
+function ELF_ST_VISIBILITY(const o:TELFWord):TELFWord;
+
+function ELF32_R_SYM(const i:TELFWord):TELFWord;
+function ELF32_R_TYPE(const i:TELFWord):TPACCUInt8;
+function ELF32_R_INFO(const s,t:TELFWord):TELFWord;
+
+function ELF64_R_SYM(const i:TELFXWord):TELFWord;
+function ELF64_R_TYPE(const i:TELFXWord):TELFWord;
+function ELF74_R_INFO(const s,t:TELFXWord):TELFXWord;
+
+implementation
+
+uses PACCInstance;
+
+function ELF_ST_BIND(const i:TELFWord):TELFWord;
+begin
+ result:=i shr 4;
+end;
+
+function ELF_ST_TYPE(const i:TELFWord):TELFWord;
+begin
+ result:=i and $f;
+end;
+
+function ELF_ST_INFO(const b,t:TELFWord):TELFWord;
+begin
+ result:=(b shl 4) or (t and $f);
+end;
+
+function ELF_ST_VISIBILITY(const o:TELFWord):TELFWord;
+begin
+ result:=o and 3;
+end;
+
+function ELF32_R_SYM(const i:TELFWord):TELFWord;
+begin
+ result:=i shr 8;
+end;
+
+function ELF32_R_TYPE(const i:TELFWord):TPACCUInt8;
+begin
+ result:=i and $ff;
+end;
+
+function ELF32_R_INFO(const s,t:TELFWord):TELFWord;
+begin
+ result:=(s shl 8) or (t and $ff);
+end;
+
+function ELF64_R_SYM(const i:TELFXWord):TELFWord;
+begin
+ result:=i shr 32;
+end;
+
+function ELF64_R_TYPE(const i:TELFXWord):TELFWord;
+begin
+ result:=i and $ffffffff;
+end;
+
+function ELF74_R_INFO(const s,t:TELFXWord):TELFXWord;
+begin
+ result:=(s shl 32) or (t and $ffffffff);
+end;
 
 constructor TPACCLinker_ELF_ELF.Create(const AInstance:TObject);
 begin
