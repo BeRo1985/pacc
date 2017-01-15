@@ -154,26 +154,42 @@ type TPACCLinker_COFF_PE=class;
        property Items[const AIndex:TPACCInt]:TPACCLinker_COFF_PE_Resource read GetItem write SetItem; default;
      end;
 
-     PPACCLinker_COFF_PE_Import=^TPACCLinker_COFF_PE_Import;
-     TPACCLinker_COFF_PE_Import=record
-      Used:boolean;
-      SymbolName:TPUCUUTF8String;
-      ImportLibraryName:TPUCUUTF8String;
-      ImportName:TPUCUUTF8String;
-      CodeSectionOffset:TPACCUInt64;
-      NameOffset:TPACCUInt64;
+     TPACCLinker_COFF_PE_Import=class
+      public
+       Used:boolean;
+       SymbolName:TPUCUUTF8String;
+       ImportLibraryName:TPUCUUTF8String;
+       ImportName:TPUCUUTF8String;
+       CodeSectionOffset:TPACCUInt64;
+       NameOffset:TPACCUInt64;
      end;
 
-     TPACCLinker_COFF_PE_Imports=array of TPACCLinker_COFF_PE_Import;
-
-     PPACCLinker_COFF_PE_Export=^TPACCLinker_COFF_PE_Export;
-     TPACCLinker_COFF_PE_Export=record
-      Used:boolean;
-      SymbolName:TPUCUUTF8String;
-      ExportName:TPUCUUTF8String;
+     TPACCLinker_COFF_PE_ImportList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PE_Import;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PE_Import);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_COFF_PE_Import read GetItem write SetItem; default;
      end;
 
-     TPACCLinker_COFF_PE_Exports=array of TPACCLinker_COFF_PE_Export;
+     TPACCLinker_COFF_PE_Export=class
+      public
+       Used:boolean;
+       SymbolName:TPUCUUTF8String;
+       ExportName:TPUCUUTF8String;
+     end;
+
+     TPACCLinker_COFF_PE_ExportList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PE_Export;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PE_Export);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_COFF_PE_Export read GetItem write SetItem; default;
+     end;
 
      TPACCLinker_COFF_PE=class(TPACCLinker)
       private
@@ -184,12 +200,10 @@ type TPACCLinker_COFF_PE=class;
 
        fSymbols:TPACCLinker_COFF_PE_SymbolList;
 
-       fImports:TPACCLinker_COFF_PE_Imports;
-       fCountImports:TPACCInt32;
+       fImports:TPACCLinker_COFF_PE_ImportList;
        fImportSymbolNameHashMap:TPACCRawByteStringHashMap;
 
-       fExports:TPACCLinker_COFF_PE_Imports;
-       fCountExports:TPACCInt32;
+       fExports:TPACCLinker_COFF_PE_ExportList;
        fExportSymbolNameHashMap:TPACCRawByteStringHashMap;
 
        fResources:TPACCLinker_COFF_PE_ResourceList;
@@ -218,6 +232,10 @@ type TPACCLinker_COFF_PE=class;
        property Sections:TPACCLinker_COFF_PE_SectionList read fSections;
 
        property Symbols:TPACCLinker_COFF_PE_SymbolList read fSymbols;
+
+       property Imports_:TPACCLinker_COFF_PE_ImportList read fImports;
+
+       property Exports_:TPACCLinker_COFF_PE_ExportList read fExports;
 
        property Resources:TPACCLinker_COFF_PE_ResourceList read fResources;
 
@@ -1498,6 +1516,54 @@ begin
  inherited Items[AIndex]:=pointer(AItem);
 end;
 
+constructor TPACCLinker_COFF_PE_ImportList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCLinker_COFF_PE_ImportList.Destroy;
+begin
+ while Count>0 do begin
+  Items[Count-1].Free;
+  Delete(Count-1);
+ end;
+ inherited Destroy;
+end;
+
+function TPACCLinker_COFF_PE_ImportList.GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PE_Import;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCLinker_COFF_PE_ImportList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PE_Import);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
+constructor TPACCLinker_COFF_PE_ExportList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCLinker_COFF_PE_ExportList.Destroy;
+begin
+ while Count>0 do begin
+  Items[Count-1].Free;
+  Delete(Count-1);
+ end;
+ inherited Destroy;
+end;
+
+function TPACCLinker_COFF_PE_ExportList.GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PE_Export;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCLinker_COFF_PE_ExportList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PE_Export);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
 constructor TPACCLinker_COFF_PE.Create(const AInstance:TObject);
 begin
  inherited Create(AInstance);
@@ -1516,12 +1582,10 @@ begin
 
  fResources:=TPACCLinker_COFF_PE_ResourceList.Create;
 
- fImports:=nil;
- fCountImports:=0;
+ fImports:=TPACCLinker_COFF_PE_ImportList.Create;
  fImportSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
 
- fExports:=nil;
- fCountExports:=0;
+ fExports:=TPACCLinker_COFF_PE_ExportList.Create;
  fExportSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
 
  fImageBase:=$400000;
@@ -1545,53 +1609,43 @@ begin
  end;
  fSections.Free;
 
- fImports:=nil;
+ fImports.Free;
  fImportSymbolNameHashMap.Free;
 
- fExports:=nil;
+ fExports.Free;
  fExportSymbolNameHashMap.Free;
 
  inherited Destroy;
 end;
 
 procedure TPACCLinker_COFF_PE.AddImport(const ASymbolName,AImportLibraryName,AImportName:TPUCUUTF8String);
-var Index:TPACCInt32;
-    Import_:PPACCLinker_COFF_PE_Import;
+var Import_:TPACCLinker_COFF_PE_Import;
 begin
- if assigned(fImportSymbolNameHashMap.Get(ASymbolName,false)) then begin
+ if assigned(fImportSymbolNameHashMap[ASymbolName]) then begin
   TPACCInstance(Instance).AddWarning('Duplicate import symbol name "'+ASymbolName+'"',nil);
  end else begin
-  Index:=fCountImports;
-  inc(fCountImports);
-  if length(fImports)<fCountImports then begin
-   SetLength(fImports,fCountImports*2);
-  end;
-  Import_:=@fImports[Index];
-  Import_^.Used:=false;
-  Import_^.SymbolName:=ASymbolName;
-  Import_^.ImportLibraryName:=AImportLibraryName;
-  Import_^.ImportName:=AImportName;
-  fImportSymbolNameHashMap[ASymbolName]:=pointer(TPACCPtrUInt(Index));
+  Import_:=TPACCLinker_COFF_PE_Import.Create;
+  fImports.Add(Import_);
+  Import_.Used:=false;
+  Import_.SymbolName:=ASymbolName;
+  Import_.ImportLibraryName:=AImportLibraryName;
+  Import_.ImportName:=AImportName;
+  fImportSymbolNameHashMap[ASymbolName]:=Import_;
  end;
 end;
 
 procedure TPACCLinker_COFF_PE.AddExport(const ASymbolName,AExportName:TPUCUUTF8String);
-var Index:TPACCInt32;
-    Export_:PPACCLinker_COFF_PE_Export;
+var Export_:TPACCLinker_COFF_PE_Export;
 begin
- if assigned(fExportSymbolNameHashMap.Get(ASymbolName,false)) then begin
+ if assigned( fExportSymbolNameHashMap[ASymbolName]) then begin
   TPACCInstance(Instance).AddWarning('Duplicate export symbol name "'+ASymbolName+'"',nil);
  end else begin
-  Index:=fCountExports;
-  inc(fCountExports);
-  if length(fExports)<fCountExports then begin
-   SetLength(fExports,fCountExports*2);
-  end;
-  Export_:=@fExports[Index];
-  Export_^.Used:=false;
-  Export_^.SymbolName:=ASymbolName;
-  Export_^.ExportName:=AExportName;
-  fExportSymbolNameHashMap[ASymbolName]:=pointer(TPACCPtrUInt(Index));
+  Export_:=TPACCLinker_COFF_PE_Export.Create;
+  fExports.Add(Export_);
+  Export_.Used:=false;
+  Export_.SymbolName:=ASymbolName;
+  Export_.ExportName:=AExportName;
+  fExportSymbolNameHashMap[ASymbolName]:=Export_;
  end;
 end;
 
@@ -2408,8 +2462,7 @@ var Relocations:TRelocations;
  procedure ScanImports;
  var SymbolIndex:TPACCInt32;
      Symbol:TPACCLinker_COFF_PE_Symbol;
-     Entity:PPACCRawByteStringHashMapEntity;
-     Import_:PPACCLinker_COFF_PE_Import;
+     Import_:TPACCLinker_COFF_PE_Import;
  begin
   for SymbolIndex:=0 to Symbols.Count-1 do begin
    Symbol:=Symbols[SymbolIndex];
@@ -2424,13 +2477,12 @@ var Relocations:TRelocations;
        (Symbol.Name[4]='m') and
        (Symbol.Name[5]='p') and
        (Symbol.Name[6]='_') then begin
-     Entity:=fImportSymbolNameHashMap.Get(copy(Symbol.Name,7,length(Symbol.Name)-6),false);
+     Import_:=fImportSymbolNameHashMap[copy(Symbol.Name,7,length(Symbol.Name)-6)];
     end else begin
-     Entity:=fImportSymbolNameHashMap.Get(Symbol.Name,false);
+     Import_:=fImportSymbolNameHashMap[Symbol.Name];
     end;
-    if assigned(Entity) then begin
-     Import_:=@fImports[TPACCPtrUInt(Entity.Value)];
-     Import_^.Used:=true;
+    if assigned(Import_) then begin
+     Import_.Used:=true;
     end;
    end;
   end;
@@ -2462,7 +2514,7 @@ var Relocations:TRelocations;
      ImportSectionSymbolIndex,CodeSectionSymbolIndex,FirstThunkSymbolIndex,
      LibraryNameSymbolIndex,LibraryImportSymbolIndex,LibraryImportNameSymbolIndex,
      LibraryImportTrunkCodeSymbolIndex:TPACCInt32;
-     Import_:PPACCLinker_COFF_PE_Import;
+     Import_:TPACCLinker_COFF_PE_Import;
      OK:boolean;
      Section,CodeSection,ImportSection:TPACCLinker_COFF_PE_Section;
      Relocation:PPACCLinker_COFF_PE_Relocation;
@@ -2479,9 +2531,9 @@ var Relocations:TRelocations;
  begin
 
   OK:=false;
-  for ImportIndex:=0 to fCountImports-1 do begin
-   Import_:=@fImports[ImportIndex];
-   if Import_^.Used then begin
+  for ImportIndex:=0 to fImports.Count-1 do begin
+   Import_:=fImports[ImportIndex];
+   if Import_.Used then begin
     OK:=true;
     break;
    end;
@@ -2511,10 +2563,10 @@ var Relocations:TRelocations;
     LibraryStringHashMap:=TPACCRawByteStringHashMap.Create;
     try
 
-     for ImportIndex:=0 to fCountImports-1 do begin
-      Import_:=@fImports[ImportIndex];
-      if Import_^.Used then begin
-       Entity:=LibraryStringHashMap.Get(Import_^.ImportLibraryName,false);
+     for ImportIndex:=0 to fImports.Count-1 do begin
+      Import_:=fImports[ImportIndex];
+      if Import_.Used then begin
+       Entity:=LibraryStringHashMap.Get(Import_.ImportLibraryName,false);
        if assigned(Entity) then begin
         LibraryIndex:=TPACCPtrUInt(pointer(Entity.Value));
        end else begin
@@ -2523,9 +2575,9 @@ var Relocations:TRelocations;
         if length(Libraries)<CountLibraries then begin
          SetLength(Libraries,CountLibraries*2);
         end;
-        LibraryStringHashMap[Import_^.ImportLibraryName]:=pointer(TPACCPtrUInt(LibraryIndex));
+        LibraryStringHashMap[Import_.ImportLibraryName]:=pointer(TPACCPtrUInt(LibraryIndex));
         Library_:=@Libraries[LibraryIndex];
-        Library_^.Name:=Import_^.ImportLibraryName;
+        Library_^.Name:=Import_.ImportLibraryName;
         Library_^.DescriptorOffset:=0;
         Library_^.NameOffset:=0;
         Library_^.ThunkOffset:=0;
@@ -2539,8 +2591,8 @@ var Relocations:TRelocations;
         SetLength(Library_^.Imports,Library_^.CountImports*2);
        end;
        LibraryImport:=@Library_^.Imports[LibraryImportIndex];
-       LibraryImport^.SymbolName:=Import_^.SymbolName;
-       LibraryImport^.Name:=Import_^.ImportName;
+       LibraryImport^.SymbolName:=Import_.SymbolName;
+       LibraryImport^.Name:=Import_.ImportName;
        LibraryImport^.NameOffset:=0;
        LibraryImport^.CodeOffset:=0;
        LibraryImport^.CodePatchOffset:=0;
@@ -2736,7 +2788,7 @@ var Relocations:TRelocations;
  var SymbolIndex:TPACCInt32;
      Symbol:TPACCLinker_COFF_PE_Symbol;
      Entity:PPACCRawByteStringHashMapEntity;
-     Import_:PPACCLinker_COFF_PE_Import;
+     Export_:TPACCLinker_COFF_PE_Export;
  begin
   for SymbolIndex:=0 to Symbols.Count-1 do begin
    Symbol:=Symbols[SymbolIndex];
@@ -2748,13 +2800,12 @@ var Relocations:TRelocations;
        (Symbol.Name[4]='x') and
        (Symbol.Name[5]='p') and
        (Symbol.Name[6]='_') then begin
-     Entity:=fExportSymbolNameHashMap.Get(copy(Symbol.Name,7,length(Symbol.Name)-6),false);
+     Export_:=fExportSymbolNameHashMap[copy(Symbol.Name,7,length(Symbol.Name)-6)];
     end else begin
-     Entity:=fExportSymbolNameHashMap.Get(Symbol.Name,false);
+     Export_:=fExportSymbolNameHashMap[Symbol.Name];
     end;
-    if assigned(Entity) then begin
-     Import_:=@fExports[TPACCPtrUInt(Entity.Value)];
-     Import_^.Used:=true;
+    if assigned(Export_) then begin
+     Export_.Used:=true;
     end;
    end;
   end;
@@ -2763,31 +2814,31 @@ var Relocations:TRelocations;
  var ExportIndex,SectionIndex,PassIndex:TPACCInt32;
      AddressOfName,AddressOfFunctions,AddressOfNames,AddressOfOrdinals,Value:TPACCUInt32;
      Value16:TPACCUInt16;
-     Export_:PPACCLinker_COFF_PE_Export;
+     Export_:TPACCLinker_COFF_PE_Export;
      Section,ExportSection:TPACCLinker_COFF_PE_Section;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
      ImageExportDirectory:TImageExportDirectory;
-     Exports_:TStringList;
+     ExportList:TStringList;
      ExportName:TPACCRawByteString;
      ExportSectionSymbol,TempSectionSymbol:TPACCLinker_COFF_PE_Symbol;
      ExportSectionSymbolIndex,TempSectionSymbolIndex:TPACCInt32;
      Relocation:PPACCLinker_COFF_PE_Relocation;
  begin
 
-  Exports_:=TStringList.Create;
+  ExportList:=TStringList.Create;
   try
 
-   Exports_.NameValueSeparator:='=';
-   for ExportIndex:=0 to fCountExports-1 do begin
-    Export_:=@fExports[ExportIndex];
-    if Export_^.Used then begin
-     Exports_.Add(Export_^.ExportName+Exports_.NameValueSeparator+Export_^.SymbolName);
+   ExportList.NameValueSeparator:='=';
+   for ExportIndex:=0 to fExports.Count-1 do begin
+    Export_:=fExports[ExportIndex];
+    if Export_.Used then begin
+     ExportList.Add(Export_.ExportName+ExportList.NameValueSeparator+Export_.SymbolName);
     end;
    end;
 
-   if Exports_.Count>0 then begin
+   if ExportList.Count>0 then begin
 
-    Exports_.Sort;
+    ExportList.Sort;
 
     ExportSection:=nil;
     for SectionIndex:=0 to Sections.Count-1 do begin
@@ -2895,17 +2946,17 @@ var Relocations:TRelocations;
      ImageExportDirectory.MinorVersion:=0;
      ImageExportDirectory.Name:=0;
      ImageExportDirectory.Base:=1;
-     ImageExportDirectory.NumberOfFunctions:=Exports_.Count;
-     ImageExportDirectory.NumberOfNames:=Exports_.Count;
+     ImageExportDirectory.NumberOfFunctions:=ExportList.Count;
+     ImageExportDirectory.NumberOfNames:=ExportList.Count;
      ImageExportDirectory.AddressOfFunctions:=0;
      ImageExportDirectory.AddressOfNames:=0;
      ImageExportDirectory.AddressOfNameOrdinals:=0;
      ExportSection.Stream.WriteBuffer(ImageExportDirectory,SizeOf(TImageExportDirectory));
 
      AddressOfFunctions:=ExportSection.Stream.Position;
-     for ExportIndex:=0 to Exports_.Count-1 do begin
+     for ExportIndex:=0 to ExportList.Count-1 do begin
       if PassIndex=1 then begin
-       TempSectionSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,Exports_.Values[Exports_.Names[ExportIndex]],ExportSection,0,0,IMAGE_SYM_CLASS_EXTERNAL,plcpskUndefined);
+       TempSectionSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,ExportList.Values[ExportList.Names[ExportIndex]],ExportSection,0,0,IMAGE_SYM_CLASS_EXTERNAL,plcpskUndefined);
        TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
        ExportSection.Symbols.Add(TempSectionSymbol);
        Relocation:=ExportSection.NewRelocation;
@@ -2925,8 +2976,8 @@ var Relocations:TRelocations;
      end;
 
      AddressOfNames:=ExportSection.Stream.Position;
-     Value:=ExportSection.Stream.Position+(Exports_.Count*SizeOf(TPACCUInt32));
-     for ExportIndex:=0 to Exports_.Count-1 do begin
+     Value:=ExportSection.Stream.Position+(ExportList.Count*SizeOf(TPACCUInt32));
+     for ExportIndex:=0 to ExportList.Count-1 do begin
       if PassIndex=1 then begin
        TempSectionSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'@@__export_data_section_addressof_AddressOfName_'+IntToStr(ExportIndex),ExportSection,Value,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
        TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
@@ -2944,16 +2995,16 @@ var Relocations:TRelocations;
        end;
       end;
       ExportSection.Stream.WriteBuffer(NullBytes[0],SizeOf(TPACCUInt32));
-      inc(Value,length(Exports_.Names[ExportIndex])+1);
+      inc(Value,length(ExportList.Names[ExportIndex])+1);
      end;
-     for ExportIndex:=0 to Exports_.Count-1 do begin
-      ExportName:=Exports_.Names[ExportIndex];
+     for ExportIndex:=0 to ExportList.Count-1 do begin
+      ExportName:=ExportList.Names[ExportIndex];
       ExportSection.Stream.WriteBuffer(ExportName[1],length(ExportName));
       ExportSection.Stream.WriteBuffer(NullBytes[0],SizeOf(TPACCUInt8));
      end;
 
      AddressOfOrdinals:=ExportSection.Stream.Position;
-     for ExportIndex:=0 to Exports_.Count-1 do begin
+     for ExportIndex:=0 to ExportList.Count-1 do begin
       Value16:=ExportIndex;
       ExportSection.Stream.WriteBuffer(Value16,SizeOf(TPACCUInt16));
      end;
@@ -2968,7 +3019,7 @@ var Relocations:TRelocations;
    end;
 
   finally
-   Exports_.Free;
+   ExportList.Free;
   end;
 
  end;
