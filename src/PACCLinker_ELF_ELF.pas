@@ -839,10 +839,52 @@ type // File header
        );
      end;
 
-type TPACCLinker_ELF_ELF=class;
+     TPACCLinker_ELF_ELF=class;
+
+     TPACCLinker_ELF_ELF_Section=class
+      private
+
+       fLinker:TPACCLinker_ELF_ELF;
+
+       fName:TPACCRawByteString;
+
+       fDataOffset:TPACCUInt64;
+
+       fStream:TMemoryStream;
+
+       fsh_name:TPACCUInt64;
+       fsh_num:TPACCUInt64;
+       fsh_type:TPACCUInt64;
+       fsh_flags:TPACCUInt64;
+       fsh_addr:TPACCUInt64;
+       fsh_offset:TPACCUInt64;
+       fsh_size:TPACCUInt64;
+       fsh_link:TPACCUInt64;
+       fsh_info:TPACCUInt64;
+       fsh_addralign:TPACCUInt64;
+       fsh_entsize:TPACCUInt64;
+      public
+       constructor Create(const ALinker:TPACCLinker_ELF_ELF;const AName:TPACCRawByteString); reintroduce;
+       destructor Destroy; override;
+      published
+       property Linker:TPACCLinker_ELF_ELF read fLinker;
+     end;
+
+     TPACCLinker_ELF_ELF_SectionList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Section;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Section);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Section read GetItem write SetItem; default;
+     end;
 
      TPACCLinker_ELF_ELF=class(TPACCLinker)
       private
+
+       fSections:TPACCLinker_ELF_ELF_SectionList;
+
       public
 
        constructor Create(const AInstance:TObject); override;
@@ -947,14 +989,62 @@ begin
  end;
 end;
 
+constructor TPACCLinker_ELF_ELF_Section.Create(const ALinker:TPACCLinker_ELF_ELF;const AName:TPACCRawByteString);
+var Index:TPACCInt32;
+begin
+ inherited Create;
+
+ fLinker:=ALinker;
+
+ fLinker.fSections.Add(self);
+
+ fStream:=TMemoryStream.Create;
+
+end;
+
+destructor TPACCLinker_ELF_ELF_Section.Destroy;
+begin
+ fStream.Free;
+ fLinker.fSections.Remove(self);
+ inherited Destroy;
+end;
+
+constructor TPACCLinker_ELF_ELF_SectionList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCLinker_ELF_ELF_SectionList.Destroy;
+begin
+ inherited Destroy;
+end;
+
+function TPACCLinker_ELF_ELF_SectionList.GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Section;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCLinker_ELF_ELF_SectionList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Section);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
 constructor TPACCLinker_ELF_ELF.Create(const AInstance:TObject);
 begin
  inherited Create(AInstance);
+
+ fSections:=TPACCLinker_ELF_ELF_SectionList.Create;
+
 end;
 
 destructor TPACCLinker_ELF_ELF.Destroy;
 begin
 
+ while fSections.Count>0 do begin
+  fSections[fSections.Count-1].Free;
+ end;
+
+ fSections.Free;
 
  inherited Destroy;
 end;
