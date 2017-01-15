@@ -58,12 +58,12 @@ type TPACCLinker_COFF_PE=class;
 
      TPACCLinker_COFF_PESectionList=class(TList)
       private
-       function GetItem(const Index:TPACCInt):TPACCLinker_COFF_PESection;
-       procedure SetItem(const Index:TPACCInt;Node:TPACCLinker_COFF_PESection);
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PESection;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PESection);
       public
        constructor Create;
        destructor Destroy; override;
-       property Items[const Index:TPACCInt]:TPACCLinker_COFF_PESection read GetItem write SetItem; default;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_COFF_PESection read GetItem write SetItem; default;
      end;
 
      PPACCLinker_COFF_PESymbolKind=^TPACCLinker_COFF_PESymbolKind;
@@ -107,12 +107,12 @@ type TPACCLinker_COFF_PE=class;
 
      TPACCLinker_COFF_PESymbolList=class(TList)
       private
-       function GetItem(const Index:TPACCInt):TPACCLinker_COFF_PESymbol;
-       procedure SetItem(const Index:TPACCInt;Node:TPACCLinker_COFF_PESymbol);
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PESymbol;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PESymbol);
       public
        constructor Create;
        destructor Destroy; override;
-       property Items[const Index:TPACCInt]:TPACCLinker_COFF_PESymbol read GetItem write SetItem; default;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_COFF_PESymbol read GetItem write SetItem; default;
      end;
 
      TPACCLinker_COFF_PEResource=class
@@ -143,12 +143,12 @@ type TPACCLinker_COFF_PE=class;
 
      TPACCLinker_COFF_PEResourceList=class(TList)
       private
-       function GetItem(const Index:TPACCInt):TPACCLinker_COFF_PEResource;
-       procedure SetItem(const Index:TPACCInt;Node:TPACCLinker_COFF_PEResource);
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PEResource;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PEResource);
       public
        constructor Create;
        destructor Destroy; override;
-       property Items[const Index:TPACCInt]:TPACCLinker_COFF_PEResource read GetItem write SetItem; default;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_COFF_PEResource read GetItem write SetItem; default;
      end;
 
      PPACCLinker_COFF_PEImport=^TPACCLinker_COFF_PEImport;
@@ -1070,44 +1070,218 @@ type TBytes=array of TPACCUInt8;
       HeaderSize:TPACCUInt32;
      end;
 
-     PPRsrcNode=^PRsrcNode;
-     PRsrcNode=^TRsrcNode;
-     TRsrcNode=record
-      Parent:PRsrcNode;
-      ID:TPACCUInt32;
-      Name:pointer;
+     TResourceNode=class;
+
+     PResourceNodeItem=^TResourceNodeItem;
+     TResourceNodeItem=class
+      private
+       fLeaf:boolean;
+       fIsIntegerID:boolean;
+       fID:TPUCUUTF16String;
+       fObject:TObject;
+       fCodePage:TPACCUInt32;
+       function GetStream:TMemoryStream;
+       procedure SetStream(const AStream:TMemoryStream);
+       function GetNode:TResourceNode;
+       procedure SetNode(const ANode:TResourceNode);
+      protected
+       function CheckIntegerID:boolean;
+      public
+       constructor Create; reintroduce;
+       destructor Destroy; override;
+      published
+       property Leaf:boolean read fLeaf write fLeaf;
+       property IsIntegerID:boolean read fIsIntegerID write fIsIntegerID;
+       property ID:TPUCUUTF16String read fID write fID;
+       property Stream:TMemoryStream read GetStream write SetStream;
+       property Node:TResourceNode read GetNode write SetNode;
+       property CodePage:TPACCUInt32 read fCodePage write fCodePage;
      end;
 
-     PPRsrcNodes=^TPRsrcNodes;
-     TPRsrcNodes=array[0..0] of PRsrcNode;
+     TResourceNodeItems=array of TResourceNodeItem;
 
-     PRsrcBranch=^TRsrcBranch;
-     TRsrcBranch=record
-      Node:TRsrcNode;
-      NC:TPACCUInt32;
-      Children:PPRsrcNode;
-      Data:TImageResourceDirectory;
-     end;
-
-     PRsrcLeaf=^TRsrcLeaf;
-     TRsrcLeaf=record
-      Node:TRsrcNode;
-      Next:PRsrcLeaf;
-      NewOffset:TPACCUInt32;
-      Data:TImageResourceDataEntry;
-     end;
-
-     PRsrcData=^TRsrcData;
-     TRsrcData=record
-      Start:pointer;
-      NewStart:pointer;
-      Root:PRsrcNode;
-      Head,Current:PRsrcLeaf;
-      DSize,SSize:TPACCUInt32;
-      Error:boolean;
+     TResourceNode=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TResourceNodeItem;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TResourceNodeItem);
+      public
+       constructor Create(const AType,AName:TPUCUUTF16String;const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32); reintroduce; overload;
+       constructor CreateName(const AName:TPUCUUTF16String;const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32); reintroduce; overload;
+       constructor CreateLang(const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32); reintroduce; overload;
+       destructor Destroy; override;
+       procedure Add(const AType,AName:TPUCUUTF16String;const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32); reintroduce; overload;
+       procedure AddName(const AName:TPUCUUTF16String;const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32); reintroduce; overload;
+       procedure AddLang(const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32); reintroduce; overload;
+       property Items[const AIndex:TPACCInt]:TResourceNodeItem read GetItem write SetItem; default;
      end;
 
 var NullBytes:array[0..65535] of TPACCUInt8;
+
+constructor TResourceNodeItem.Create;
+begin
+ inherited Create;
+ fLeaf:=false;
+ fIsIntegerID:=false;
+ fID:='';
+ fObject:=nil;
+ fCodePage:=0;
+end;
+
+destructor TResourceNodeItem.Destroy;
+begin
+ FreeAndNil(fObject);
+ inherited Destroy;
+end;
+
+function TResourceNodeItem.GetStream:TMemoryStream;
+begin
+ result:=TMemoryStream(fObject);
+end;
+
+procedure TResourceNodeItem.SetStream(const AStream:TMemoryStream);
+begin
+ fObject:=AStream;
+end;
+
+function TResourceNodeItem.GetNode:TResourceNode;
+begin
+ result:=TResourceNode(fObject);
+end;
+
+procedure TResourceNodeItem.SetNode(const ANode:TResourceNode);
+begin
+ fObject:=ANode;
+end;
+
+function TResourceNodeItem.CheckIntegerID:boolean;
+var Index:TPACCInt32;
+begin
+ for Index:=1 to length(fID) do begin
+  if (fID[Index]<'0') or (fID[Index]>'9') then begin
+   result:=false;
+   exit;
+  end;
+ end;
+ try
+  result:=IntToStr(StrToIntDef(fID,-1))=fID;
+ except
+  result:=false;
+ end;
+end;
+
+constructor TResourceNode.Create(const AType,AName:TPUCUUTF16String;const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32);
+var Item:TResourceNodeItem;
+begin
+ inherited Create;
+ Item:=TResourceNodeItem.Create;
+ inherited Add(Item);
+ Item.ID:=AType;
+ Item.IsIntegerID:=Item.CheckIntegerID;
+ Item.Leaf:=false;
+ Item.Node:=TResourceNode.CreateName(AName,ALang,AStream,ACodePage);
+end;
+
+constructor TResourceNode.CreateName(const AName:TPUCUUTF16String;const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32);
+var Item:TResourceNodeItem;
+begin
+ inherited Create;
+ Item:=TResourceNodeItem.Create;
+ inherited Add(Item);
+ Item.ID:=AName;
+ Item.IsIntegerID:=Item.CheckIntegerID;
+ Item.Leaf:=false;
+ Item.Node:=TResourceNode.CreateLang(ALang,AStream,ACodePage);
+end;
+
+constructor TResourceNode.CreateLang(const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32);
+var Item:TResourceNodeItem;
+begin
+ inherited Create;
+ Item:=TResourceNodeItem.Create;
+ inherited Add(Item);
+ Item.ID:=IntToStr(ALang);
+ Item.IsIntegerID:=true;
+ Item.Leaf:=true;
+ Item.Stream:=AStream;
+ Item.CodePage:=ACodePage;
+end;          
+
+destructor TResourceNode.Destroy;
+var Index:TPACCInt32;
+begin
+ for Index:=Count-1 downto 0 do begin
+  Items[Index].Free;
+  Items[Index]:=nil;
+ end;
+ inherited Destroy;
+end;
+
+function TResourceNode.GetItem(const AIndex:TPACCInt):TResourceNodeItem;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TResourceNode.SetItem(const AIndex:TPACCInt;const AItem:TResourceNodeItem);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
+procedure TResourceNode.Add(const AType,AName:TPUCUUTF16String;const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32);
+var Index:TPACCInt32;
+    Item:TResourceNodeItem;
+begin
+ for Index:=0 to Count-1 do begin
+  Item:=Items[Index];
+  if Item.ID=AType then begin
+   exit;
+  end;
+ end;
+ Item:=TResourceNodeItem.Create;
+ inherited Add(Item);
+ Item.ID:=AType;
+ Item.IsIntegerID:=Item.CheckIntegerID;
+ Item.Leaf:=false;
+ Item.Node:=TResourceNode.CreateName(AName,ALang,AStream,ACodePage);
+end;
+
+procedure TResourceNode.AddName(const AName:TPUCUUTF16String;const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32);
+var Index:TPACCInt32;
+    Item:TResourceNodeItem;
+begin
+ for Index:=0 to Count-1 do begin
+  Item:=Items[Index];
+  if Item.ID=AName then begin
+   exit;
+  end;
+ end;
+ Item:=TResourceNodeItem.Create;
+ inherited Add(Item);
+ Item.ID:=AName;
+ Item.IsIntegerID:=Item.CheckIntegerID;
+ Item.Leaf:=false;
+ Item.Node:=TResourceNode.CreateLang(ALang,AStream,ACodePage);
+end;
+
+procedure TResourceNode.AddLang(const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32);
+var Index:TPACCInt32;
+    Item:TResourceNodeItem;
+    Lang:TPUCUUTF16String;
+begin
+ Lang:=IntToStr(ALang);
+ for Index:=0 to Count-1 do begin
+  Item:=Items[Index];
+  if Item.ID=Lang then begin
+   exit;
+  end;
+ end;
+ Item:=TResourceNodeItem.Create;
+ inherited Add(Item);
+ Item.ID:=IntToStr(ALang);
+ Item.IsIntegerID:=true;
+ Item.Leaf:=true;
+ Item.Stream:=AStream;
+ Item.CodePage:=ACodePage;
+end;
 
 constructor TPACCLinker_COFF_PESection.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32);
 var Index:TPACCInt32;
@@ -1179,14 +1353,14 @@ begin
  inherited Destroy;
 end;
 
-function TPACCLinker_COFF_PESectionList.GetItem(const Index:TPACCInt):TPACCLinker_COFF_PESection;
+function TPACCLinker_COFF_PESectionList.GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PESection;
 begin
- result:=pointer(inherited Items[Index]);
+ result:=pointer(inherited Items[AIndex]);
 end;
 
-procedure TPACCLinker_COFF_PESectionList.SetItem(const Index:TPACCInt;Node:TPACCLinker_COFF_PESection);
+procedure TPACCLinker_COFF_PESectionList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PESection);
 begin
- inherited Items[Index]:=pointer(Node);
+ inherited Items[AIndex]:=pointer(AItem);
 end;
 
 constructor TPACCLinker_COFF_PESymbol.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32;const ASymbolKind:TPACCLinker_COFF_PESymbolKind);
@@ -1241,14 +1415,14 @@ begin
  inherited Destroy;
 end;
 
-function TPACCLinker_COFF_PESymbolList.GetItem(const Index:TPACCInt):TPACCLinker_COFF_PESymbol;
+function TPACCLinker_COFF_PESymbolList.GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PESymbol;
 begin
- result:=pointer(inherited Items[Index]);
+ result:=pointer(inherited Items[AIndex]);
 end;
 
-procedure TPACCLinker_COFF_PESymbolList.SetItem(const Index:TPACCInt;Node:TPACCLinker_COFF_PESymbol);
+procedure TPACCLinker_COFF_PESymbolList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PESymbol);
 begin
- inherited Items[Index]:=pointer(Node);
+ inherited Items[AIndex]:=pointer(AItem);
 end;
 
 constructor TPACCLinker_COFF_PEResource.Create(const ALinker:TPACCLinker_COFF_PE);
@@ -1297,14 +1471,14 @@ begin
  inherited Destroy;
 end;
 
-function TPACCLinker_COFF_PEResourceList.GetItem(const Index:TPACCInt):TPACCLinker_COFF_PEResource;
+function TPACCLinker_COFF_PEResourceList.GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PEResource;
 begin
- result:=pointer(inherited Items[Index]);
+ result:=pointer(inherited Items[AIndex]);
 end;
 
-procedure TPACCLinker_COFF_PEResourceList.SetItem(const Index:TPACCInt;Node:TPACCLinker_COFF_PEResource);
+procedure TPACCLinker_COFF_PEResourceList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PEResource);
 begin
- inherited Items[Index]:=pointer(Node);
+ inherited Items[AIndex]:=pointer(AItem);
 end;
 
 constructor TPACCLinker_COFF_PE.Create(const AInstance:TObject);
@@ -1775,10 +1949,8 @@ end;
 function CompareSections(a,b:pointer):TPACCInt32;
 begin
  result:=TPACCLinker_COFF_PESection(a).Order-TPACCLinker_COFF_PESection(b).Order;
- if result=0 then begin
-  if TPACCLinker_COFF_PESection(a).Name=TPACCLinker_COFF_PESection(b).Name then begin
-   result:=CompareStr(TPACCLinker_COFF_PESection(a).Ordering,TPACCLinker_COFF_PESection(b).Ordering);
-  end;
+ if (result=0) and (TPACCLinker_COFF_PESection(a).Name=TPACCLinker_COFF_PESection(b).Name) then begin
+  result:=CompareStr(TPACCLinker_COFF_PESection(a).Ordering,TPACCLinker_COFF_PESection(b).Ordering);
  end;
 end;
 
