@@ -100,7 +100,7 @@ Conditionals=
 DebugSourceDirs=
 UsePackages=0
 [Parameters]
-RunParams=-shared helloworld_win32.asm
+RunParams=helloworld_win32.asm
 HostApplication=
 Launcher=
 UseLauncher=0

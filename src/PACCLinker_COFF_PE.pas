@@ -3448,11 +3448,7 @@ var Relocations:TRelocations;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
      Resource:TPACCLinker_COFF_PEResource;
      Stack:TList;
-     Offset,
-     NameOffset,NameSize,NamePosition,
-     TableOffset,
-     DataEntryOffset,DataEntrySize,DataEntryPosition,
-     DataOffset,DataSize,DataPosition:TPACCUInt32;
+     NextImageResourceDirectoryOffset:TPACCUInt32;
      ImageResourceDirectory:TImageResourceDirectory;
      ImageResourceDirectoryEntry:TImageResourceDirectoryEntry;
      v16:TPACCUInt16;
@@ -3485,66 +3481,14 @@ var Relocations:TRelocations;
      end;
     end;
 
-    Offset:=Section.VirtualAddress;
-
-    NameOffset:=Offset;
-    NameSize:=0;
-    NamePosition:=0;
-    TableOffset:=0;
-    DataEntryOffset:=Offset;
-    DataEntrySize:=0;
-    DataEntryPosition:=0;
-    DataSize:=0;
-    DataPosition:=0;
-
-{   Stack:=TList.Create;
-    try
-     Stack.Add(Root);
-     while Stack.Count>0 do begin
-      CurrentObject:=Stack[Stack.Count-1];
-      Stack.Delete(Stack.Count-1);
-      if assigned(CurrentObject) then begin
-       if CurrentObject is TResourceNode then begin
-        Node:=TResourceNode(CurrentObject);
-        for Index:=Node.Count-1 downto 0 do begin
-         Item:=Node[Index];
-         Stack.Add(Item);
-        end;
-       end else if CurrentObject is TResourceNodeItem then begin
-        Item:=TResourceNodeItem(CurrentObject);
-        inc(NameOffset,SizeOf(TImageResourceDirectoryEntry));
-        inc(DataEntryOffset,SizeOf(TImageResourceDirectoryEntry));
-        if not Item.IsIntegerID then begin
-         inc(NameSize,(length(Item.ID)+1)*SizeOf(TPUCUUTF16Char));
-        end;
-        if Item.Leaf then begin
-         inc(NameOffset,SizeOf(TImageResourceDataEntry));
-         inc(DataEntrySize,SizeOf(TImageResourceDataEntry));
-         DataSize:=((DataSize+Item.Stream.Size)+3) and not TPACCUInt32(3);
-        end else begin
-         Stack.Add(Item.Node);
-        end;
-       end else begin
-        TPACCInstance(Instance).AddError('Internal error 2017-01-15-02-10-0000',nil,true);
-       end;
-      end else begin
-       TPACCInstance(Instance).AddError('Internal error 2017-01-15-02-10-0001',nil,true);
-      end;
-     end;
-    finally
-     Stack.Free;
-    end;
-
-    DataOffset:=((NameOffset+NameSize)+15) and not TPACCUInt32(15);
-    if DataOffset>0 then begin
-    end;}
-
     Stack:=TList.Create;
     try
 
      for PassIndex:=0 to 1 do begin
 
       Section.Stream.Seek(0,soBeginning);
+
+      NextImageResourceDirectoryOffset:=0;
 
       for Part:=ptNodes to ptData do begin
 
@@ -3597,6 +3541,7 @@ var Relocations:TRelocations;
 
           if Part=ptNodes then begin
            Section.Stream.WriteBuffer(ImageResourceDirectory,SizeOf(TImageResourceDirectory));
+           inc(NextImageResourceDirectoryOffset,SizeOf(TImageResourceDirectory)+(Node.Count*SizeOf(ImageResourceDirectoryEntry)));
           end;
 
          end else if CurrentObject is TResourceNodeItem then begin
@@ -3611,8 +3556,7 @@ var Relocations:TRelocations;
             if Item.Leaf then begin
              ImageResourceDirectoryEntry.OffsetToChildData:=Item.DataOffset;
             end else begin
-             ImageResourceDirectoryEntry.OffsetToChildData:=TableOffset or $80000000;
-             Stack.Add(Item.Node);
+             ImageResourceDirectoryEntry.OffsetToChildData:=NextImageResourceDirectoryOffset or $80000000;
             end;
             Section.Stream.WriteBuffer(ImageResourceDirectoryEntry,SizeOf(ImageResourceDirectoryEntry));
            end;
@@ -3640,6 +3584,9 @@ var Relocations:TRelocations;
              Item.DataOffset:=0;
             end;
            end;
+          end;
+          if not Item.Leaf then begin
+           Stack.Add(Item.Node);
           end;
          end else begin
           TPACCInstance(Instance).AddError('Internal error 2017-01-15-02-40-0000',nil,true);
