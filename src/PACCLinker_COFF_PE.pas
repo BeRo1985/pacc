@@ -125,10 +125,12 @@ type TPACCLinker_COFF_PE=class;
        fLanguageID:TPACCUInt16;
        fVersion:TPACCUInt32;
        fCharacteristics:TPACCUInt32;
+       fCodePage:TPACCUInt32;
        fStream:TMemoryStream;
       public
        constructor Create(const ALinker:TPACCLinker_COFF_PE); reintroduce;
        destructor Destroy; override;
+       procedure UpdateCodePage; 
       published
        property Linker:TPACCLinker_COFF_PE read fLinker;
        property Type_:TPUCUUTF16String read fType_ write fType_;
@@ -138,6 +140,7 @@ type TPACCLinker_COFF_PE=class;
        property LanguageID:TPACCUInt16 read fLanguageID write fLanguageID;
        property Version:TPACCUInt32 read fVersion write fVersion;
        property Characteristics:TPACCUInt32 read fCharacteristics write fCharacteristics;
+       property CodePage:TPACCUInt32 read fCodePage write fCodePage;
        property Stream:TMemoryStream read fStream;
      end;
 
@@ -225,6 +228,8 @@ type TPACCLinker_COFF_PE=class;
 implementation
 
 uses PACCInstance,PACCTarget_x86_32{,PACCTarget_x86_64_Win64};
+
+{$i PACCLinker_COFF_PE_LCIDToCodePageLookUpTable.inc}
 
 const MZEXEHeaderSize=128;
       MZEXEHeaderBytes:array[0..MZEXEHeaderSize-1] of TPACCUInt8=
@@ -808,7 +813,7 @@ type TBytes=array of TPACCUInt8;
      PImageResourceDirStringU=^TImageResourceDirStringU;
      TImageResourceDirStringU=packed record
       length:TPACCUInt16;
-      NameString:array[0..0] of WideChar;
+      NameString:array[0..0] of TPUCUUTF16Char;
      end;
 
      PImageDebugDirectory=^TImageDebugDirectory;
@@ -1445,6 +1450,8 @@ begin
 
  fCharacteristics:=0;
 
+ fCodePage:=0;
+
  fStream:=TMemoryStream.Create;
 
 end;
@@ -1455,6 +1462,11 @@ begin
  fName:='';
  fStream.Free;
  inherited Destroy;
+end;
+
+procedure TPACCLinker_COFF_PEResource.UpdateCodePage;
+begin
+ fCodePage:=LCIDToCodePageLookUpTable[fLanguageID];
 end;
 
 constructor TPACCLinker_COFF_PEResourceList.Create;
@@ -1905,6 +1917,7 @@ var Is16Bit:boolean;
    Resource.LanguageID:=LanguageID;
    Resource.Version:=Version;
    Resource.Characteristics:=Characteristics;
+   Resource.UpdateCodePage;
    DataStream.Seek(0,soBeginning);
    Resource.Stream.LoadFromStream(DataStream);
    Resource.Stream.Seek(0,soBeginning);
@@ -3380,30 +3393,93 @@ var Relocations:TRelocations;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
  begin
   if TPACCInstance(Instance).Options.CreateSharedLibrary and assigned(Relocations.RootNode) then begin
+
    RelocationsSort(Relocations);
+
    Size:=RelocationsSize(Relocations);
+
    for SectionIndex:=0 to Sections.Count-1 do begin
     Section:=Sections[SectionIndex];
     if Section.Name='.reloc' then begin
      TPACCInstance(Instance).AddError('Section ".reloc" already exist',nil,true);
     end;
    end;
+
    Section:=TPACCLinker_COFF_PESection.Create(self,'.reloc',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ);
    Sections.Add(Section);
+
    LastVirtualAddress:=(LastVirtualAddress+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
    Section.VirtualAddress:=LastVirtualAddress;
+
    Section.Stream.SetSize(Size);
    RelocationsBuild(Relocations,Section.Stream.Memory,0);
+
    Section.VirtualSize:=(Section.Stream.Size+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
+
    Section.RawSize:=Section.Stream.Size;
    while (Section.RawSize>0) and (TPACCUInt8(PAnsiChar(Section.Stream.Memory)[Section.RawSize-1])=0) do begin
     Section.RawSize:=Section.RawSize-1;
    end;
+
    inc(LastVirtualAddress,Section.VirtualSize);
+
    PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_BASERELOC];
    PECOFFDirectoryEntry^.Section:=Section;
    PECOFFDirectoryEntry^.Offset:=0;
    PECOFFDirectoryEntry^.Size:=Size;
+
+  end;
+ end;
+ procedure GenerateResourceSection;
+ var SectionIndex,ResourceIndex:TPACCInt32;
+     Section:TPACCLinker_COFF_PESection;
+     Root:TResourceNode;
+     PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
+     Resource:TPACCLinker_COFF_PEResource;
+ begin
+  if Resources.Count>0 then begin
+
+   for SectionIndex:=0 to Sections.Count-1 do begin
+    Section:=Sections[SectionIndex];
+    if Section.Name='.rsrc' then begin
+     TPACCInstance(Instance).AddError('Section ".rsrc" already exist',nil,true);
+    end;
+   end;
+
+   Section:=TPACCLinker_COFF_PESection.Create(self,'.rsrc',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ);
+   Sections.Add(Section);
+
+   LastVirtualAddress:=(LastVirtualAddress+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
+   Section.VirtualAddress:=LastVirtualAddress;
+
+   Root:=nil;
+   try
+    for ResourceIndex:=0 to Resources.Count-1 do begin
+     Resource:=Resources[ResourceIndex];
+     if assigned(Root) then begin
+      Root.Add(Resource.Type_,Resource.Name,Resource.fLanguageID,Resource.Stream,Resource.CodePage);
+     end else begin
+      Root:=TResourceNode.Create(Resource.Type_,Resource.Name,Resource.fLanguageID,Resource.Stream,Resource.CodePage);
+     end;
+    end;
+   finally
+    Root.Free;
+   end;
+
+   Section.VirtualSize:=(Section.Stream.Size+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
+
+   Section.RawSize:=Section.Stream.Size;
+{  while (Section.RawSize>0) and (TPACCUInt8(PAnsiChar(Section.Stream.Memory)[Section.RawSize-1])=0) do begin
+    Section.RawSize:=Section.RawSize-1;
+   end;}
+
+   inc(LastVirtualAddress,Section.VirtualSize);
+
+   PECOFFDirectoryEntry:=@PECOFFDirectoryEntries^[IMAGE_DIRECTORY_ENTRY_RESOURCE];
+   PECOFFDirectoryEntry^.Section:=Section;
+   PECOFFDirectoryEntry^.Offset:=0;
+   PECOFFDirectoryEntry^.Size:=Section.Stream.Size;
+
   end;
  end;
  procedure GenerateImage(const Stream:TStream);
@@ -3764,6 +3840,8 @@ begin
     ResolveRelocations;
 
     GenerateRelocationSection;
+
+    GenerateResourceSection;
 
     GenerateImage(AOutputStream);
 
