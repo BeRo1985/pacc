@@ -267,7 +267,7 @@ const ET_NONE=0;
       EI_NIDENT=16;
 
       // Magic number
-      ELFMAG0=$7f; 
+      ELFMAG0=$7f;
       ELFMAG1=ord('E');
       ELFMAG2=ord('L');
       ELFMAG3=ord('F');
@@ -595,7 +595,7 @@ const ET_NONE=0;
      TELF64SWord=TELFSWord;
 
 type PELFIdent=^TELFIdent;
-     TELFIdent=array[0..EI_NIDENT-1] of AnsiChar;
+     TELFIdent=array[0..EI_NIDENT-1] of TPACCUInt8;
 
      // File header
      PELF32EHdr=^TELF32EHdr;
@@ -1443,15 +1443,30 @@ var EHdr32:TELF32EHdr;
     EHdr:TELFEHdr;
 begin
 
- AObjectStream.Seek(0,soBeginning);
+ if AObjectStream.Seek(0,soBeginning)<>0 then begin
+  TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+ end;
 
  if fIs64Bit then begin
-  AObjectStream.Read(EHdr64,SizeOf(TELF64EHdr));
+  AObjectStream.ReadBuffer(EHdr64,SizeOf(TELF64EHdr));
   EHdr.AssignFrom64(EHdr64);
  end else begin
-  AObjectStream.Read(EHdr32,SizeOf(TELF32EHdr));
+  AObjectStream.ReadBuffer(EHdr32,SizeOf(TELF32EHdr));
   EHdr.AssignFrom32(EHdr32);
  end;
+
+ if (EHdr.e_ident[0]<>ELFMAG0) or
+    (EHdr.e_ident[1]<>ELFMAG1) or
+    (EHdr.e_ident[2]<>ELFMAG2) or
+    (EHdr.e_ident[3]<>ELFMAG3) then begin
+  TPACCInstance(Instance).AddError('No ELF object',nil,true);
+ end;
+
+ if EHdr.e_machine<>fMachine then begin
+  TPACCInstance(Instance).AddError('Wrong ELF machine',nil,true);
+ end;
+
+ 
 
 end;
 
