@@ -1,4 +1,4 @@
-unit PACCLinker_COFF_PE;
+unit PACCLinker_COFF_PE_LCIDToCodePageLookUpTable;
 {$i PACC.inc}
 interface
 uses PACCTypes;
