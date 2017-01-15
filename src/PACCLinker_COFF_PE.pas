@@ -3434,11 +3434,15 @@ var Relocations:TRelocations;
   end;
  end;
  procedure GenerateResourceSection;
- var SectionIndex,ResourceIndex:TPACCInt32;
+ var SectionIndex,ResourceIndex,Index:TPACCInt32;
      Section:TPACCLinker_COFF_PESection;
-     Root:TResourceNode;
+     CurrentObject:TObject;
+     Root,Node:TResourceNode;
+     Item:TResourceNodeItem;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
      Resource:TPACCLinker_COFF_PEResource;
+     Stack:TList;
+     NameSize,NameOffset,NamePosition,TableOffset,Offset,Size,DataSize:TPACCUInt32;
  begin
   if Resources.Count>0 then begin
 
@@ -3457,6 +3461,7 @@ var Relocations:TRelocations;
 
    Root:=nil;
    try
+
     for ResourceIndex:=0 to Resources.Count-1 do begin
      Resource:=Resources[ResourceIndex];
      if assigned(Root) then begin
@@ -3465,6 +3470,52 @@ var Relocations:TRelocations;
       Root:=TResourceNode.Create(Resource.Type_,Resource.Name,Resource.fLanguageID,Resource.Stream,Resource.CodePage);
      end;
     end;
+
+    NameSize:=0;
+    NameOffset:=0;
+    NamePosition:=0;
+    TableOffset:=0;
+    Offset:=0;
+    Size:=0;
+    DataSize:=0;
+
+    Stack:=TList.Create;
+    try
+     Stack.Add(Root);
+     while Stack.Count>0 do begin
+      CurrentObject:=Stack[Stack.Count-1];
+      Stack.Delete(Stack.Count-1);
+      if assigned(CurrentObject) then begin
+       if CurrentObject is TResourceNode then begin
+        Node:=TResourceNode(CurrentObject);
+        for Index:=Node.Count-1 downto 0 do begin
+         Stack.Add(Node[Index]);
+        end;
+       end else if CurrentObject is TResourceNodeItem then begin
+        Item:=TResourceNodeItem(CurrentObject);
+        inc(NameOffset,SizeOf(TImageResourceDirectoryEntry));
+        inc(Offset,SizeOf(TImageResourceDirectoryEntry));
+        if not Item.IsIntegerID then begin
+         inc(NameSize,(length(Item.ID)+1)*SizeOf(TPUCUUTF16Char));
+        end;
+        if Item.Leaf then begin
+         inc(NameOffset,SizeOf(TImageResourceDataEntry));
+         inc(Size,SizeOf(TImageResourceDataEntry));
+         DataSize:=((DataSize+Item.Stream.Size)+3) and not TPACCUInt32(3);
+        end else begin
+         Stack.Add(Item.Node);
+        end;
+       end else begin
+        TPACCInstance(Instance).AddError('Internal error 2017-01-15-02-10-0000',nil,true);
+       end;
+      end else begin
+       TPACCInstance(Instance).AddError('Internal error 2017-01-15-02-10-0001',nil,true);
+      end;
+     end;
+    finally
+     Stack.Free;
+    end;
+
    finally
     Root.Free;
    end;
