@@ -1431,7 +1431,7 @@ begin
   EHdr3264.ELF64EHdr.e_ident:=EHdr3264.ELF32EHdr.e_ident;
  end;
 
- if AObjectStream.Seek(EHdr3264.ELF64EHdr.e_ehsize,soBeginning)<>EHdr3264.ELF64EHdr.e_ehsize then begin
+ if AObjectStream.Seek(EHdr3264.ELF64EHdr.e_shoff,soBeginning)<>EHdr3264.ELF64EHdr.e_shoff then begin
   TPACCInstance(Instance).AddError('Stream seek error',nil,true);
  end;
 
