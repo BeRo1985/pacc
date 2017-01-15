@@ -524,6 +524,30 @@ const ET_NONE=0;
       VER_NEED_CURRENT=1; // Current version
       VER_NEED_NUM=2; // Given version number
 
+      // Legal values for a_type (entry type)
+      AT_NULL=0; // End of vector
+      AT_IGNORE=1; // Entry should be ignored
+      AT_EXECFD=2; // File descriptor of program
+      AT_PHDR=3; // Program headers for program
+      AT_PHENT=4; // Size of program header entry
+      AT_PHNUM=5; // Number of program headers
+      AT_PAGESZ=6; // System page size
+      AT_BASE=7; // Base address of interpreter
+      AT_FLAGS=8; // Flags
+      AT_ENTRY=9; // Entry point of program
+      AT_NOTELF=10; // Program is not ELF
+      AT_UID=11; // Real uid
+      AT_EUID=12; // Effective uid
+      AT_GID=13; // Real gid
+      AT_EGID=14; // Effective gid
+
+      // Some more special a_type values describing the hardware.
+      AT_PLATFORM=15; // String identifying platform
+      AT_HWCAP=16; // Machine dependent hints about processor capabilities
+
+      // This entry gives some information about the FPU initialization performed by the kernel.
+      AT_FPUCW=17; //  Used FPU control word.
+
 type PELFHalf=^TELFHalf;
      TELFHalf=TPACCUInt16;
 
@@ -790,6 +814,29 @@ type // File header
       vna_other:TELF64Word;
       vna_name:TELF64Word;
       vna_next:TELF64Word;
+     end;
+
+     // Auxiliary vector
+     PELF32AuxV=^TELF32AuxV;
+     TELF32AuxV=packed record
+      case a_int:TPACCInt32 of
+       0:(
+        a_val:TPACCInt64;
+       );
+       1:(
+        a_ptr:pointer;
+       );
+     end;
+
+     PELF64AuxV=^TELF64AuxV;
+     TELF64AuxV=packed record
+      case a_int:TPACCInt64 of
+       0:(
+        a_val:TPACCInt64;
+       );
+       1:(
+        a_ptr:pointer;
+       );
      end;
 
 type TPACCLinker_ELF_ELF=class;
