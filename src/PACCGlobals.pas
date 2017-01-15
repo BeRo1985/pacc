@@ -5,7 +5,7 @@ interface
 
 uses {$if defined(Win32) or defined(Win64)}Windows,{$ifend}SysUtils,Classes,Math,PUCU,PasMP,PACCTypes,PACCRawByteStringHashMap;
 
-const PACCVersionString='2017.01.14.03.05.0000';
+const PACCVersionString='2017.01.15.05.05.0000';
       PACCCopyrightString='Copyright (C) 2009-2017, Benjamin ''BeRo'' Rosseaux';
 
 type PPACCEncoding=^TPACCEncoding;

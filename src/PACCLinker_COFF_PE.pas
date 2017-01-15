@@ -3600,7 +3600,7 @@ var Relocations:TRelocations;
            end;
           end;
          end;
-         for Index:=0 to ChildNodes.Count-1 do begin
+         for Index:=ChildNodes.Count-1 downto 0 do begin
           Stack.Add(ChildNodes[Index]);
          end;
         end;
