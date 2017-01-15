@@ -7,18 +7,18 @@ uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCRawByteStringHashMap,P
 
 type TPACCLinker_COFF_PE=class;
 
-     PPACCLinker_COFF_PERelocation=^TPACCLinker_COFF_PERelocation;
-     TPACCLinker_COFF_PERelocation=record
+     PPACCLinker_COFF_PE_Relocation=^TPACCLinker_COFF_PE_Relocation;
+     TPACCLinker_COFF_PE_Relocation=record
       VirtualAddress:TPACCUInt32;
       Symbol:TPACCUInt32;
       RelocationType:TPACCUInt16;
      end;
 
-     TPACCLinker_COFF_PERelocations=array of TPACCLinker_COFF_PERelocation;
+     TPACCLinker_COFF_PE_Relocations=array of TPACCLinker_COFF_PE_Relocation;
 
-     TPACCLinker_COFF_PESymbolList=class;
+     TPACCLinker_COFF_PE_SymbolList=class;
 
-     TPACCLinker_COFF_PESection=class
+     TPACCLinker_COFF_PE_Section=class
       private
        fLinker:TPACCLinker_COFF_PE;
        fName:TPACCRawByteString;
@@ -30,13 +30,13 @@ type TPACCLinker_COFF_PE=class;
        fVirtualSize:TPACCUInt64;
        fRawSize:TPACCUInt64;
        fCharacteristics:TPACCUInt32;
-       fSymbols:TPACCLinker_COFF_PESymbolList;
+       fSymbols:TPACCLinker_COFF_PE_SymbolList;
        fFileOffset:TPACCInt64;
        fActive:boolean;
       protected
-       Relocations:TPACCLinker_COFF_PERelocations;
+       Relocations:TPACCLinker_COFF_PE_Relocations;
        CountRelocations:TPACCInt32;
-       function NewRelocation:PPACCLinker_COFF_PERelocation;
+       function NewRelocation:PPACCLinker_COFF_PE_Relocation;
       public
        constructor Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32); reintroduce;
        destructor Destroy; override;
@@ -51,23 +51,23 @@ type TPACCLinker_COFF_PE=class;
        property VirtualSize:TPACCUInt64 read fVirtualSize write fVirtualSize;
        property RawSize:TPACCUInt64 read fRawSize write fRawSize;
        property Characteristics:TPACCUInt32 read fCharacteristics write fCharacteristics;
-       property Symbols:TPACCLinker_COFF_PESymbolList read fSymbols;
+       property Symbols:TPACCLinker_COFF_PE_SymbolList read fSymbols;
        property FileOffset:TPACCInt64 read fFileOffset write fFileOffset;
        property Active:boolean read fActive write fActive;
      end;
 
-     TPACCLinker_COFF_PESectionList=class(TList)
+     TPACCLinker_COFF_PE_SectionList=class(TList)
       private
-       function GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PESection;
-       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PESection);
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PE_Section;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PE_Section);
       public
        constructor Create;
        destructor Destroy; override;
-       property Items[const AIndex:TPACCInt]:TPACCLinker_COFF_PESection read GetItem write SetItem; default;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_COFF_PE_Section read GetItem write SetItem; default;
      end;
 
-     PPACCLinker_COFF_PESymbolKind=^TPACCLinker_COFF_PESymbolKind;
-     TPACCLinker_COFF_PESymbolKind=
+     PPACCLinker_COFF_PE_SymbolKind=^TPACCLinker_COFF_PE_SymbolKind;
+     TPACCLinker_COFF_PE_SymbolKind=
       (
        plcpskUndefined,
        plcpskAbsolute,
@@ -75,47 +75,47 @@ type TPACCLinker_COFF_PE=class;
        plcpskNormal
       );
 
-     TPACCLinker_COFF_PESymbol=class
+     TPACCLinker_COFF_PE_Symbol=class
       private
        fLinker:TPACCLinker_COFF_PE;
        fName:TPACCRawByteString;
-       fSection:TPACCLinker_COFF_PESection;
+       fSection:TPACCLinker_COFF_PE_Section;
        fValue:TPACCInt64;
        fType:TPACCInt32;
        fClass:TPACCInt32;
-       fSymbolKind:TPACCLinker_COFF_PESymbolKind;
-       fAlias:TPACCLinker_COFF_PESymbol;
-       fSubSymbols:TPACCLinker_COFF_PESymbolList;
+       fSymbolKind:TPACCLinker_COFF_PE_SymbolKind;
+       fAlias:TPACCLinker_COFF_PE_Symbol;
+       fSubSymbols:TPACCLinker_COFF_PE_SymbolList;
        fAuxData:TMemoryStream;
        fActive:boolean;
       public
-       constructor Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32;const ASymbolKind:TPACCLinker_COFF_PESymbolKind); reintroduce;
+       constructor Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PE_Section;const AValue:TPACCInt64;const AType,AClass:TPACCInt32;const ASymbolKind:TPACCLinker_COFF_PE_SymbolKind); reintroduce;
        destructor Destroy; override;
       published
        property Linker:TPACCLinker_COFF_PE read fLinker;
        property Name:TPACCRawByteString read fName;
-       property Section:TPACCLinker_COFF_PESection read fSection write fSection;
+       property Section:TPACCLinker_COFF_PE_Section read fSection write fSection;
        property Value:TPACCInt64 read fValue write fValue;
        property Type_:TPACCInt32 read fType;
        property Class_:TPACCInt32 read fClass;
-       property SymbolKind:TPACCLinker_COFF_PESymbolKind read fSymbolKind write fSymbolKind;
-       property Alias:TPACCLinker_COFF_PESymbol read fAlias write fAlias;
-       property SubSymbols:TPACCLinker_COFF_PESymbolList read fSubSymbols;
+       property SymbolKind:TPACCLinker_COFF_PE_SymbolKind read fSymbolKind write fSymbolKind;
+       property Alias:TPACCLinker_COFF_PE_Symbol read fAlias write fAlias;
+       property SubSymbols:TPACCLinker_COFF_PE_SymbolList read fSubSymbols;
        property AuxData:TMemoryStream read fAuxData write fAuxData;
        property Active:boolean read fActive write fActive;
      end;
 
-     TPACCLinker_COFF_PESymbolList=class(TList)
+     TPACCLinker_COFF_PE_SymbolList=class(TList)
       private
-       function GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PESymbol;
-       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PESymbol);
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PE_Symbol;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PE_Symbol);
       public
        constructor Create;
        destructor Destroy; override;
-       property Items[const AIndex:TPACCInt]:TPACCLinker_COFF_PESymbol read GetItem write SetItem; default;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_COFF_PE_Symbol read GetItem write SetItem; default;
      end;
 
-     TPACCLinker_COFF_PEResource=class
+     TPACCLinker_COFF_PE_Resource=class
       private
        fLinker:TPACCLinker_COFF_PE;
        fType_:TPUCUUTF16String;
@@ -144,18 +144,18 @@ type TPACCLinker_COFF_PE=class;
        property Stream:TMemoryStream read fStream;
      end;
 
-     TPACCLinker_COFF_PEResourceList=class(TList)
+     TPACCLinker_COFF_PE_ResourceList=class(TList)
       private
-       function GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PEResource;
-       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PEResource);
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PE_Resource;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PE_Resource);
       public
        constructor Create;
        destructor Destroy; override;
-       property Items[const AIndex:TPACCInt]:TPACCLinker_COFF_PEResource read GetItem write SetItem; default;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_COFF_PE_Resource read GetItem write SetItem; default;
      end;
 
-     PPACCLinker_COFF_PEImport=^TPACCLinker_COFF_PEImport;
-     TPACCLinker_COFF_PEImport=record
+     PPACCLinker_COFF_PE_Import=^TPACCLinker_COFF_PE_Import;
+     TPACCLinker_COFF_PE_Import=record
       Used:boolean;
       SymbolName:TPUCUUTF8String;
       ImportLibraryName:TPUCUUTF8String;
@@ -164,35 +164,35 @@ type TPACCLinker_COFF_PE=class;
       NameOffset:TPACCUInt64;
      end;
 
-     TPACCLinker_COFF_PEImports=array of TPACCLinker_COFF_PEImport;
+     TPACCLinker_COFF_PE_Imports=array of TPACCLinker_COFF_PE_Import;
 
-     PPACCLinker_COFF_PEExport=^TPACCLinker_COFF_PEExport;
-     TPACCLinker_COFF_PEExport=record
+     PPACCLinker_COFF_PE_Export=^TPACCLinker_COFF_PE_Export;
+     TPACCLinker_COFF_PE_Export=record
       Used:boolean;
       SymbolName:TPUCUUTF8String;
       ExportName:TPUCUUTF8String;
      end;
 
-     TPACCLinker_COFF_PEExports=array of TPACCLinker_COFF_PEExport;
+     TPACCLinker_COFF_PE_Exports=array of TPACCLinker_COFF_PE_Export;
 
      TPACCLinker_COFF_PE=class(TPACCLinker)
       private
 
        fMachine:TPACCUInt16;
 
-       fSections:TPACCLinker_COFF_PESectionList;
+       fSections:TPACCLinker_COFF_PE_SectionList;
 
-       fSymbols:TPACCLinker_COFF_PESymbolList;
+       fSymbols:TPACCLinker_COFF_PE_SymbolList;
 
-       fImports:TPACCLinker_COFF_PEImports;
+       fImports:TPACCLinker_COFF_PE_Imports;
        fCountImports:TPACCInt32;
        fImportSymbolNameHashMap:TPACCRawByteStringHashMap;
 
-       fExports:TPACCLinker_COFF_PEImports;
+       fExports:TPACCLinker_COFF_PE_Imports;
        fCountExports:TPACCInt32;
        fExportSymbolNameHashMap:TPACCRawByteStringHashMap;
 
-       fResources:TPACCLinker_COFF_PEResourceList;
+       fResources:TPACCLinker_COFF_PE_ResourceList;
 
        fImageBase:TPACCUInt64;
 
@@ -215,11 +215,11 @@ type TPACCLinker_COFF_PE=class;
 
        property Machine:TPACCUInt16 read fMachine;
 
-       property Sections:TPACCLinker_COFF_PESectionList read fSections;
+       property Sections:TPACCLinker_COFF_PE_SectionList read fSections;
 
-       property Symbols:TPACCLinker_COFF_PESymbolList read fSymbols;
+       property Symbols:TPACCLinker_COFF_PE_SymbolList read fSymbols;
 
-       property Resources:TPACCLinker_COFF_PEResourceList read fResources;
+       property Resources:TPACCLinker_COFF_PE_ResourceList read fResources;
 
        property ImageBase:TPACCUInt64 read fImageBase write fImageBase;
 
@@ -1293,7 +1293,7 @@ begin
  Item.CodePage:=ACodePage;
 end;
 
-constructor TPACCLinker_COFF_PESection.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32);
+constructor TPACCLinker_COFF_PE_Section.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const AVirtualAddress:TPACCUInt64;const ACharacteristics:TPACCUInt32);
 var Index:TPACCInt32;
 begin
  inherited Create;
@@ -1325,7 +1325,7 @@ begin
 
  fRawSize:=0;
 
- fSymbols:=TPACCLinker_COFF_PESymbolList.Create;
+ fSymbols:=TPACCLinker_COFF_PE_SymbolList.Create;
 
  fActive:=true;
 
@@ -1334,7 +1334,7 @@ begin
 
 end;
 
-destructor TPACCLinker_COFF_PESection.Destroy;
+destructor TPACCLinker_COFF_PE_Section.Destroy;
 begin
  Relocations:=nil;
  fSymbols.Free;
@@ -1342,7 +1342,7 @@ begin
  inherited Destroy;
 end;
 
-function TPACCLinker_COFF_PESection.NewRelocation:PPACCLinker_COFF_PERelocation;
+function TPACCLinker_COFF_PE_Section.NewRelocation:PPACCLinker_COFF_PE_Relocation;
 var Index:TPACCInt32;
 begin
  Index:=CountRelocations;
@@ -1353,27 +1353,27 @@ begin
  result:=@Relocations[Index];
 end;
 
-constructor TPACCLinker_COFF_PESectionList.Create;
+constructor TPACCLinker_COFF_PE_SectionList.Create;
 begin
  inherited Create;
 end;
 
-destructor TPACCLinker_COFF_PESectionList.Destroy;
+destructor TPACCLinker_COFF_PE_SectionList.Destroy;
 begin
  inherited Destroy;
 end;
 
-function TPACCLinker_COFF_PESectionList.GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PESection;
+function TPACCLinker_COFF_PE_SectionList.GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PE_Section;
 begin
  result:=pointer(inherited Items[AIndex]);
 end;
 
-procedure TPACCLinker_COFF_PESectionList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PESection);
+procedure TPACCLinker_COFF_PE_SectionList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PE_Section);
 begin
  inherited Items[AIndex]:=pointer(AItem);
 end;
 
-constructor TPACCLinker_COFF_PESymbol.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PESection;const AValue:TPACCInt64;const AType,AClass:TPACCInt32;const ASymbolKind:TPACCLinker_COFF_PESymbolKind);
+constructor TPACCLinker_COFF_PE_Symbol.Create(const ALinker:TPACCLinker_COFF_PE;const AName:TPACCRawByteString;const ASection:TPACCLinker_COFF_PE_Section;const AValue:TPACCInt64;const AType,AClass:TPACCInt32;const ASymbolKind:TPACCLinker_COFF_PE_SymbolKind);
 begin
  inherited Create;
 
@@ -1393,7 +1393,7 @@ begin
 
  fAlias:=nil;
  
- fSubSymbols:=TPACCLinker_COFF_PESymbolList.Create;
+ fSubSymbols:=TPACCLinker_COFF_PE_SymbolList.Create;
 
  fAuxData:=nil;
 
@@ -1401,7 +1401,7 @@ begin
 
 end;
 
-destructor TPACCLinker_COFF_PESymbol.Destroy;
+destructor TPACCLinker_COFF_PE_Symbol.Destroy;
 begin
 
  fAuxData.Free;
@@ -1415,27 +1415,27 @@ begin
  inherited Destroy;
 end;
 
-constructor TPACCLinker_COFF_PESymbolList.Create;
+constructor TPACCLinker_COFF_PE_SymbolList.Create;
 begin
  inherited Create;
 end;
 
-destructor TPACCLinker_COFF_PESymbolList.Destroy;
+destructor TPACCLinker_COFF_PE_SymbolList.Destroy;
 begin
  inherited Destroy;
 end;
 
-function TPACCLinker_COFF_PESymbolList.GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PESymbol;
+function TPACCLinker_COFF_PE_SymbolList.GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PE_Symbol;
 begin
  result:=pointer(inherited Items[AIndex]);
 end;
 
-procedure TPACCLinker_COFF_PESymbolList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PESymbol);
+procedure TPACCLinker_COFF_PE_SymbolList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PE_Symbol);
 begin
  inherited Items[AIndex]:=pointer(AItem);
 end;
 
-constructor TPACCLinker_COFF_PEResource.Create(const ALinker:TPACCLinker_COFF_PE);
+constructor TPACCLinker_COFF_PE_Resource.Create(const ALinker:TPACCLinker_COFF_PE);
 begin
  inherited Create;
 
@@ -1461,7 +1461,7 @@ begin
 
 end;
 
-destructor TPACCLinker_COFF_PEResource.Destroy;
+destructor TPACCLinker_COFF_PE_Resource.Destroy;
 begin
  fType_:='';
  fName:='';
@@ -1469,17 +1469,17 @@ begin
  inherited Destroy;
 end;
 
-procedure TPACCLinker_COFF_PEResource.UpdateCodePage;
+procedure TPACCLinker_COFF_PE_Resource.UpdateCodePage;
 begin
  fCodePage:=LCIDToCodePageLookUpTable[fLanguageID];
 end;
 
-constructor TPACCLinker_COFF_PEResourceList.Create;
+constructor TPACCLinker_COFF_PE_ResourceList.Create;
 begin
  inherited Create;
 end;
 
-destructor TPACCLinker_COFF_PEResourceList.Destroy;
+destructor TPACCLinker_COFF_PE_ResourceList.Destroy;
 begin
  while Count>0 do begin
   Items[Count-1].Free;
@@ -1488,12 +1488,12 @@ begin
  inherited Destroy;
 end;
 
-function TPACCLinker_COFF_PEResourceList.GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PEResource;
+function TPACCLinker_COFF_PE_ResourceList.GetItem(const AIndex:TPACCInt):TPACCLinker_COFF_PE_Resource;
 begin
  result:=pointer(inherited Items[AIndex]);
 end;
 
-procedure TPACCLinker_COFF_PEResourceList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PEResource);
+procedure TPACCLinker_COFF_PE_ResourceList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_COFF_PE_Resource);
 begin
  inherited Items[AIndex]:=pointer(AItem);
 end;
@@ -1510,11 +1510,11 @@ begin
   fMachine:=IMAGE_FILE_MACHINE_UNKNOWN;
  end;
 
- fSections:=TPACCLinker_COFF_PESectionList.Create;
+ fSections:=TPACCLinker_COFF_PE_SectionList.Create;
 
- fSymbols:=TPACCLinker_COFF_PESymbolList.Create;
+ fSymbols:=TPACCLinker_COFF_PE_SymbolList.Create;
 
- fResources:=TPACCLinker_COFF_PEResourceList.Create;
+ fResources:=TPACCLinker_COFF_PE_ResourceList.Create;
 
  fImports:=nil;
  fCountImports:=0;
@@ -1556,7 +1556,7 @@ end;
 
 procedure TPACCLinker_COFF_PE.AddImport(const ASymbolName,AImportLibraryName,AImportName:TPUCUUTF8String);
 var Index:TPACCInt32;
-    Import_:PPACCLinker_COFF_PEImport;
+    Import_:PPACCLinker_COFF_PE_Import;
 begin
  if assigned(fImportSymbolNameHashMap.Get(ASymbolName,false)) then begin
   TPACCInstance(Instance).AddWarning('Duplicate import symbol name "'+ASymbolName+'"',nil);
@@ -1577,7 +1577,7 @@ end;
 
 procedure TPACCLinker_COFF_PE.AddExport(const ASymbolName,AExportName:TPUCUUTF8String);
 var Index:TPACCInt32;
-    Export_:PPACCLinker_COFF_PEExport;
+    Export_:PPACCLinker_COFF_PE_Export;
 begin
  if assigned(fExportSymbolNameHashMap.Get(ASymbolName,false)) then begin
   TPACCInstance(Instance).AddWarning('Duplicate export symbol name "'+ASymbolName+'"',nil);
@@ -1599,20 +1599,20 @@ procedure TPACCLinker_COFF_PE.AddObject(const AObjectStream:TStream;const AObjec
 var SectionIndex,RelocationIndex,NumberOfRelocations,SymbolIndex,SectionStartIndex,SymbolStartIndex,Index:TPACCInt32;
     RelocationOffset:TPACCUInt32;
     COFFFileHeader:TCOFFFileHeader;
-    LocalSections:TPACCLinker_COFF_PESectionList;
+    LocalSections:TPACCLinker_COFF_PE_SectionList;
     COFFSectionHeaders:TCOFFSectionHeaders;
     COFFSectionHeader:PCOFFSectionHeader;
-    Section:TPACCLinker_COFF_PESection;
+    Section:TPACCLinker_COFF_PE_Section;
     OldSize,Offset:TPACCInt64;
     COFFRelocations:TCOFFRelocations;
     COFFRelocation:PCOFFRelocation;
-    Relocation:PPACCLinker_COFF_PERelocation;
+    Relocation:PPACCLinker_COFF_PE_Relocation;
     COFFSymbols:TCOFFSymbols;
     COFFSymbol:PCOFFSymbol;
-    Symbol:TPACCLinker_COFF_PESymbol;
+    Symbol:TPACCLinker_COFF_PE_Symbol;
     Name:TPACCRawByteString;
     c:ansichar;
-    SymbolKind:TPACCLinker_COFF_PESymbolKind;
+    SymbolKind:TPACCLinker_COFF_PE_SymbolKind;
     SymbolRemap:array of TPACCUInt32;
 begin
 
@@ -1668,14 +1668,14 @@ begin
   SectionStartIndex:=Sections.Count;
   SymbolStartIndex:=Symbols.Count;
 
-  LocalSections:=TPACCLinker_COFF_PESectionList.Create;
+  LocalSections:=TPACCLinker_COFF_PE_SectionList.Create;
   try
 
    // Load sections
    for SectionIndex:=0 to COFFFileHeader.NumberOfSections-1 do begin
     COFFSectionHeader:=@COFFSectionHeaders[SectionIndex];
     if (COFFSectionHeader^.VirtualSize>0) or (COFFSectionHeader^.SizeOfRawData>0) then begin
-     Section:=TPACCLinker_COFF_PESection.Create(self,COFFSectionHeader^.Name,COFFSectionHeader^.VirtualAddress,COFFSectionHeader^.Characteristics);
+     Section:=TPACCLinker_COFF_PE_Section.Create(self,COFFSectionHeader^.Name,COFFSectionHeader^.VirtualAddress,COFFSectionHeader^.Characteristics);
      Sections.Add(Section);
      LocalSections.Add(Section);
      if (COFFSectionHeader^.Characteristics and IMAGE_SCN_ALIGN_MASK)<>0 then begin
@@ -1811,7 +1811,7 @@ begin
         end;
        end;
       end;
-      Symbol:=TPACCLinker_COFF_PESymbol.Create(self,Name,Section,COFFSymbol^.Value,COFFSymbol^.SymbolType,COFFSymbol^.SymbolClass,SymbolKind);
+      Symbol:=TPACCLinker_COFF_PE_Symbol.Create(self,Name,Section,COFFSymbol^.Value,COFFSymbol^.SymbolType,COFFSymbol^.SymbolClass,SymbolKind);
       SymbolRemap[SymbolIndex]:=Symbols.Add(Symbol);
       inc(SymbolIndex);
       if assigned(Section) then begin
@@ -1900,7 +1900,7 @@ var Is16Bit:boolean;
      LanguageID:TPACCUInt16;
      Version:TPACCUInt32;
      Characteristics:TPACCUInt32;
-     Resource:TPACCLinker_COFF_PEResource;
+     Resource:TPACCLinker_COFF_PE_Resource;
  begin
   HeaderStream.ReadBuffer(DataSize,SizeOf(TPACCUInt32));
   HeaderStream.ReadBuffer(HeaderSize,SizeOf(TPACCUInt32));
@@ -1913,7 +1913,7 @@ var Is16Bit:boolean;
   HeaderStream.ReadBuffer(Version,SizeOf(TPACCUInt32));
   HeaderStream.ReadBuffer(Characteristics,SizeOf(TPACCUInt32));
   if (DataSize<>0) or (Name<>'0') then begin
-   Resource:=TPACCLinker_COFF_PEResource.Create(self);
+   Resource:=TPACCLinker_COFF_PE_Resource.Create(self);
    Resources.Add(Resource);
    Resource.Type_:=Type_;
    Resource.Name:=Name;
@@ -1968,9 +1968,9 @@ end;
 
 function CompareSections(a,b:pointer):TPACCInt32;
 begin
- result:=TPACCLinker_COFF_PESection(a).Order-TPACCLinker_COFF_PESection(b).Order;
- if (result=0) and (TPACCLinker_COFF_PESection(a).Name=TPACCLinker_COFF_PESection(b).Name) then begin
-  result:=CompareStr(TPACCLinker_COFF_PESection(a).Ordering,TPACCLinker_COFF_PESection(b).Ordering);
+ result:=TPACCLinker_COFF_PE_Section(a).Order-TPACCLinker_COFF_PE_Section(b).Order;
+ if (result=0) and (TPACCLinker_COFF_PE_Section(a).Name=TPACCLinker_COFF_PE_Section(b).Name) then begin
+  result:=CompareStr(TPACCLinker_COFF_PE_Section(a).Ordering,TPACCLinker_COFF_PE_Section(b).Ordering);
  end;
 end;
 
@@ -1988,7 +1988,7 @@ type PRelocationNode=^TRelocationNode;
      end;
      PPECOFFDirectoryEntry=^TPECOFFDirectoryEntry;
      TPECOFFDirectoryEntry=record
-      Section:TPACCLinker_COFF_PESection;
+      Section:TPACCLinker_COFF_PE_Section;
       Offset:TPACCUInt32;
       Size:TPACCUInt32;
      end;
@@ -2407,9 +2407,9 @@ var Relocations:TRelocations;
  end;
  procedure ScanImports;
  var SymbolIndex:TPACCInt32;
-     Symbol:TPACCLinker_COFF_PESymbol;
+     Symbol:TPACCLinker_COFF_PE_Symbol;
      Entity:PPACCRawByteStringHashMapEntity;
-     Import_:PPACCLinker_COFF_PEImport;
+     Import_:PPACCLinker_COFF_PE_Import;
  begin
   for SymbolIndex:=0 to Symbols.Count-1 do begin
    Symbol:=Symbols[SymbolIndex];
@@ -2462,10 +2462,10 @@ var Relocations:TRelocations;
      ImportSectionSymbolIndex,CodeSectionSymbolIndex,FirstThunkSymbolIndex,
      LibraryNameSymbolIndex,LibraryImportSymbolIndex,LibraryImportNameSymbolIndex,
      LibraryImportTrunkCodeSymbolIndex:TPACCInt32;
-     Import_:PPACCLinker_COFF_PEImport;
+     Import_:PPACCLinker_COFF_PE_Import;
      OK:boolean;
-     Section,CodeSection,ImportSection:TPACCLinker_COFF_PESection;
-     Relocation:PPACCLinker_COFF_PERelocation;
+     Section,CodeSection,ImportSection:TPACCLinker_COFF_PE_Section;
+     Relocation:PPACCLinker_COFF_PE_Relocation;
      Libraries:TImportLibraries;
      Library_:PImportLibrary;
      LibraryImport:PImportLibraryImport;
@@ -2474,7 +2474,7 @@ var Relocations:TRelocations;
      ImageImportDescriptor:TImageImportDescriptor;
      ImportSectionSymbol,CodeSectionSymbol,FirstThunkSymbol,
      LibraryNameSymbol,LibraryImportSymbol,LibraryImportNameSymbol,
-     LibraryImportTrunkCodeSymbol:TPACCLinker_COFF_PESymbol;
+     LibraryImportTrunkCodeSymbol:TPACCLinker_COFF_PE_Symbol;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
  begin
 
@@ -2498,10 +2498,10 @@ var Relocations:TRelocations;
     end;
    end;
 
-   CodeSection:=TPACCLinker_COFF_PESection.Create(self,'.text$imports',0,IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_16BYTES);
+   CodeSection:=TPACCLinker_COFF_PE_Section.Create(self,'.text$imports',0,IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_16BYTES);
    Sections.Add(CodeSection);
 
-   ImportSection:=TPACCLinker_COFF_PESection.Create(self,'.idata',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_ALIGN_16BYTES);
+   ImportSection:=TPACCLinker_COFF_PE_Section.Create(self,'.idata',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_ALIGN_16BYTES);
    Sections.Add(ImportSection);
 
    Libraries:=nil;
@@ -2560,12 +2560,12 @@ var Relocations:TRelocations;
      CodeSection.Stream.Seek(0,soBeginning);
 
      if PassIndex=1 then begin
-      ImportSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_data_section',ImportSection,0,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      ImportSectionSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'@@__import_data_section',ImportSection,0,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
       ImportSectionSymbolIndex:=Symbols.Add(ImportSectionSymbol);
       if ImportSectionSymbolIndex>0 then begin
       end;
       ImportSection.Symbols.Add(ImportSectionSymbol);
-      CodeSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_code_section',CodeSection,0,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      CodeSectionSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'@@__import_code_section',CodeSection,0,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
       CodeSectionSymbolIndex:=Symbols.Add(CodeSectionSymbol);
       if CodeSectionSymbolIndex>0 then begin
       end;
@@ -2580,7 +2580,7 @@ var Relocations:TRelocations;
       if PassIndex=1 then begin
 
        begin
-        FirstThunkSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_library_'+IntToStr(LibraryIndex)+'_thunk',ImportSection,Library_^.ThunkOffset,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+        FirstThunkSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'@@__import_library_'+IntToStr(LibraryIndex)+'_thunk',ImportSection,Library_^.ThunkOffset,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
         FirstThunkSymbolIndex:=Symbols.Add(FirstThunkSymbol);
         ImportSection.Symbols.Add(FirstThunkSymbol);
         Relocation:=ImportSection.NewRelocation;
@@ -2597,7 +2597,7 @@ var Relocations:TRelocations;
        end;
 
        begin
-        LibraryNameSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_library_'+IntToStr(LibraryIndex)+'_name',ImportSection,Library_^.NameOffset,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+        LibraryNameSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'@@__import_library_'+IntToStr(LibraryIndex)+'_name',ImportSection,Library_^.NameOffset,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
         LibraryNameSymbolIndex:=Symbols.Add(LibraryNameSymbol);
         ImportSection.Symbols.Add(LibraryNameSymbol);
         Relocation:=ImportSection.NewRelocation;
@@ -2634,13 +2634,13 @@ var Relocations:TRelocations;
 
        if PassIndex=1 then begin
 
-        LibraryImportTrunkCodeSymbol:=TPACCLinker_COFF_PESymbol.Create(self,LibraryImport^.SymbolName,CodeSection,LibraryImport^.CodeOffset,0,IMAGE_SYM_CLASS_EXTERNAL,plcpskNormal);
+        LibraryImportTrunkCodeSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,LibraryImport^.SymbolName,CodeSection,LibraryImport^.CodeOffset,0,IMAGE_SYM_CLASS_EXTERNAL,plcpskNormal);
         LibraryImportTrunkCodeSymbolIndex:=Symbols.Add(LibraryImportTrunkCodeSymbol);
         CodeSection.Symbols.Add(LibraryImportTrunkCodeSymbol);
         if LibraryImportTrunkCodeSymbolIndex<>0 then begin
         end;
 
-        LibraryImportSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'__imp_'+LibraryImport^.SymbolName,ImportSection,ImportSection.Stream.Position,0,IMAGE_SYM_CLASS_EXTERNAL,plcpskNormal);
+        LibraryImportSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'__imp_'+LibraryImport^.SymbolName,ImportSection,ImportSection.Stream.Position,0,IMAGE_SYM_CLASS_EXTERNAL,plcpskNormal);
         LibraryImportSymbolIndex:=Symbols.Add(LibraryImportSymbol);
         ImportSection.Symbols.Add(LibraryImportSymbol);
         Relocation:=CodeSection.NewRelocation;            
@@ -2655,7 +2655,7 @@ var Relocations:TRelocations;
          end;
         end;
 
-        LibraryImportNameSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_library_'+IntToStr(LibraryIndex)+'_import_'+IntToStr(LibraryImportIndex)+'_name',ImportSection,LibraryImport^.NameOffset,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+        LibraryImportNameSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'@@__import_library_'+IntToStr(LibraryIndex)+'_import_'+IntToStr(LibraryImportIndex)+'_name',ImportSection,LibraryImport^.NameOffset,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
         LibraryImportNameSymbolIndex:=Symbols.Add(LibraryImportNameSymbol);
         ImportSection.Symbols.Add(LibraryImportNameSymbol);
         Relocation:=ImportSection.NewRelocation;
@@ -2734,9 +2734,9 @@ var Relocations:TRelocations;
  end;
  procedure ScanExports;
  var SymbolIndex:TPACCInt32;
-     Symbol:TPACCLinker_COFF_PESymbol;
+     Symbol:TPACCLinker_COFF_PE_Symbol;
      Entity:PPACCRawByteStringHashMapEntity;
-     Import_:PPACCLinker_COFF_PEImport;
+     Import_:PPACCLinker_COFF_PE_Import;
  begin
   for SymbolIndex:=0 to Symbols.Count-1 do begin
    Symbol:=Symbols[SymbolIndex];
@@ -2763,15 +2763,15 @@ var Relocations:TRelocations;
  var ExportIndex,SectionIndex,PassIndex:TPACCInt32;
      AddressOfName,AddressOfFunctions,AddressOfNames,AddressOfOrdinals,Value:TPACCUInt32;
      Value16:TPACCUInt16;
-     Export_:PPACCLinker_COFF_PEExport;
-     Section,ExportSection:TPACCLinker_COFF_PESection;
+     Export_:PPACCLinker_COFF_PE_Export;
+     Section,ExportSection:TPACCLinker_COFF_PE_Section;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
      ImageExportDirectory:TImageExportDirectory;
      Exports_:TStringList;
      ExportName:TPACCRawByteString;
-     ExportSectionSymbol,TempSectionSymbol:TPACCLinker_COFF_PESymbol;
+     ExportSectionSymbol,TempSectionSymbol:TPACCLinker_COFF_PE_Symbol;
      ExportSectionSymbolIndex,TempSectionSymbolIndex:TPACCInt32;
-     Relocation:PPACCLinker_COFF_PERelocation;
+     Relocation:PPACCLinker_COFF_PE_Relocation;
  begin
 
   Exports_:=TStringList.Create;
@@ -2801,7 +2801,7 @@ var Relocations:TRelocations;
      ExportSection.Characteristics:=ExportSection.Characteristics or IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_ALIGN_16BYTES;
      ExportSection.Alignment:=Max(ExportSection.Alignment,16);
     end else begin
-     ExportSection:=TPACCLinker_COFF_PESection.Create(self,'.edata',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_ALIGN_16BYTES);
+     ExportSection:=TPACCLinker_COFF_PE_Section.Create(self,'.edata',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_ALIGN_16BYTES);
      Sections.Add(ExportSection);
     end;
 
@@ -2820,13 +2820,13 @@ var Relocations:TRelocations;
 
      if PassIndex=1 then begin
 
-      ExportSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section',ExportSection,0,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      ExportSectionSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'@@__export_data_section',ExportSection,0,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
       ExportSectionSymbolIndex:=Symbols.Add(ExportSectionSymbol);
       if ExportSectionSymbolIndex>0 then begin
       end;
       ExportSection.Symbols.Add(ExportSectionSymbol);
 
-      TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section_addressof_AddressOfName',ExportSection,AddressOfName,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      TempSectionSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'@@__export_data_section_addressof_AddressOfName',ExportSection,AddressOfName,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
       TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
       ExportSection.Symbols.Add(TempSectionSymbol);
       Relocation:=ExportSection.NewRelocation;
@@ -2841,7 +2841,7 @@ var Relocations:TRelocations;
        end;
       end;
 
-      TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section_addressof_AddressOfFunctions',ExportSection,AddressOfFunctions,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      TempSectionSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'@@__export_data_section_addressof_AddressOfFunctions',ExportSection,AddressOfFunctions,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
       TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
       ExportSection.Symbols.Add(TempSectionSymbol);
       Relocation:=ExportSection.NewRelocation;
@@ -2856,7 +2856,7 @@ var Relocations:TRelocations;
        end;
       end;
 
-      TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section_addressof_AddressOfNames',ExportSection,AddressOfNames,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      TempSectionSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'@@__export_data_section_addressof_AddressOfNames',ExportSection,AddressOfNames,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
       TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
       ExportSection.Symbols.Add(TempSectionSymbol);
       Relocation:=ExportSection.NewRelocation;
@@ -2871,7 +2871,7 @@ var Relocations:TRelocations;
        end;
       end;
 
-      TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section_addressof_AddressOfNameOrdinals',ExportSection,AddressOfOrdinals,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+      TempSectionSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'@@__export_data_section_addressof_AddressOfNameOrdinals',ExportSection,AddressOfOrdinals,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
       TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
       ExportSection.Symbols.Add(TempSectionSymbol);
       Relocation:=ExportSection.NewRelocation;
@@ -2905,7 +2905,7 @@ var Relocations:TRelocations;
      AddressOfFunctions:=ExportSection.Stream.Position;
      for ExportIndex:=0 to Exports_.Count-1 do begin
       if PassIndex=1 then begin
-       TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,Exports_.Values[Exports_.Names[ExportIndex]],ExportSection,0,0,IMAGE_SYM_CLASS_EXTERNAL,plcpskUndefined);
+       TempSectionSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,Exports_.Values[Exports_.Names[ExportIndex]],ExportSection,0,0,IMAGE_SYM_CLASS_EXTERNAL,plcpskUndefined);
        TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
        ExportSection.Symbols.Add(TempSectionSymbol);
        Relocation:=ExportSection.NewRelocation;
@@ -2928,7 +2928,7 @@ var Relocations:TRelocations;
      Value:=ExportSection.Stream.Position+(Exports_.Count*SizeOf(TPACCUInt32));
      for ExportIndex:=0 to Exports_.Count-1 do begin
       if PassIndex=1 then begin
-       TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section_addressof_AddressOfName_'+IntToStr(ExportIndex),ExportSection,Value,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
+       TempSectionSymbol:=TPACCLinker_COFF_PE_Symbol.Create(self,'@@__export_data_section_addressof_AddressOfName_'+IntToStr(ExportIndex),ExportSection,Value,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
        TempSectionSymbolIndex:=Symbols.Add(TempSectionSymbol);
        ExportSection.Symbols.Add(TempSectionSymbol);
        Relocation:=ExportSection.NewRelocation;
@@ -2974,7 +2974,7 @@ var Relocations:TRelocations;
  end;
  procedure SortSections;
  var SectionIndex:TPACCInt32;
-     Section:TPACCLinker_COFF_PESection;
+     Section:TPACCLinker_COFF_PE_Section;
      SectionOrder:TStringList;
  begin
   SectionOrder:=TStringList.Create;
@@ -3005,7 +3005,7 @@ var Relocations:TRelocations;
  procedure MergeDuplicateAndDeleteUnusedSections;
   procedure AdjustSymbolsForSectionIndexToDelete(ToDeleteSectionIndex,NewSectionIndex:TPACCInt32);
   var SymbolIndex:TPACCInt32;
-      Symbol:TPACCLinker_COFF_PESymbol;
+      Symbol:TPACCLinker_COFF_PE_Symbol;
   begin
    for SymbolIndex:=0 to Symbols.Count-1 do begin
     Symbol:=Symbols[SymbolIndex];
@@ -3027,9 +3027,9 @@ var Relocations:TRelocations;
  var SectionIndex,RelocationIndex,RelocationStartIndex,SymbolIndex,DestinationSectionIndex,Index:TPACCInt32;
      FillUpCount,StartOffset,VirtualAddressDelta:TPACCInt64;
      SectionNameHashMap:TPACCRawByteStringHashMap;
-     Section,DestinationSection:TPACCLinker_COFF_PESection;
-     Relocation:PPACCLinker_COFF_PERelocation;
-     Symbol:TPACCLinker_COFF_PESymbol;
+     Section,DestinationSection:TPACCLinker_COFF_PE_Section;
+     Relocation:PPACCLinker_COFF_PE_Relocation;
+     Symbol:TPACCLinker_COFF_PE_Symbol;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
  begin
 
@@ -3152,8 +3152,8 @@ var Relocations:TRelocations;
  end;
  procedure PositionAndSizeSections;
  var SectionIndex,RelocationIndex:TPACCInt32;
-     Section:TPACCLinker_COFF_PESection;
-     Relocation:PPACCLinker_COFF_PERelocation;
+     Section:TPACCLinker_COFF_PE_Section;
+     Relocation:PPACCLinker_COFF_PE_Relocation;
  begin
   LastVirtualAddress:=PECOFFSectionAlignment;
   for SectionIndex:=0 to Sections.Count-1 do begin
@@ -3171,7 +3171,7 @@ var Relocations:TRelocations;
  end;
  procedure ResolveSymbols;
  var SymbolIndex:TPACCInt32;
-     Symbol:TPACCLinker_COFF_PESymbol;
+     Symbol:TPACCLinker_COFF_PE_Symbol;
      UnresolvableExternalSymbols:boolean;
  begin
   UnresolvableExternalSymbols:=false;
@@ -3208,9 +3208,9 @@ var Relocations:TRelocations;
  type PSectionBytes=^TSectionBytes;
       TSectionBytes=array[0..65535] of TPACCUInt8;
  var SectionIndex,RelocationIndex,SymbolIndex:TPACCInt32;
-     Relocation:PPACCLinker_COFF_PERelocation;
-     Section:TPACCLinker_COFF_PESection;
-     Symbol:TPACCLinker_COFF_PESymbol;
+     Relocation:PPACCLinker_COFF_PE_Relocation;
+     Section:TPACCLinker_COFF_PE_Section;
+     Symbol:TPACCLinker_COFF_PE_Symbol;
      SymbolRVA,Offset,VirtualAddress:TPACCUInt64;
      SectionData:PSectionBytes;
  begin
@@ -3398,7 +3398,7 @@ var Relocations:TRelocations;
  end;
  procedure GenerateRelocationSection;
  var SectionIndex:TPACCInt32;
-     Section:TPACCLinker_COFF_PESection;
+     Section:TPACCLinker_COFF_PE_Section;
      Size:TPACCUInt32;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
  begin
@@ -3415,7 +3415,7 @@ var Relocations:TRelocations;
     end;
    end;
 
-   Section:=TPACCLinker_COFF_PESection.Create(self,'.reloc',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ);
+   Section:=TPACCLinker_COFF_PE_Section.Create(self,'.reloc',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ);
    Sections.Add(Section);
 
    LastVirtualAddress:=(LastVirtualAddress+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
@@ -3443,14 +3443,14 @@ var Relocations:TRelocations;
  procedure GenerateResourceSection;
  type TPart=(ptNodes,ptDataEntries,ptNames,ptData);
  var SectionIndex,ResourceIndex,Index,PassIndex:TPACCInt32;
-     Section:TPACCLinker_COFF_PESection;
+     Section:TPACCLinker_COFF_PE_Section;
      CurrentObject:TObject;
      Part:TPart;
      Pass:boolean;
      Root,Node:TResourceNode;
      Item:TResourceNodeItem;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
-     Resource:TPACCLinker_COFF_PEResource;
+     Resource:TPACCLinker_COFF_PE_Resource;
      Stack,ChildNodes:TList;
      ImageResourceDirectory:TImageResourceDirectory;
      ImageResourceDirectoryEntry:TImageResourceDirectoryEntry;
@@ -3466,7 +3466,7 @@ var Relocations:TRelocations;
     end;
    end;
 
-   Section:=TPACCLinker_COFF_PESection.Create(self,'.rsrc',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_CNT_RESOURCE);
+   Section:=TPACCLinker_COFF_PE_Section.Create(self,'.rsrc',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_CNT_RESOURCE);
    Sections.Add(Section);
 
    LastVirtualAddress:=(LastVirtualAddress+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
@@ -3655,9 +3655,9 @@ var Relocations:TRelocations;
      ImageNTHeaders:TImageNTHeaders;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
      FileOffset,CountBytes,TempSize:TPACCInt64;
-     Section:TPACCLinker_COFF_PESection;
+     Section:TPACCLinker_COFF_PE_Section;
      ImageSectionHeader:TImageSectionHeader;
-     Symbol:TPACCLinker_COFF_PESymbol;
+     Symbol:TPACCLinker_COFF_PE_Symbol;
  begin
 
   Characteristics:=IMAGE_FILE_EXECUTABLE_IMAGE or
