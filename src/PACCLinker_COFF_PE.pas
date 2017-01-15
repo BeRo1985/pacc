@@ -1088,8 +1088,9 @@ type TBytes=array of TPACCUInt8;
        function GetNode:TResourceNode;
        procedure SetNode(const ANode:TResourceNode);
       protected
+       DataEntryOffset:TPACCInt64;
        NameOffset:TPACCInt64;
-       DataOffset:TPACCInt64;
+       DataRVA:TPACCInt64;
        function CheckIntegerID:boolean;
       public
        constructor Create; reintroduce;
@@ -1110,6 +1111,7 @@ type TBytes=array of TPACCUInt8;
        function GetItem(const AIndex:TPACCInt):TResourceNodeItem;
        procedure SetItem(const AIndex:TPACCInt;const AItem:TResourceNodeItem);
       protected
+       Offset:TPACCInt64;
       public
        constructor Create(const AType,AName:TPUCUUTF16String;const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32); reintroduce; overload;
        constructor CreateName(const AName:TPUCUUTF16String;const ALang:TPACCInt32;const AStream:TMemoryStream;const ACodePage:TPACCUInt32); reintroduce; overload;
@@ -3439,7 +3441,7 @@ var Relocations:TRelocations;
   end;
  end;
  procedure GenerateResourceSection;
- type TPart=(ptNodes,ptNames,ptData);
+ type TPart=(ptNodes,ptDataEntries,ptNames,ptData);
  var SectionIndex,ResourceIndex,Index,PassIndex:TPACCInt32;
      Section:TPACCLinker_COFF_PESection;
      CurrentObject:TObject;
@@ -3448,11 +3450,106 @@ var Relocations:TRelocations;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
      Resource:TPACCLinker_COFF_PEResource;
      Stack:TList;
-     NextImageResourceDirectoryOffset:TPACCUInt32;
-     ImageResourceDirectory:TImageResourceDirectory;
-     ImageResourceDirectoryEntry:TImageResourceDirectoryEntry;
      v16:TPACCUInt16;
      Part:TPart;
+  procedure WriteNode(Node:TResourceNode);
+  var Index:TPACCInt32;
+      Pass:boolean;
+      ChildNodes:TList;
+      ImageResourceDirectory:TImageResourceDirectory;
+      ImageResourceDirectoryEntry:TImageResourceDirectoryEntry;
+      ImageResourceDataEntry:TImageResourceDataEntry;
+  begin
+   ChildNodes:=TList.Create;
+   try
+    case Part of
+     ptNodes:begin
+      FillChar(ImageResourceDirectory,SizeOf(TImageResourceDirectory),#0);
+      ImageResourceDirectory.MajorVersion:=4;
+      ImageResourceDirectory.MinorVersion:=0;
+      ImageResourceDirectory.NumberOfNamedEntries:=0;
+      ImageResourceDirectory.NumberOfIDEntries:=0;
+      for Index:=0 to Node.Count-1 do begin
+       Item:=Node[Index];
+       if Item.IsIntegerID then begin
+        inc(ImageResourceDirectory.NumberOfIDEntries);
+       end else begin
+        inc(ImageResourceDirectory.NumberOfNamedEntries);
+       end;
+      end;
+      Node.Offset:=Section.Stream.Position;
+      Section.Stream.WriteBuffer(ImageResourceDirectory,SizeOf(TImageResourceDirectory));
+     end;
+    end;
+    for Pass:=true downto false do begin
+     for Index:=0 to Node.Count-1 do begin
+      Item:=Node[Index];
+      if Item.IsIntegerID xor Pass then begin
+       case Part of
+        ptNodes:begin
+         if Item.IsIntegerID then begin
+          ImageResourceDirectoryEntry.TypeNameLevel:=StrToInt(String(Item.ID));
+         end else begin
+          ImageResourceDirectoryEntry.TypeNameLevel:=Item.NameOffset or $80000000;
+         end;
+         if Item.Leaf then begin
+          ImageResourceDirectoryEntry.OffsetToChildData:=Item.DataEntryOffset;
+         end else begin
+          ImageResourceDirectoryEntry.OffsetToChildData:=Item.Node.Offset or $80000000;
+         end;
+         Section.Stream.WriteBuffer(ImageResourceDirectoryEntry,SizeOf(TImageResourceDirectoryEntry));
+        end;
+        ptDataEntries:begin
+         if Item.Leaf then begin
+          Item.DataEntryOffset:=Section.Stream.Position;
+          FillChar(ImageResourceDataEntry,SizeOf(TImageResourceDataEntry),#0);
+          ImageResourceDataEntry.OffsetToData:=Item.DataRVA;
+          ImageResourceDataEntry.Size:=Item.Stream.Size;
+          ImageResourceDataEntry.CodePage:=Item.CodePage;
+          ImageResourceDataEntry.Reserved:=0;
+          Section.Stream.WriteBuffer(ImageResourceDataEntry,SizeOf(TImageResourceDataEntry));
+         end else begin
+          Item.DataEntryOffset:=0;
+         end;
+        end;
+        ptNames:begin
+         if Item.IsIntegerID then begin
+          Item.NameOffset:=0;
+         end else begin
+          Item.NameOffset:=Section.Stream.Position;
+          v16:=length(Item.ID);
+          Section.Stream.WriteBuffer(v16,SizeOf(TPACCUInt16));
+          if v16>0 then begin
+           Section.Stream.WriteBuffer(Item.ID[1],v16*SizeOf(TPUCUUTF16Char));
+          end;
+         end;
+        end;
+        ptData:begin
+         if Item.Leaf then begin
+          Item.DataRVA:=Section.VirtualAddress+Section.Stream.Position;
+          Item.Stream.Seek(0,soBeginning);
+          Section.Stream.CopyFrom(Item.Stream,Item.Stream.Size);
+          if (Section.Stream.Position and not TPACCInt64(3))<>0 then begin
+           WriteNullPadding(Section.Stream,((Section.Stream.Position+3) and not TPACCInt64(3))-Section.Stream.Position);
+          end;
+         end else begin
+          Item.DataRVA:=0;
+         end;
+        end;
+       end;
+       if not Item.Leaf then begin
+        ChildNodes.Add(Item.Node);
+       end;
+      end;
+     end;
+    end;
+    for Index:=0 to ChildNodes.Count-1 do begin
+     WriteNode(ChildNodes[Index]);
+    end;
+   finally
+    ChildNodes.Free;
+   end;
+  end;
  begin
   if Resources.Count>0 then begin
 
@@ -3488,11 +3585,14 @@ var Relocations:TRelocations;
 
       Section.Stream.Seek(0,soBeginning);
 
-      NextImageResourceDirectoryOffset:=0;
-
       for Part:=ptNodes to ptData do begin
 
        case Part of
+        ptDataEntries:begin
+         if (Section.Stream.Position and not TPACCInt64(3))<>0 then begin
+          WriteNullPadding(Section.Stream,((Section.Stream.Position+3) and not TPACCInt64(3))-Section.Stream.Position);
+         end;
+        end;
         ptNames:begin
          if (Section.Stream.Position and not TPACCInt64(3))<>0 then begin
           WriteNullPadding(Section.Stream,((Section.Stream.Position+3) and not TPACCInt64(3))-Section.Stream.Position);
@@ -3505,96 +3605,7 @@ var Relocations:TRelocations;
         end;
        end;
 
-       Stack.Clear;
-       Stack.Add(Root);
-       while Stack.Count>0 do begin
-        CurrentObject:=Stack[Stack.Count-1];
-        Stack.Delete(Stack.Count-1);
-        if assigned(CurrentObject) then begin
-         if CurrentObject is TResourceNode then begin
-
-          if Part=ptNodes then begin
-           FillChar(ImageResourceDirectory,SizeOf(TImageResourceDirectory),#0);
-           ImageResourceDirectory.NumberOfNamedEntries:=0;
-           ImageResourceDirectory.NumberOfIDEntries:=0;
-          end;
-
-          Node:=TResourceNode(CurrentObject);
-          for Index:=Node.Count-1 downto 0 do begin
-           Item:=Node[Index];
-           if Item.IsIntegerID then begin
-            if Part=ptNodes then begin
-             inc(ImageResourceDirectory.NumberOfIDEntries);
-            end;
-            Stack.Add(Item);
-           end;
-          end;
-          for Index:=Node.Count-1 downto 0 do begin
-           Item:=Node[Index];
-           if not Item.IsIntegerID then begin
-            if Part=ptNodes then begin
-             inc(ImageResourceDirectory.NumberOfNamedEntries);
-            end;
-            Stack.Add(Item);
-           end;
-          end;
-
-          if Part=ptNodes then begin
-           Section.Stream.WriteBuffer(ImageResourceDirectory,SizeOf(TImageResourceDirectory));
-           inc(NextImageResourceDirectoryOffset,SizeOf(TImageResourceDirectory)+(Node.Count*SizeOf(ImageResourceDirectoryEntry)));
-          end;
-
-         end else if CurrentObject is TResourceNodeItem then begin
-          Item:=TResourceNodeItem(CurrentObject);
-          case Part of
-           ptNodes:begin
-            if Item.IsIntegerID then begin
-             ImageResourceDirectoryEntry.TypeNameLevel:=StrToInt(String(Item.ID));
-            end else begin
-             ImageResourceDirectoryEntry.TypeNameLevel:=Item.NameOffset or $80000000;
-            end;
-            if Item.Leaf then begin
-             ImageResourceDirectoryEntry.OffsetToChildData:=Item.DataOffset;
-            end else begin
-             ImageResourceDirectoryEntry.OffsetToChildData:=NextImageResourceDirectoryOffset or $80000000;
-            end;
-            Section.Stream.WriteBuffer(ImageResourceDirectoryEntry,SizeOf(ImageResourceDirectoryEntry));
-           end;
-           ptNames:begin
-            if Item.IsIntegerID then begin
-             Item.NameOffset:=0;
-            end else begin
-             Item.NameOffset:=Section.Stream.Position;
-             v16:=length(Item.ID);
-             Section.Stream.WriteBuffer(v16,SizeOf(TPACCUInt16));
-             if v16>0 then begin
-              Section.Stream.WriteBuffer(Item.ID[1],v16*SizeOf(TPUCUUTF16Char));
-             end;
-            end;
-           end;
-           ptData:begin
-            if Item.Leaf then begin
-             Item.DataOffset:=Section.Stream.Position;
-             Item.Stream.Seek(0,soBeginning);
-             Section.Stream.CopyFrom(Item.Stream,Item.Stream.Size);
-             if (Section.Stream.Position and not TPACCInt64(3))<>0 then begin
-              WriteNullPadding(Section.Stream,((Section.Stream.Position+3) and not TPACCInt64(3))-Section.Stream.Position);
-             end;
-            end else begin
-             Item.DataOffset:=0;
-            end;
-           end;
-          end;
-          if not Item.Leaf then begin
-           Stack.Add(Item.Node);
-          end;
-         end else begin
-          TPACCInstance(Instance).AddError('Internal error 2017-01-15-02-40-0000',nil,true);
-         end;
-        end else begin
-         TPACCInstance(Instance).AddError('Internal error 2017-01-15-02-40-0001',nil,true);
-        end;
-       end;
+       WriteNode(Root);
 
        case Part of
         ptData:begin
