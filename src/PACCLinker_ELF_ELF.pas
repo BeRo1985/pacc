@@ -966,12 +966,55 @@ type // File header
        property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Section read GetItem write SetItem; default;
      end;
 
+     TPACCLinker_ELF_ELF_Import=class
+      public
+       Used:boolean;
+       SymbolName:TPUCUUTF8String;
+       ImportLibraryName:TPUCUUTF8String;
+       ImportName:TPUCUUTF8String;
+       CodeSectionOffset:TPACCUInt64;
+       NameOffset:TPACCUInt64;
+     end;
+
+     TPACCLinker_ELF_ELF_ImportList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Import;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Import);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Import read GetItem write SetItem; default;
+     end;
+
+     TPACCLinker_ELF_ELF_Export=class
+      public
+       Used:boolean;
+       SymbolName:TPUCUUTF8String;
+       ExportName:TPUCUUTF8String;
+     end;
+
+     TPACCLinker_ELF_ELF_ExportList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Export;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Export);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Export read GetItem write SetItem; default;
+     end;
+
      TPACCLinker_ELF_ELF=class(TPACCLinker)
       private
 
        fSections:TPACCLinker_ELF_ELF_SectionList;
 
        fSymbols:TPACCLinker_ELF_ELF_SymbolList;
+
+       fImports:TPACCLinker_ELF_ELF_ImportList;
+       fImportSymbolNameHashMap:TPACCRawByteStringHashMap;
+
+       fExports:TPACCLinker_ELF_ELF_ExportList;
+       fExportSymbolNameHashMap:TPACCRawByteStringHashMap;
 
       public
 
@@ -993,6 +1036,10 @@ type // File header
        property Sections:TPACCLinker_ELF_ELF_SectionList read fSections;
 
        property Symbols:TPACCLinker_ELF_ELF_SymbolList read fSymbols;
+
+       property Imports_:TPACCLinker_ELF_ELF_ImportList read fImports;
+
+       property Exports_:TPACCLinker_ELF_ELF_ExportList read fExports;
 
      end;
 
@@ -1095,6 +1142,54 @@ begin
 
 end;
 
+constructor TPACCLinker_ELF_ELF_ImportList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCLinker_ELF_ELF_ImportList.Destroy;
+begin
+ while Count>0 do begin
+  Items[Count-1].Free;
+  Delete(Count-1);
+ end;
+ inherited Destroy;
+end;
+
+function TPACCLinker_ELF_ELF_ImportList.GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Import;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCLinker_ELF_ELF_ImportList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Import);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
+constructor TPACCLinker_ELF_ELF_ExportList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCLinker_ELF_ELF_ExportList.Destroy;
+begin
+ while Count>0 do begin
+  Items[Count-1].Free;
+  Delete(Count-1);
+ end;
+ inherited Destroy;
+end;
+
+function TPACCLinker_ELF_ELF_ExportList.GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Export;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCLinker_ELF_ELF_ExportList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Export);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
 destructor TPACCLinker_ELF_ELF_Symbol.Destroy;
 begin
  inherited Destroy;
@@ -1173,6 +1268,12 @@ begin
 
  fSymbols:=TPACCLinker_ELF_ELF_SymbolList.Create;
 
+ fImports:=TPACCLinker_ELF_ELF_ImportList.Create;
+ fImportSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
+
+ fExports:=TPACCLinker_ELF_ELF_ExportList.Create;
+ fExportSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
+
 end;
 
 destructor TPACCLinker_ELF_ELF.Destroy;
@@ -1190,15 +1291,44 @@ begin
  end;
  fSections.Free;
 
+ fImports.Free;
+ fImportSymbolNameHashMap.Free;
+
+ fExports.Free;
+ fExportSymbolNameHashMap.Free;
+
  inherited Destroy;
 end;
 
 procedure TPACCLinker_ELF_ELF.AddImport(const ASymbolName,AImportLibraryName,AImportName:TPUCUUTF8String);
+var Import_:TPACCLinker_ELF_ELF_Import;
 begin
+ if assigned(fImportSymbolNameHashMap[ASymbolName]) then begin
+  TPACCInstance(Instance).AddWarning('Duplicate import symbol name "'+ASymbolName+'"',nil);
+ end else begin
+  Import_:=TPACCLinker_ELF_ELF_Import.Create;
+  fImports.Add(Import_);
+  Import_.Used:=false;
+  Import_.SymbolName:=ASymbolName;
+  Import_.ImportLibraryName:=AImportLibraryName;
+  Import_.ImportName:=AImportName;
+  fImportSymbolNameHashMap[ASymbolName]:=Import_;
+ end;
 end;
 
 procedure TPACCLinker_ELF_ELF.AddExport(const ASymbolName,AExportName:TPUCUUTF8String);
+var Export_:TPACCLinker_ELF_ELF_Export;
 begin
+ if assigned( fExportSymbolNameHashMap[ASymbolName]) then begin
+  TPACCInstance(Instance).AddWarning('Duplicate export symbol name "'+ASymbolName+'"',nil);
+ end else begin
+  Export_:=TPACCLinker_ELF_ELF_Export.Create;
+  fExports.Add(Export_);
+  Export_.Used:=false;
+  Export_.SymbolName:=ASymbolName;
+  Export_.ExportName:=AExportName;
+  fExportSymbolNameHashMap[ASymbolName]:=Export_;
+ end;
 end;
 
 procedure TPACCLinker_ELF_ELF.AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String='');
