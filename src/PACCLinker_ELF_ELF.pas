@@ -351,7 +351,8 @@ const ET_NONE=0;
       SHF_OS_NONCONFORMING=$100; 
       SHF_GROUP=$200; 
       SHF_TLS=$400;
-      SHF_MASKOS=$0ff00000; 
+      SHF_MASKOS=$0ff00000;
+      SHF_PRIVATE=$80000000; 
       SHF_MASKPROC=$f0000000; 
 
       // Section group flags
@@ -841,6 +842,34 @@ type // File header
 
      TPACCLinker_ELF_ELF=class;
 
+     TPACCLinker_ELF_ELF_Section=class;
+
+     TPACCLinker_ELF_ELF_Symbol=class
+      private
+       fLinker:TPACCLinker_ELF_ELF;
+       fName:TPACCRawByteString;
+       fSection:TPACCLinker_ELF_ELF_Section;
+       fActive:boolean;
+      public
+       constructor Create(const ALinker:TPACCLinker_ELF_ELF;const AName:TPACCRawByteString;const ASection:TPACCLinker_ELF_ELF_Section); reintroduce;
+       destructor Destroy; override;
+      published
+       property Linker:TPACCLinker_ELF_ELF read fLinker;
+       property Name:TPACCRawByteString read fName;
+       property Section:TPACCLinker_ELF_ELF_Section read fSection write fSection;
+       property Active:boolean read fActive write fActive;
+     end;
+
+     TPACCLinker_ELF_ELF_SymbolList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Symbol;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Symbol);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Symbol read GetItem write SetItem; default;
+     end;
+
      TPACCLinker_ELF_ELF_Section=class
       private
 
@@ -863,11 +892,20 @@ type // File header
        fsh_info:TPACCUInt64;
        fsh_addralign:TPACCUInt64;
        fsh_entsize:TPACCUInt64;
+
+       fActive:boolean;
+
       public
+
        constructor Create(const ALinker:TPACCLinker_ELF_ELF;const AName:TPACCRawByteString); reintroduce;
        destructor Destroy; override;
+
       published
+
        property Linker:TPACCLinker_ELF_ELF read fLinker;
+
+       property Active:boolean read fActive write fActive;
+
      end;
 
      TPACCLinker_ELF_ELF_SectionList=class(TList)
@@ -885,6 +923,8 @@ type // File header
 
        fSections:TPACCLinker_ELF_ELF_SectionList;
 
+       fSymbols:TPACCLinker_ELF_ELF_SymbolList;
+
       public
 
        constructor Create(const AInstance:TObject); override;
@@ -901,6 +941,10 @@ type // File header
        procedure Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String=''); override;
 
       published
+
+       property Sections:TPACCLinker_ELF_ELF_SectionList read fSections;
+
+       property Symbols:TPACCLinker_ELF_ELF_SymbolList read fSymbols;
 
      end;
 
@@ -989,6 +1033,45 @@ begin
  end;
 end;
 
+constructor TPACCLinker_ELF_ELF_Symbol.Create(const ALinker:TPACCLinker_ELF_ELF;const AName:TPACCRawByteString;const ASection:TPACCLinker_ELF_ELF_Section);
+begin
+ inherited Create;
+
+ fLinker:=ALinker;
+
+ fName:=AName;
+
+ fSection:=ASection;
+
+ fActive:=true;
+
+end;
+
+destructor TPACCLinker_ELF_ELF_Symbol.Destroy;
+begin
+ inherited Destroy;
+end;
+
+constructor TPACCLinker_ELF_ELF_SymbolList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCLinker_ELF_ELF_SymbolList.Destroy;
+begin
+ inherited Destroy;
+end;
+
+function TPACCLinker_ELF_ELF_SymbolList.GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Symbol;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCLinker_ELF_ELF_SymbolList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Symbol);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
 constructor TPACCLinker_ELF_ELF_Section.Create(const ALinker:TPACCLinker_ELF_ELF;const AName:TPACCRawByteString);
 var Index:TPACCInt32;
 begin
@@ -996,16 +1079,15 @@ begin
 
  fLinker:=ALinker;
 
- fLinker.fSections.Add(self);
-
  fStream:=TMemoryStream.Create;
+
+ fActive:=true;
 
 end;
 
 destructor TPACCLinker_ELF_ELF_Section.Destroy;
 begin
  fStream.Free;
- fLinker.fSections.Remove(self);
  inherited Destroy;
 end;
 
@@ -1035,15 +1117,23 @@ begin
 
  fSections:=TPACCLinker_ELF_ELF_SectionList.Create;
 
+ fSymbols:=TPACCLinker_ELF_ELF_SymbolList.Create;
+
 end;
 
 destructor TPACCLinker_ELF_ELF.Destroy;
 begin
 
+ while fSymbols.Count>0 do begin
+  fSymbols[fSymbols.Count-1].Free;
+  fSymbols.Delete(fSymbols.Count-1);
+ end;
+ fSymbols.Free;
+
  while fSections.Count>0 do begin
   fSections[fSections.Count-1].Free;
+  fSections.Delete(fSections.Count-1);
  end;
-
  fSections.Free;
 
  inherited Destroy;
