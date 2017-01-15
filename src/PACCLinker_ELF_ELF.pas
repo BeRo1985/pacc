@@ -686,6 +686,27 @@ type PELFIdent=^TELFIdent;
       sh_entsize:TELFXWord;
      end;
 
+     PELFCommonSHdr=^TELFCommonSHdr;
+     TELFCommonSHdr=packed record
+      sh_name:TELFWord;
+      sh_type:TELFWord;
+     end;
+
+     PELF3264SHdr=^TELF3264SHdr;
+     TELF3264SHdr=packed record
+      case TPACCInt of
+       0:(
+        CommonSHdr:TELFCommonSHdr;
+        AfterCommonSHdr:pointer;
+       );
+       32:(
+        ELF32SHdr:TELF32SHdr;
+       );
+       64:(
+        ELF64SHdr:TELF64SHdr;
+       );
+     end;
+
      // Segment header
      PELF32PHdr=^TELF32PHdr;
      TELF32PHdr=packed record
@@ -1366,76 +1387,172 @@ begin
 end;
 
 procedure TPACCLinker_ELF_ELF.AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String='');
-var EHdr3264:TELF3264EHdr;
+var SectionIndex:TPACCInt32;
+    ELF3264EHdr:TELF3264EHdr;
+    ELF3264SHdr:TELF3264SHdr;
+    LocalSections:TPACCLinker_ELF_ELF_SectionList;
+    Section,SHStrTabSection:TPACCLinker_ELF_ELF_Section;
+    Name:TPACCRawByteString;
+    c:AnsiChar;
 begin
 
  if AObjectStream.Seek(0,soBeginning)<>0 then begin
   TPACCInstance(Instance).AddError('Stream seek error',nil,true);
  end;
 
- AObjectStream.ReadBuffer(EHdr3264.CommonEHdr,SizeOf(TELFCommonEHdr));
+ AObjectStream.ReadBuffer(ELF3264EHdr.CommonEHdr,SizeOf(TELFCommonEHdr));
 
- if (EHdr3264.CommonEHdr.e_ident[0]<>ELFMAG0) or
-    (EHdr3264.CommonEHdr.e_ident[1]<>ELFMAG1) or
-    (EHdr3264.CommonEHdr.e_ident[2]<>ELFMAG2) or
-    (EHdr3264.CommonEHdr.e_ident[3]<>ELFMAG3) then begin
+ if (ELF3264EHdr.CommonEHdr.e_ident[0]<>ELFMAG0) or
+    (ELF3264EHdr.CommonEHdr.e_ident[1]<>ELFMAG1) or
+    (ELF3264EHdr.CommonEHdr.e_ident[2]<>ELFMAG2) or
+    (ELF3264EHdr.CommonEHdr.e_ident[3]<>ELFMAG3) then begin
   TPACCInstance(Instance).AddError('No ELF object',nil,true);
  end;
 
- if ((not Is64Bit) and (EHdr3264.CommonEHdr.e_ident[4]<>ELFCLASS32)) or
-    (Is64Bit and (EHdr3264.CommonEHdr.e_ident[4]<>ELFCLASS64)) then begin
+ if ((not Is64Bit) and (ELF3264EHdr.CommonEHdr.e_ident[4]<>ELFCLASS32)) or
+    (Is64Bit and (ELF3264EHdr.CommonEHdr.e_ident[4]<>ELFCLASS64)) then begin
   TPACCInstance(Instance).AddError('Wrong ELF bitness',nil,true);
  end;
 
- if EHdr3264.CommonEHdr.e_ident[5]<>ELFDATA2LSB then begin
+ if ELF3264EHdr.CommonEHdr.e_ident[5]<>ELFDATA2LSB then begin
   TPACCInstance(Instance).AddError('Wrong ELF endianess',nil,true);
  end;
 
- if EHdr3264.CommonEHdr.e_ident[6]<>EV_CURRENT then begin
+ if ELF3264EHdr.CommonEHdr.e_ident[6]<>EV_CURRENT then begin
   TPACCInstance(Instance).AddError('Wrong ELF version',nil,true);
  end;
 
- if EHdr3264.CommonEHdr.e_ident[7]<>ELFOSABI_NONE then begin
+ if ELF3264EHdr.CommonEHdr.e_ident[7]<>ELFOSABI_NONE then begin
   TPACCInstance(Instance).AddError('Wrong ELF ABI',nil,true);
  end;
 
- if EHdr3264.CommonEHdr.e_type<>ET_REL then begin
+ if ELF3264EHdr.CommonEHdr.e_type<>ET_REL then begin
   TPACCInstance(Instance).AddError('No ELF object',nil,true);
  end;
 
- if EHdr3264.CommonEHdr.e_machine<>fMachine then begin
+ if ELF3264EHdr.CommonEHdr.e_machine<>fMachine then begin
   TPACCInstance(Instance).AddError('Wrong ELF machine',nil,true);
  end;
 
- if EHdr3264.CommonEHdr.e_version<>EV_CURRENT then begin
+ if ELF3264EHdr.CommonEHdr.e_version<>EV_CURRENT then begin
   TPACCInstance(Instance).AddError('Wrong ELF version',nil,true);
  end;
 
  if fIs64Bit then begin
-  AObjectStream.ReadBuffer(EHdr3264.AfterCommonEHdr,SizeOf(TELF64EHdr)-SizeOf(TELFCommonEHdr));
+
+  AObjectStream.ReadBuffer(ELF3264EHdr.AfterCommonEHdr,SizeOf(TELF64EHdr)-SizeOf(TELFCommonEHdr));
+
  end else begin
-  AObjectStream.ReadBuffer(EHdr3264.AfterCommonEHdr,SizeOf(TELF32EHdr)-SizeOf(TELFCommonEHdr));
-  EHdr3264.ELF64EHdr.e_shstrndx:=EHdr3264.ELF32EHdr.e_shstrndx;
-  EHdr3264.ELF64EHdr.e_shnum:=EHdr3264.ELF32EHdr.e_shnum;
-  EHdr3264.ELF64EHdr.e_shentsize:=EHdr3264.ELF32EHdr.e_shentsize;
-  EHdr3264.ELF64EHdr.e_phnum:=EHdr3264.ELF32EHdr.e_phnum;
-  EHdr3264.ELF64EHdr.e_phentsize:=EHdr3264.ELF32EHdr.e_phentsize;
-  EHdr3264.ELF64EHdr.e_ehsize:=EHdr3264.ELF32EHdr.e_ehsize;
-  EHdr3264.ELF64EHdr.e_flags:=EHdr3264.ELF32EHdr.e_flags;
-  EHdr3264.ELF64EHdr.e_shoff:=EHdr3264.ELF32EHdr.e_shoff;
-  EHdr3264.ELF64EHdr.e_phoff:=EHdr3264.ELF32EHdr.e_phoff;
-  EHdr3264.ELF64EHdr.e_entry:=EHdr3264.ELF32EHdr.e_entry;
-  EHdr3264.ELF64EHdr.e_version:=EHdr3264.ELF32EHdr.e_version;
-  EHdr3264.ELF64EHdr.e_machine:=EHdr3264.ELF32EHdr.e_machine;
-  EHdr3264.ELF64EHdr.e_type:=EHdr3264.ELF32EHdr.e_type;
-  EHdr3264.ELF64EHdr.e_ident:=EHdr3264.ELF32EHdr.e_ident;
+
+  AObjectStream.ReadBuffer(ELF3264EHdr.AfterCommonEHdr,SizeOf(TELF32EHdr)-SizeOf(TELFCommonEHdr));
+
+  // Convert 32-bit ELF file header into a 64-bit ELF file header in-place by reversed field order,
+  // because some 64-bit header fields are larger than these in the 32-bit header
+  ELF3264EHdr.ELF64EHdr.e_shstrndx:=ELF3264EHdr.ELF32EHdr.e_shstrndx;
+  ELF3264EHdr.ELF64EHdr.e_shnum:=ELF3264EHdr.ELF32EHdr.e_shnum;
+  ELF3264EHdr.ELF64EHdr.e_shentsize:=ELF3264EHdr.ELF32EHdr.e_shentsize;
+  ELF3264EHdr.ELF64EHdr.e_phnum:=ELF3264EHdr.ELF32EHdr.e_phnum;
+  ELF3264EHdr.ELF64EHdr.e_phentsize:=ELF3264EHdr.ELF32EHdr.e_phentsize;
+  ELF3264EHdr.ELF64EHdr.e_ehsize:=ELF3264EHdr.ELF32EHdr.e_ehsize;
+  ELF3264EHdr.ELF64EHdr.e_flags:=ELF3264EHdr.ELF32EHdr.e_flags;
+  ELF3264EHdr.ELF64EHdr.e_shoff:=ELF3264EHdr.ELF32EHdr.e_shoff;
+  ELF3264EHdr.ELF64EHdr.e_phoff:=ELF3264EHdr.ELF32EHdr.e_phoff;
+  ELF3264EHdr.ELF64EHdr.e_entry:=ELF3264EHdr.ELF32EHdr.e_entry;
+  ELF3264EHdr.ELF64EHdr.e_version:=ELF3264EHdr.ELF32EHdr.e_version;
+  ELF3264EHdr.ELF64EHdr.e_machine:=ELF3264EHdr.ELF32EHdr.e_machine;
+  ELF3264EHdr.ELF64EHdr.e_type:=ELF3264EHdr.ELF32EHdr.e_type;
+  ELF3264EHdr.ELF64EHdr.e_ident:=ELF3264EHdr.ELF32EHdr.e_ident;
+
  end;
 
- if AObjectStream.Seek(EHdr3264.ELF64EHdr.e_shoff,soBeginning)<>EHdr3264.ELF64EHdr.e_shoff then begin
+ if AObjectStream.Seek(ELF3264EHdr.ELF64EHdr.e_shoff,soBeginning)<>ELF3264EHdr.ELF64EHdr.e_shoff then begin
   TPACCInstance(Instance).AddError('Stream seek error',nil,true);
  end;
 
- 
+ LocalSections:=TPACCLinker_ELF_ELF_SectionList.Create;
+ try
+
+  for SectionIndex:=0 to ELF3264EHdr.ELF64EHdr.e_shnum-1 do begin
+
+   Section:=TPACCLinker_ELF_ELF_Section.Create(self,'');
+   Sections.Add(Section);
+   LocalSections.Add(Section);
+
+   if fIs64Bit then begin
+
+    AObjectStream.ReadBuffer(ELF3264SHdr.ELF64SHdr,SizeOf(TELF64SHdr));
+
+    Section.sh_name:=ELF3264SHdr.ELF64SHdr.sh_name;
+    Section.sh_type:=ELF3264SHdr.ELF64SHdr.sh_type;
+    Section.sh_flags:=ELF3264SHdr.ELF64SHdr.sh_flags;
+    Section.sh_addr:=ELF3264SHdr.ELF64SHdr.sh_addr;
+    Section.sh_offset:=ELF3264SHdr.ELF64SHdr.sh_offset;
+    Section.sh_size:=ELF3264SHdr.ELF64SHdr.sh_size;
+    Section.sh_link:=ELF3264SHdr.ELF64SHdr.sh_link;
+    Section.sh_info:=ELF3264SHdr.ELF64SHdr.sh_info;
+    Section.sh_addralign:=ELF3264SHdr.ELF64SHdr.sh_addralign;
+    Section.sh_entsize:=ELF3264SHdr.ELF64SHdr.sh_entsize;
+
+   end else begin
+
+    AObjectStream.ReadBuffer(ELF3264SHdr.ELF32SHdr,SizeOf(TELF32SHdr));
+
+    Section.sh_name:=ELF3264SHdr.ELF32SHdr.sh_name;
+    Section.sh_type:=ELF3264SHdr.ELF32SHdr.sh_type;
+    Section.sh_flags:=ELF3264SHdr.ELF32SHdr.sh_flags;
+    Section.sh_addr:=ELF3264SHdr.ELF32SHdr.sh_addr;
+    Section.sh_offset:=ELF3264SHdr.ELF32SHdr.sh_offset;
+    Section.sh_size:=ELF3264SHdr.ELF32SHdr.sh_size;
+    Section.sh_link:=ELF3264SHdr.ELF32SHdr.sh_link;
+    Section.sh_info:=ELF3264SHdr.ELF32SHdr.sh_info;
+    Section.sh_addralign:=ELF3264SHdr.ELF32SHdr.sh_addralign;
+    Section.sh_entsize:=ELF3264SHdr.ELF32SHdr.sh_entsize;
+
+   end;
+
+  end;
+
+  for SectionIndex:=0 to LocalSections.Count-1 do begin
+   Section:=LocalSections[SectionIndex];
+   if Section.sh_size>0 then begin
+    if AObjectStream.Seek(Section.sh_offset,soBeginning)<>Section.sh_offset then begin
+     TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+    end;
+    if Section.Stream.CopyFrom(AObjectStream,Section.sh_size)<>Section.sh_size then begin
+     TPACCInstance(Instance).AddError('Stream read error',nil,true);
+    end;
+   end;
+  end;
+
+  if ELF3264EHdr.ELF64EHdr.e_shstrndx<LocalSections.Count then begin
+   SHStrTabSection:=LocalSections[ELF3264EHdr.ELF64EHdr.e_shstrndx];
+  end else begin
+   SHStrTabSection:=nil;
+   TPACCInstance(Instance).AddError('No .shstrtab section',nil,true);
+  end;
+
+  for SectionIndex:=0 to LocalSections.Count-1 do begin
+   Section:=LocalSections[SectionIndex];
+   if Section.sh_name>0 then begin
+    if SHStrTabSection.Stream.Seek(Section.sh_name,soBeginning)<>Section.sh_name then begin
+     TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+    end;
+    Name:='';
+    while SHStrTabSection.Stream.Position<SHStrTabSection.Stream.Size do begin
+     SHStrTabSection.Stream.ReadBuffer(c,SizeOf(AnsiChar));
+     if c=#0 then begin
+      break;
+     end else begin
+      Name:=Name+c;
+     end;
+    end;
+    Section.Name:=Name;
+   end;
+  end;
+
+ finally
+  LocalSections.Free;
+ end;
 
 end;
 

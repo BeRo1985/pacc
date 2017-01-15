@@ -1829,7 +1829,7 @@ begin
        end;
        Name:='';
        while AObjectStream.Position<AObjectStream.Size do begin
-        AObjectStream.Read(c,SizeOf(AnsiChar));
+        AObjectStream.ReadBuffer(c,SizeOf(AnsiChar));
         if c=#0 then begin
          break;
         end else begin
