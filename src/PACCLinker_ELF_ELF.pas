@@ -753,7 +753,9 @@ function ELF32_R_INFO(const s,t:TELFWord):TELFWord;
 
 function ELF64_R_SYM(const i:TELFXWord):TELFWord;
 function ELF64_R_TYPE(const i:TELFXWord):TELFWord;
-function ELF74_R_INFO(const s,t:TELFXWord):TELFXWord;
+function ELF64_R_INFO(const s,t:TELFXWord):TELFXWord;
+
+function ELF_HASH(Name:PAnsiChar):TPACCUInt64;
 
 implementation
 
@@ -804,9 +806,24 @@ begin
  result:=i and $ffffffff;
 end;
 
-function ELF74_R_INFO(const s,t:TELFXWord):TELFXWord;
+function ELF64_R_INFO(const s,t:TELFXWord):TELFXWord;
 begin
  result:=(s shl 32) or (t and $ffffffff);
+end;
+
+function ELF_HASH(Name:PAnsiChar):TPACCUInt64;
+var t:TPACCUInt64;
+begin
+ result:=0;
+ while assigned(Name) and (Name^<>#0) do begin
+  result:=(result shl 4)+TPACCUInt8(AnsiChar(Name^));
+  inc(Name);
+  t:=result and $f0000000;
+  if t<>0 then begin
+   result:=result xor (t shr 24);
+  end;
+  result:=result and not t;
+ end;
 end;
 
 constructor TPACCLinker_ELF_ELF.Create(const AInstance:TObject);
