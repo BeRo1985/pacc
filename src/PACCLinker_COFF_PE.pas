@@ -1132,7 +1132,9 @@ end;
 
 destructor TResourceNodeItem.Destroy;
 begin
- FreeAndNil(fObject);
+ if assigned(fObject) and (fObject is TResourceNode) then begin
+  FreeAndNil(fObject);
+ end;
  inherited Destroy;
 end;
 
@@ -1525,7 +1527,7 @@ destructor TPACCLinker_COFF_PE.Destroy;
 begin
 
  fResources.Free;
- 
+
  while fSymbols.Count>0 do begin
   fSymbols[fSymbols.Count-1].Free;
   fSymbols.Delete(fSymbols.Count-1);
