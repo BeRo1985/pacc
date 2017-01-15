@@ -846,18 +846,44 @@ type // File header
 
      TPACCLinker_ELF_ELF_Symbol=class
       private
+
        fLinker:TPACCLinker_ELF_ELF;
+
        fName:TPACCRawByteString;
+
        fSection:TPACCLinker_ELF_ELF_Section;
+
+       fst_name:TPACCUInt64;
+       fst_info:TPACCUInt64;
+       fst_other:TPACCUInt64;
+       fst_shndx:TPACCUInt64;
+       fst_value:TPACCUInt64;
+       fst_size:TPACCUInt64;
+
        fActive:boolean;
+
       public
+
        constructor Create(const ALinker:TPACCLinker_ELF_ELF;const AName:TPACCRawByteString;const ASection:TPACCLinker_ELF_ELF_Section); reintroduce;
        destructor Destroy; override;
+
       published
+
        property Linker:TPACCLinker_ELF_ELF read fLinker;
-       property Name:TPACCRawByteString read fName;
+
+       property Name:TPACCRawByteString read fName write fName;
+
        property Section:TPACCLinker_ELF_ELF_Section read fSection write fSection;
+
+       property st_name:TPACCUInt64 read fst_name write fst_name;
+       property st_info:TPACCUInt64 read fst_info write fst_info;
+       property st_other:TPACCUInt64 read fst_other write fst_other;
+       property st_shndx:TPACCUInt64 read fst_shndx write fst_shndx;
+       property st_value:TPACCUInt64 read fst_value write fst_value;
+       property st_size:TPACCUInt64 read fst_size write fst_size;
+
        property Active:boolean read fActive write fActive;
+
      end;
 
      TPACCLinker_ELF_ELF_SymbolList=class(TList)
@@ -893,6 +919,8 @@ type // File header
        fsh_addralign:TPACCUInt64;
        fsh_entsize:TPACCUInt64;
 
+       fSymbols:TPACCLinker_ELF_ELF_SymbolList;
+
        fActive:boolean;
 
       public
@@ -903,6 +931,26 @@ type // File header
       published
 
        property Linker:TPACCLinker_ELF_ELF read fLinker;
+
+       property Name:TPACCRawByteString read fName write fName;
+
+       property DataOffset:TPACCUInt64 read fDataOffset write fDataOffset;
+
+       property Stream:TMemoryStream read fStream write fStream;
+
+       property sh_name:TPACCUInt64 read fsh_name write fsh_name;
+       property sh_num:TPACCUInt64 read fsh_num write fsh_num;
+       property sh_type:TPACCUInt64 read fsh_type write fsh_type;
+       property sh_flags:TPACCUInt64 read fsh_flags write fsh_flags;
+       property sh_addr:TPACCUInt64 read fsh_addr write fsh_addr;
+       property sh_offset:TPACCUInt64 read fsh_offset write fsh_offset;
+       property sh_size:TPACCUInt64 read fsh_size write fsh_size;
+       property sh_link:TPACCUInt64 read fsh_link write fsh_link;
+       property sh_info:TPACCUInt64 read fsh_info write fsh_info;
+       property sh_addralign:TPACCUInt64 read fsh_addralign write fsh_addralign;
+       property sh_entsize:TPACCUInt64 read fsh_entsize write fsh_entsize;
+
+       property Symbols:TPACCLinker_ELF_ELF_SymbolList read fSymbols;
 
        property Active:boolean read fActive write fActive;
 
@@ -1081,13 +1129,19 @@ begin
 
  fStream:=TMemoryStream.Create;
 
+ fSymbols:=TPACCLinker_ELF_ELF_SymbolList.Create;
+
  fActive:=true;
 
 end;
 
 destructor TPACCLinker_ELF_ELF_Section.Destroy;
 begin
+
  fStream.Free;
+
+ fSymbols.Free;
+
  inherited Destroy;
 end;
 
