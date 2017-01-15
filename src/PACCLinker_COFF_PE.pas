@@ -227,9 +227,7 @@ type TPACCLinker_COFF_PE=class;
 
 implementation
 
-uses PACCInstance,PACCTarget_x86_32{,PACCTarget_x86_64_Win64};
-
-{$i PACCLinker_COFF_PE_LCIDToCodePageLookUpTable.inc}
+uses PACCInstance,PACCLinker_COFF_PE_LCIDToCodePageLookUpTable,PACCTarget_x86_32{,PACCTarget_x86_64_Win64};
 
 const MZEXEHeaderSize=128;
       MZEXEHeaderBytes:array[0..MZEXEHeaderSize-1] of TPACCUInt8=

@@ -7,7 +7,6 @@ program pacc;
 {%File 'PACC.inc'}
 {%File 'SASM.inc'}
 {%File 'SASMDataContent.inc'}
-{%File 'PACCLinker_COFF_PE_LCIDToCodePageLookUpTable.inc'}
 
 uses
   SysUtils,

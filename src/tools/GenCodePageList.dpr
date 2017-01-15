@@ -15,8 +15,12 @@ end;
 var i:integer;
     t:textfile;
 begin
- AssignFile(t,'..\PACCLinker_COFF_PE_LCIDToCodePageLookUpTable.inc');
+ AssignFile(t,'..\PACCLinker_COFF_PE_LCIDToCodePageLookUpTable.pas');
  Rewrite(t);
+ writeln(t,'unit PACCLinker_COFF_PE_LCIDToCodePageLookUpTable;');
+ writeln(t,'{$i PACC.inc}');
+ writeln(t,'interface');
+ writeln(t,'uses PACCTypes;');
  writeln(t,'const LCIDToCodePageLookUpTable:array[0..$ffff] of TPACCUInt16=(');
  for i:=0 to $ffff do begin
   if i<$ffff then begin
@@ -29,5 +33,7 @@ begin
   end;
  end;
  write(t,');');
+ writeln(t,'implementation');
+ writeln(t,'end.');
  CloseFile(t);
 end.
