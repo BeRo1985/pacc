@@ -1166,7 +1166,7 @@ begin
   end;
  end;
  try
-  result:=IntToStr(StrToIntDef(fID,-1))=fID;
+  result:=TPUCUUTF16String(IntToStr(StrToIntDef(String(fID),-1)))=fID;
  except
   result:=false;
  end;
@@ -1202,7 +1202,7 @@ begin
  inherited Create;
  Item:=TResourceNodeItem.Create;
  inherited Add(Item);
- Item.ID:=IntToStr(ALang);
+ Item.ID:=TPUCUUTF16String(IntToStr(ALang));
  Item.IsIntegerID:=true;
  Item.Leaf:=true;
  Item.Stream:=AStream;
@@ -1270,7 +1270,7 @@ var Index:TPACCInt32;
     Item:TResourceNodeItem;
     Lang:TPUCUUTF16String;
 begin
- Lang:=IntToStr(ALang);
+ Lang:=TPUCUUTF16String(IntToStr(ALang));
  for Index:=0 to Count-1 do begin
   Item:=Items[Index];
   if Item.ID=Lang then begin
@@ -1279,7 +1279,7 @@ begin
  end;
  Item:=TResourceNodeItem.Create;
  inherited Add(Item);
- Item.ID:=IntToStr(ALang);
+ Item.ID:=Lang;
  Item.IsIntegerID:=true;
  Item.Leaf:=true;
  Item.Stream:=AStream;
@@ -1871,7 +1871,7 @@ var Is16Bit:boolean;
    HeaderStream.ReadBuffer(Value,SizeOf(TPACCUInt16));
    if Value=$ffff then begin
     HeaderStream.ReadBuffer(Value,SizeOf(TPACCUInt16));
-    result:=IntToStr(Value);
+    result:=TPUCUUTF16String(IntToStr(Value));
    end else begin
     result:=TPUCUUTF16Char(Value);
     while HeaderStream.Position<HeaderStream.Size do begin
@@ -1954,6 +1954,8 @@ begin
    HeaderStream.Free;
   end;
   AResourcesStream.Seek(LastPosition+(((StrippedResourceHeader.DataSize+StrippedResourceHeader.HeaderSize)+3) and not TPACCInt32(3)),soBeginning);
+ end;
+ if Is16Bit then begin
  end;
 end;
 
@@ -2461,9 +2463,6 @@ var Relocations:TRelocations;
      LibraryStringHashMap:TPACCRawByteStringHashMap;
      Entity:PPACCRawByteStringHashMapEntity;
      ImageImportDescriptor:TImageImportDescriptor;
-     Size:TPACCUInt64;
-     v32:TPACCUInt32;
-     v64:TPACCUInt64;
      ImportSectionSymbol,CodeSectionSymbol,FirstThunkSymbol,
      LibraryNameSymbol,LibraryImportSymbol,LibraryImportNameSymbol,
      LibraryImportTrunkCodeSymbol:TPACCLinker_COFF_PESymbol;
@@ -2554,9 +2553,13 @@ var Relocations:TRelocations;
      if PassIndex=1 then begin
       ImportSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_data_section',ImportSection,0,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
       ImportSectionSymbolIndex:=Symbols.Add(ImportSectionSymbol);
+      if ImportSectionSymbolIndex>0 then begin
+      end;
       ImportSection.Symbols.Add(ImportSectionSymbol);
       CodeSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__import_code_section',CodeSection,0,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
       CodeSectionSymbolIndex:=Symbols.Add(CodeSectionSymbol);
+      if CodeSectionSymbolIndex>0 then begin
+      end;
       CodeSection.Symbols.Add(CodeSectionSymbol);
      end;
 
@@ -2810,6 +2813,8 @@ var Relocations:TRelocations;
 
       ExportSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section',ExportSection,0,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
       ExportSectionSymbolIndex:=Symbols.Add(ExportSectionSymbol);
+      if ExportSectionSymbolIndex>0 then begin
+      end;
       ExportSection.Symbols.Add(ExportSectionSymbol);
 
       TempSectionSymbol:=TPACCLinker_COFF_PESymbol.Create(self,'@@__export_data_section_addressof_AddressOfName',ExportSection,AddressOfName,0,IMAGE_SYM_CLASS_STATIC,plcpskNormal);
@@ -3016,7 +3021,6 @@ var Relocations:TRelocations;
      Section,DestinationSection:TPACCLinker_COFF_PESection;
      Relocation:PPACCLinker_COFF_PERelocation;
      Symbol:TPACCLinker_COFF_PESymbol;
-     Name:TPACCRawByteString;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
  begin
 
@@ -3384,10 +3388,9 @@ var Relocations:TRelocations;
   end;
  end;
  procedure GenerateRelocationSection;
- var SectionIndex,RelocationIndex:TPACCInt32;
+ var SectionIndex:TPACCInt32;
      Section:TPACCLinker_COFF_PESection;
      Size:TPACCUInt32;
-     Data:pointer;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
  begin
   if TPACCInstance(Instance).Options.CreateSharedLibrary and assigned(Relocations.RootNode) then begin
@@ -3444,7 +3447,7 @@ var Relocations:TRelocations;
     end;
    end;
 
-   Section:=TPACCLinker_COFF_PESection.Create(self,'.rsrc',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ);
+   Section:=TPACCLinker_COFF_PESection.Create(self,'.rsrc',0,IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_CNT_RESOURCE);
    Sections.Add(Section);
 
    LastVirtualAddress:=(LastVirtualAddress+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
@@ -3486,10 +3489,10 @@ var Relocations:TRelocations;
  var Index,HeaderSize,SectionIndex,Len:TPACCInt32;
      Characteristics,TotalImageSize,AddressOfEntryPoint,CodeBase,SubSystem,
      DLLCharacteristics,SizeOfStackReserve,SizeOfStackCommit,
-     SizeOfHeapReserve,SizeOfHeapCommit,StackSize,HeapSize:TPACCUInt32;
+     SizeOfHeapReserve,SizeOfHeapCommit:TPACCUInt32;
      ImageNTHeaders:TImageNTHeaders;
      PECOFFDirectoryEntry:PPECOFFDirectoryEntry;
-     FileOffset,TotalFileOffset,CountBytes,TempSize:TPACCInt64;
+     FileOffset,CountBytes,TempSize:TPACCInt64;
      Section:TPACCLinker_COFF_PESection;
      ImageSectionHeader:TImageSectionHeader;
      Symbol:TPACCLinker_COFF_PESymbol;
@@ -3609,10 +3612,6 @@ var Relocations:TRelocations;
   SizeOfHeapReserve:=$100000;
 
   SizeOfHeapCommit:=$2000;
-
-  StackSize:=16777216;
-
-  HeapSize:=67108864;
 
   Stream.Size:=0;
   Stream.Seek(0,soBeginning);
@@ -3752,7 +3751,6 @@ var Relocations:TRelocations;
   if (FileOffset and (PECOFFFileAlignment-1))<>0 then begin
    FileOffset:=(FileOffset+(PECOFFFileAlignment-1)) and not (PECOFFFileAlignment-1);
   end;
-  TotalFileOffset:=FileOffset;
 
   for SectionIndex:=0 to Sections.Count-1 do begin
    Section:=Sections[SectionIndex];
