@@ -511,8 +511,21 @@ const ET_NONE=0;
       DF_BIND_NOW=$8; 
       DF_STATIC_TLS=$10;
 
-type PELFHalf=^TELFHalf;
-     TELFHalf=TPACCUInt16;
+      VER_DEF_NONE=0; // No version
+      VER_DEF_CURRENT=1; // Current version
+      VER_DEF_NUM=2; // Given version number
+
+      // Legal values for vd_flags (version information flags)
+      VER_FLG_BASE=1; // Version definition of file itself
+      VER_FLG_WEAK=2; // Weak version identifier
+
+      // Legal values for vn_version (version revision)
+      VER_NEED_NONE=0; // No version
+      VER_NEED_CURRENT=1; // Current version
+      VER_NEED_NUM=2; // Given version number
+
+type PELFHalf=^TELFHalf;
+     TELFHalf=TPACCUInt16;
 
      PELFWord=^TELFWord;
      TELFWord=TPACCUInt32;
@@ -716,6 +729,67 @@ type // File header
        1:(
         d_ptr:TELF64Addr;
        );
+     end;
+
+     // Version definition sections
+     PELF32Verdef=^TELF32Verdef;
+     TELF32Verdef=packed record
+      vd_version:TELF32Half;
+      vd_flags:TELF32Half;
+      vd_ndx:TELF32Half;
+      vd_cnt:TELF32Half;
+      vd_hash:TELF32Word;
+      vd_aux:TELF32Word;
+      vd_next:TELF32Word;
+     end;
+
+     PELF64Verdef=^TELF64Verdef;
+     TELF64Verdef=packed record
+      vd_version:TELF64Half;
+      vd_flags:TELF64Half;
+      vd_ndx:TELF64Half;
+      vd_cnt:TELF64Half;
+      vd_hash:TELF64Word;
+      vd_aux:TELF64Word;
+      vd_next:TELF64Word;
+     end;
+
+     // Version dependency section
+     PELF32Verneed=^TELF32Verneed;
+     TELF32Verneed=packed record
+      vn_version:TELF32Half;
+      vn_cnt:TELF32Half;
+      vn_file:TELF32Word;
+      vn_aux:TELF32Word;
+      vn_next:TELF32Word;
+     end;
+
+     PELF64Verneed=^TELF64Verneed;
+     TELF64Verneed=packed record
+      vn_version:TELF64Half;
+      vn_cnt:TELF64Half;
+      vn_file:TELF64Word;
+      vn_aux:TELF64Word;
+      vn_next:TELF64Word;
+     end;
+
+     // Auxiliary needed version information
+     PELF32Vernaux=^TELF32Vernaux;
+     TELF32Vernaux=packed record
+      vna_hash:TELF32Word;
+      vna_flahs:TELF32Half;
+      vna_other:TELF32Word;
+      vna_name:TELF32Word;
+      vna_next:TELF32Word;
+     end;
+
+     PELF64Vernaux=^TELF64Vernaux;
+     TELF64Vernaux=packed record
+      vna_hash:TELF64Word;
+      vna_flahs:TELF64Half;
+      vna_other:TELF64Word;
+      vna_name:TELF64Word;
+      vna_next:TELF64Word;
      end;
 
 type TPACCLinker_ELF_ELF=class;
