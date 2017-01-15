@@ -1462,15 +1462,44 @@ begin
   TPACCInstance(Instance).AddError('No ELF object',nil,true);
  end;
 
+ if ((not Is64Bit) and (EHdr.e_ident[4]<>ELFCLASS32)) or
+    (Is64Bit and (EHdr.e_ident[4]<>ELFCLASS64)) then begin
+  TPACCInstance(Instance).AddError('Wrong ELF bitness',nil,true);
+ end;
+
+ if EHdr.e_ident[5]<>ELFDATA2LSB then begin
+  TPACCInstance(Instance).AddError('Wrong ELF endianess',nil,true);
+ end;
+
+ if EHdr.e_ident[6]<>EV_CURRENT then begin
+  TPACCInstance(Instance).AddError('Wrong ELF version',nil,true);
+ end;
+
+ if EHdr.e_ident[7]<>ELFOSABI_NONE then begin
+  TPACCInstance(Instance).AddError('Wrong ELF ABI',nil,true);
+ end;
+
+ if EHdr.e_type<>ET_REL then begin
+  TPACCInstance(Instance).AddError('No ELF object',nil,true);
+ end;
+
  if EHdr.e_machine<>fMachine then begin
   TPACCInstance(Instance).AddError('Wrong ELF machine',nil,true);
+ end;
+
+ if EHdr.e_version<>EV_CURRENT then begin
+  TPACCInstance(Instance).AddError('Wrong ELF version',nil,true);
+ end;
+
+ if AObjectStream.Seek(EHdr.e_ehsize,soBeginning)<>EHdr.e_ehsize then begin
+  TPACCInstance(Instance).AddError('Stream seek error',nil,true);
  end;
 
  
 
 end;
 
-procedure TPACCLinker_ELF_ELF.AddResources(const AResourcesStream:TStream;const AResourcesFileName:TPUCUUTF8String=''); 
+procedure TPACCLinker_ELF_ELF.AddResources(const AResourcesStream:TStream;const AResourcesFileName:TPUCUUTF8String='');
 begin
 end;
 
