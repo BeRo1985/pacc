@@ -594,10 +594,13 @@ const ET_NONE=0;
      PELF64SWord=^TELF64SWord;
      TELF64SWord=TELFSWord;
 
-type // File header
+type PELFIdent=^TELFIdent;
+     TELFIdent=array[0..EI_NIDENT-1] of AnsiChar;
+
+     // File header
      PELF32EHdr=^TELF32EHdr;
      TELF32EHdr=packed record
-      e_ident:array[0..EI_NIDENT-1] of AnsiChar;
+      e_ident:TELFIdent;
       e_type:TELFHalf;
       e_machine:TELFHalf;
       e_version:TELFWord;
@@ -615,7 +618,7 @@ type // File header
 
      PELF64EHdr=^TELF64EHdr;
      TELF64EHdr=packed record
-      e_ident:array[0..EI_NIDENT-1] of AnsiChar;
+      e_ident:TELFIdent;
       e_type:TELFHalf;
       e_machine:TELFHalf;
       e_version:TELFWord;
@@ -629,6 +632,29 @@ type // File header
       e_shentsize:TELFHalf;
       e_shnum:TELFHalf;
       e_shstrndx:TELFHalf;
+     end;
+
+     PELFEHdr=^TELFEHdr;
+     TELFEHdr=object
+      public
+       e_ident:TELFIdent;
+       e_type:TPACCUInt64;
+       e_machine:TPACCUInt64;
+       e_version:TPACCUInt64;
+       e_entry:TPACCUInt64;
+       e_phoff:TPACCUInt64;
+       e_shoff:TPACCUInt64;
+       e_flags:TPACCUInt64;
+       e_ehsize:TPACCUInt64;
+       e_phentsize:TPACCUInt64;
+       e_phnum:TPACCUInt64;
+       e_shentsize:TPACCUInt64;
+       e_shnum:TPACCUInt64;
+       e_shstrndx:TPACCUInt64;
+       procedure AssignFrom32(const EHdr:TELF32EHdr);
+       procedure AssignTo32(out EHdr:TELF32EHdr);
+       procedure AssignFrom64(const EHdr:TELF64EHdr);
+       procedure AssignTo64(out EHdr:TELF64EHdr);
      end;
 
      // Section header
@@ -1006,6 +1032,10 @@ type // File header
      TPACCLinker_ELF_ELF=class(TPACCLinker)
       private
 
+       fIs64Bit:boolean;
+
+       fMachine:TPACCInt32;
+
        fSections:TPACCLinker_ELF_ELF_SectionList;
 
        fSymbols:TPACCLinker_ELF_ELF_SymbolList;
@@ -1032,6 +1062,10 @@ type // File header
        procedure Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String=''); override;
 
       published
+
+       property Is64Bit:boolean read fIs64Bit write fIs64Bit;
+
+       property Machine:TPACCInt32 read fMachine write fMachine;
 
        property Sections:TPACCLinker_ELF_ELF_SectionList read fSections;
 
@@ -1126,6 +1160,78 @@ begin
   end;
   result:=result and not t;
  end;
+end;
+
+procedure TELFEHdr.AssignFrom32(const EHdr:TELF32EHdr);
+begin
+ e_ident:=EHdr.e_ident;
+ e_type:=EHdr.e_type;
+ e_machine:=EHdr.e_machine;
+ e_version:=EHdr.e_version;
+ e_entry:=EHdr.e_entry;
+ e_phoff:=EHdr.e_phoff;
+ e_shoff:=EHdr.e_shoff;
+ e_flags:=EHdr.e_flags;
+ e_ehsize:=EHdr.e_ehsize;
+ e_phentsize:=EHdr.e_phentsize;
+ e_phnum:=EHdr.e_phnum;
+ e_shentsize:=EHdr.e_shentsize;
+ e_shnum:=EHdr.e_shnum;
+ e_shstrndx:=EHdr.e_shstrndx;
+end;
+
+procedure TELFEHdr.AssignTo32(out EHdr:TELF32EHdr);
+begin
+ EHdr.e_ident:=e_ident;
+ EHdr.e_type:=e_type;
+ EHdr.e_machine:=e_machine;
+ EHdr.e_version:=e_version;
+ EHdr.e_entry:=e_entry;
+ EHdr.e_phoff:=e_phoff;
+ EHdr.e_shoff:=e_shoff;
+ EHdr.e_flags:=e_flags;
+ EHdr.e_ehsize:=e_ehsize;
+ EHdr.e_phentsize:=e_phentsize;
+ EHdr.e_phnum:=e_phnum;
+ EHdr.e_shentsize:=e_shentsize;
+ EHdr.e_shnum:=e_shnum;
+ EHdr.e_shstrndx:=e_shstrndx;
+end;
+
+procedure TELFEHdr.AssignFrom64(const EHdr:TELF64EHdr);
+begin
+ e_ident:=EHdr.e_ident;
+ e_type:=EHdr.e_type;
+ e_machine:=EHdr.e_machine;
+ e_version:=EHdr.e_version;
+ e_entry:=EHdr.e_entry;
+ e_phoff:=EHdr.e_phoff;
+ e_shoff:=EHdr.e_shoff;
+ e_flags:=EHdr.e_flags;
+ e_ehsize:=EHdr.e_ehsize;
+ e_phentsize:=EHdr.e_phentsize;
+ e_phnum:=EHdr.e_phnum;
+ e_shentsize:=EHdr.e_shentsize;
+ e_shnum:=EHdr.e_shnum;
+ e_shstrndx:=EHdr.e_shstrndx;
+end;
+
+procedure TELFEHdr.AssignTo64(out EHdr:TELF64EHdr);
+begin
+ EHdr.e_ident:=e_ident;
+ EHdr.e_type:=e_type;
+ EHdr.e_machine:=e_machine;
+ EHdr.e_version:=e_version;
+ EHdr.e_entry:=e_entry;
+ EHdr.e_phoff:=e_phoff;
+ EHdr.e_shoff:=e_shoff;
+ EHdr.e_flags:=e_flags;
+ EHdr.e_ehsize:=e_ehsize;
+ EHdr.e_phentsize:=e_phentsize;
+ EHdr.e_phnum:=e_phnum;
+ EHdr.e_shentsize:=e_shentsize;
+ EHdr.e_shnum:=e_shnum;
+ EHdr.e_shstrndx:=e_shstrndx;
 end;
 
 constructor TPACCLinker_ELF_ELF_Symbol.Create(const ALinker:TPACCLinker_ELF_ELF;const AName:TPACCRawByteString;const ASection:TPACCLinker_ELF_ELF_Section);
@@ -1332,7 +1438,21 @@ begin
 end;
 
 procedure TPACCLinker_ELF_ELF.AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String='');
+var EHdr32:TELF32EHdr;
+    EHdr64:TELF64EHdr;
+    EHdr:TELFEHdr;
 begin
+
+ AObjectStream.Seek(0,soBeginning);
+
+ if fIs64Bit then begin
+  AObjectStream.Read(EHdr64,SizeOf(TELF64EHdr));
+  EHdr.AssignFrom64(EHdr64);
+ end else begin
+  AObjectStream.Read(EHdr32,SizeOf(TELF32EHdr));
+  EHdr.AssignFrom32(EHdr32);
+ end;
+
 end;
 
 procedure TPACCLinker_ELF_ELF.AddResources(const AResourcesStream:TStream;const AResourcesFileName:TPUCUUTF8String=''); 
