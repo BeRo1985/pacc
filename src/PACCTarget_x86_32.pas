@@ -42,9 +42,22 @@ type TPACCTarget_x86_32=class(TPACCTarget)
 
      end;
 
+     TPACCTarget_x86_32_ELF_ELF=class(TPACCTarget_x86_32)
+      private
+
+      public
+
+       constructor Create(const AInstance:TObject); override;
+
+       class function GetName:TPACCRawByteString; override;
+
+       function GetDefaultOutputExtension:TPACCRawByteString; override;
+
+     end;
+
 implementation
 
-uses PACCInstance,PACCPreprocessor,SASMCore,PACCLinker_COFF_PE;
+uses PACCInstance,PACCPreprocessor,SASMCore,PACCLinker_COFF_PE,PACCLinker_ELF_ELF;
 
 constructor TPACCTarget_x86_32.Create(const AInstance:TObject);
 begin
@@ -186,8 +199,29 @@ begin
  end;
 end;
 
+constructor TPACCTarget_x86_32_ELF_ELF.Create(const AInstance:TObject);
+begin
+ inherited Create(AInstance);
+ LinkerClass:=TPACCLinker_ELF_ELF;
+end;
+
+class function TPACCTarget_x86_32_ELF_ELF.GetName:TPACCRawByteString;
+begin
+ result:='x86_32_elf_elf';
+end;
+
+function TPACCTarget_x86_32_ELF_ELF.GetDefaultOutputExtension:TPACCRawByteString;
+begin
+ if TPACCInstance(Instance).Options.CreateSharedLibrary then begin
+  result:='.so';
+ end else begin
+  result:='';
+ end;
+end;
+
 initialization
  PACCRegisterTarget(TPACCTarget_x86_32_COFF_PE);
+ PACCRegisterTarget(TPACCTarget_x86_32_ELF_ELF);
 end.
 
 

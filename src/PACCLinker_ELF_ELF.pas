@@ -330,7 +330,7 @@ const ET_NONE=0;
       SHT_DYNSYM=11; 
       SHT_INIT_ARRAY=14; 
       SHT_FINI_ARRAY=15;
-      SHT_PREINIT_ARRAY=16; 
+      SHT_PREINIT_ARRAY=16;
       SHT_GROUP=17; 
       SHT_SYMTAB_SHNDX=18; 
       SHT_LOOS=$60000000; 
@@ -362,7 +362,7 @@ const ET_NONE=0;
 
       // Symbol binding
       STB_LOCAL=0; 
-      STB_GLOBAL=1; 
+      STB_GLOBAL=1;
       STB_WEAK=2; 
       STB_LOOS=10; 
       STB_HIOS=12; 
@@ -394,7 +394,7 @@ const ET_NONE=0;
 
       // Relocation types
       R_386_NONE=0; 
-      R_X86_64_NONE=0; 
+      R_X86_64_NONE=0;
       R_386_32=1; 
       R_X86_64_64=1; 
       R_386_PC32=2; 
@@ -414,7 +414,7 @@ const ET_NONE=0;
       R_386_GOTOFF=9; 
       R_X86_64_GOTPCREL=9; 
       R_386_GOTPC=10; 
-      R_X86_64_32=10; 
+      R_X86_64_32=10;
       R_X86_64_32S=11;
       R_X86_64_16=12; 
       R_X86_64_PC16=13; 
@@ -426,7 +426,7 @@ const ET_NONE=0;
       R_X86_64_TLSGD=19; 
       R_X86_64_TLSLD=20; 
       R_X86_64_DTPOFF32=21; 
-      R_X86_64_GOTTPOFF=22; 
+      R_X86_64_GOTTPOFF=22;
       R_X86_64_TPOFF32=23; 
       R_X86_64_PC64=24; 
       R_X86_64_GOTOFF64=25; 
@@ -446,7 +446,7 @@ const ET_NONE=0;
       // Segment types
       PT_NULL=0; 
       PT_LOAD=1;
-      PT_DYNAMIC=2; 
+      PT_DYNAMIC=2;
       PT_INTERP=3;
       PT_NOTE=4; 
       PT_SHLIB=5; 
@@ -478,7 +478,7 @@ const ET_NONE=0;
       DT_STRSZ=10; 
       DT_SYMENT=11; 
       DT_INIT=12; 
-      DT_FINI=13; 
+      DT_FINI=13;
       DT_SONAME=14;
       DT_RPATH=15; 
       DT_SYMBOLIC=16;
@@ -490,7 +490,7 @@ const ET_NONE=0;
       DT_TEXTREL=22; 
       DT_JMPREL=23; 
       DT_BIND_NOW=24; 
-      DT_INIT_ARRAY=25; 
+      DT_INIT_ARRAY=25;
       DT_FINI_ARRAY=26; 
       DT_INIT_ARRAYSZ=27; 
       DT_FINI_ARRAYSZ=28; 
@@ -1116,7 +1116,7 @@ function ELF_HASH(Name:PAnsiChar):TPACCUInt64;
 
 implementation
 
-uses PACCInstance;
+uses PACCInstance,PACCTarget_x86_32;
 
 function ELF_ST_BIND(const i:TELFWord):TELFWord;
 begin
@@ -1318,6 +1318,12 @@ end;
 constructor TPACCLinker_ELF_ELF.Create(const AInstance:TObject);
 begin
  inherited Create(AInstance);
+
+ fIs64Bit:=false;
+
+ if TPACCInstance(Instance).Target is TPACCTarget_x86_32_ELF_ELF then begin
+  fMachine:=EM_386;
+ end; 
 
  fSections:=TPACCLinker_ELF_ELF_SectionList.Create;
 
