@@ -732,6 +732,26 @@ type PELFIdent=^TELFIdent;
       p_align:TELFXWord;
      end;
 
+     PELFCommonPHdr=^TELFCommonPHdr;
+     TELFCommonPHdr=packed record
+      p_type:TELFWord;
+     end;
+
+     PELF3264PHdr=^TELF3264PHdr;
+     TELF3264PHdr=packed record
+      case TPACCInt of
+       0:(
+        CommonPHdr:TELFCommonPHdr;
+        AfterCommonPHdr:pointer;
+       );
+       32:(
+        ELF32PHdr:TELF32PHdr;
+       );
+       64:(
+        ELF64PHdr:TELF64PHdr;
+       );
+     end;
+
      // Symbol table entry
      PELF32Sym=^TELF32Sym;
      TELF32Sym=packed record
@@ -751,6 +771,26 @@ type PELFIdent=^TELFIdent;
       st_shndx:TELFHalf;
       st_value:TELF64Addr;
       st_size:TELFXWord;
+     end;
+
+     PELFCommonSym=^TELFCommonSym;
+     TELFCommonSym=packed record
+      st_name:TELFWord;
+     end;
+
+     PELF3264Sym=^TELF3264Sym;
+     TELF3264Sym=packed record
+      case TPACCInt of
+       0:(
+        CommonSym:TELFCommonSym;
+        AfterCommonSym:pointer;
+       );
+       32:(
+        ELF32Sym:TELF32Sym;
+       );
+       64:(
+        ELF64Sym:TELF64Sym;
+       );
      end;
 
      // Relocation entries
@@ -911,7 +951,7 @@ type PELFIdent=^TELFIdent;
 
       public
 
-       constructor Create(const ALinker:TPACCLinker_ELF_ELF;const AName:TPACCRawByteString;const ASection:TPACCLinker_ELF_ELF_Section); reintroduce;
+       constructor Create(const ALinker:TPACCLinker_ELF_ELF); reintroduce;
        destructor Destroy; override;
 
       published
@@ -972,7 +1012,7 @@ type PELFIdent=^TELFIdent;
 
       public
 
-       constructor Create(const ALinker:TPACCLinker_ELF_ELF;const AName:TPACCRawByteString); reintroduce;
+       constructor Create(const ALinker:TPACCLinker_ELF_ELF); reintroduce;
        destructor Destroy; override;
 
       published
@@ -1183,15 +1223,15 @@ begin
  end;
 end;
 
-constructor TPACCLinker_ELF_ELF_Symbol.Create(const ALinker:TPACCLinker_ELF_ELF;const AName:TPACCRawByteString;const ASection:TPACCLinker_ELF_ELF_Section);
+constructor TPACCLinker_ELF_ELF_Symbol.Create(const ALinker:TPACCLinker_ELF_ELF);
 begin
  inherited Create;
 
  fLinker:=ALinker;
 
- fName:=AName;
+ fName:='';
 
- fSection:=ASection;
+ fSection:=nil;
 
  fActive:=true;
 
@@ -1270,12 +1310,14 @@ begin
  inherited Items[AIndex]:=pointer(AItem);
 end;
 
-constructor TPACCLinker_ELF_ELF_Section.Create(const ALinker:TPACCLinker_ELF_ELF;const AName:TPACCRawByteString);
+constructor TPACCLinker_ELF_ELF_Section.Create(const ALinker:TPACCLinker_ELF_ELF);
 var Index:TPACCInt32;
 begin
  inherited Create;
 
  fLinker:=ALinker;
+
+ fName:='';
 
  fStream:=TMemoryStream.Create;
 
@@ -1396,8 +1438,10 @@ procedure TPACCLinker_ELF_ELF.AddObject(const AObjectStream:TStream;const AObjec
 var SectionIndex:TPACCInt32;
     ELF3264EHdr:TELF3264EHdr;
     ELF3264SHdr:TELF3264SHdr;
+    ELF3264Sym:TELF3264Sym;
     LocalSections:TPACCLinker_ELF_ELF_SectionList;
     Section,SHStrTabSection,StrTabSection,SymTabSection:TPACCLinker_ELF_ELF_Section;
+    Symbol:TPACCLinker_ELF_ELF_Symbol;
     Name:TPACCRawByteString;
     c:AnsiChar;
 begin
@@ -1480,7 +1524,7 @@ begin
 
   for SectionIndex:=0 to ELF3264EHdr.ELF64EHdr.e_shnum-1 do begin
 
-   Section:=TPACCLinker_ELF_ELF_Section.Create(self,'');
+   Section:=TPACCLinker_ELF_ELF_Section.Create(self);
    Sections.Add(Section);
    LocalSections.Add(Section);
 
@@ -1576,7 +1620,51 @@ begin
    TPACCInstance(Instance).AddError('No ".symtab" section',nil,true);
   end;
 
-  
+  SymTabSection.Stream.Seek(0,soBeginning);
+  while SymTabSection.Stream.Position<SymTabSection.Stream.Size do begin
+   Symbol:=TPACCLinker_ELF_ELF_Symbol.Create(self);
+   Symbols.Add(Symbol);
+   if fIs64Bit then begin
+    SymTabSection.Stream.ReadBuffer(ELF3264Sym.ELF64Sym,SizeOf(TELF64Sym));
+    Symbol.st_name:=ELF3264Sym.ELF64Sym.st_name;
+    Symbol.st_info:=ELF3264Sym.ELF64Sym.st_info;
+    Symbol.st_other:=ELF3264Sym.ELF64Sym.st_other;
+    Symbol.st_shndx:=ELF3264Sym.ELF64Sym.st_shndx;
+    Symbol.st_value:=ELF3264Sym.ELF64Sym.st_value;
+    Symbol.st_size:=ELF3264Sym.ELF64Sym.st_size;
+   end else begin
+    SymTabSection.Stream.ReadBuffer(ELF3264Sym.ELF32Sym,SizeOf(TELF32Sym));
+    Symbol.st_name:=ELF3264Sym.ELF32Sym.st_name;
+    Symbol.st_info:=ELF3264Sym.ELF32Sym.st_info;
+    Symbol.st_other:=ELF3264Sym.ELF32Sym.st_other;
+    Symbol.st_shndx:=ELF3264Sym.ELF32Sym.st_shndx;
+    Symbol.st_value:=ELF3264Sym.ELF32Sym.st_value;
+    Symbol.st_size:=ELF3264Sym.ELF32Sym.st_size;
+   end;
+   if Symbol.st_name>0 then begin
+    if StrTabSection.Stream.Seek(Symbol.st_name,soBeginning)<>Symbol.st_name then begin
+     TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+    end;
+    Name:='';
+    while StrTabSection.Stream.Position<StrTabSection.Stream.Size do begin
+     StrTabSection.Stream.ReadBuffer(c,SizeOf(AnsiChar));
+     if c=#0 then begin
+      break;
+     end else begin
+      Name:=Name+c;
+     end;
+    end;
+    Symbol.Name:=Name;
+   end;
+   if Symbol.st_shndx<LocalSections.Count then begin
+    Symbol.Section:=LocalSections[Symbol.st_shndx];
+   end else begin
+    Symbol.Section:=nil;
+    if Symbol.st_shndx<SHN_LORESERVE then begin
+     TPACCInstance(Instance).AddError('Symbol section index out of range',nil,true);
+    end;
+   end;
+  end;
 
  finally
   LocalSections.Free;
