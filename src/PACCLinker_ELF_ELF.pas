@@ -1435,12 +1435,12 @@ begin
 end;
 
 procedure TPACCLinker_ELF_ELF.AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String='');
-var SectionIndex:TPACCInt32;
+var SectionIndex,SymTabSectionIndex:TPACCInt32;
     ELF3264EHdr:TELF3264EHdr;
     ELF3264SHdr:TELF3264SHdr;
     ELF3264Sym:TELF3264Sym;
     LocalSections:TPACCLinker_ELF_ELF_SectionList;
-    Section,SHStrTabSection,StrTabSection,SymTabSection:TPACCLinker_ELF_ELF_Section;
+    Section,SHStrTabSection,StrTabSection,SymTabSection,TargetSection:TPACCLinker_ELF_ELF_Section;
     Symbol:TPACCLinker_ELF_ELF_Symbol;
     Name:TPACCRawByteString;
     c:AnsiChar;
@@ -1584,6 +1584,8 @@ begin
   StrTabSection:=nil;
   SymTabSection:=nil;
 
+  SymTabSectionIndex:=-1;
+
   for SectionIndex:=0 to LocalSections.Count-1 do begin
    Section:=LocalSections[SectionIndex];
    if Section.sh_name>0 then begin
@@ -1604,6 +1606,7 @@ begin
      StrTabSection:=Section;
     end else if Name='.symtab' then begin
      SymTabSection:=Section;
+     SymTabSectionIndex:=SectionIndex;
     end;
    end;
   end;
@@ -1658,7 +1661,7 @@ begin
    end;
    if Symbol.st_shndx<LocalSections.Count then begin
     Symbol.Section:=LocalSections[Symbol.st_shndx];
-    Symbol.Section.Symbols.Add(Symbol);    
+    Symbol.Section.Symbols.Add(Symbol);
    end else begin
     Symbol.Section:=nil;
     if Symbol.st_shndx<SHN_LORESERVE then begin
@@ -1667,6 +1670,27 @@ begin
    end;
   end;
 
+  for SectionIndex:=0 to LocalSections.Count-1 do begin
+   Section:=LocalSections[SectionIndex];
+   case Section.sh_type of
+    SHT_REL,SHT_RELA:begin
+     if Section.sh_info<LocalSections.Count then begin
+      TargetSection:=LocalSections[Section.sh_info];
+      if ((Section.Name=('.rel'+TargetSection.Name)) or
+          (Section.Name=('.rela'+TargetSection.Name))) and
+         (Section.sh_link=SymTabSectionIndex) then begin
+       Section.Stream.Seek(0,soBeginning);
+       
+      end else begin
+       TPACCInstance(Instance).AddError('Corrupt relocation section "'+Section.Name+'"',nil,true);
+      end;
+     end else begin
+      TPACCInstance(Instance).AddError('Section "'+Section.Name+'" section index out of range',nil,true);
+     end;
+    end;
+   end;
+  end;
+  
  finally
   LocalSections.Free;
  end;
