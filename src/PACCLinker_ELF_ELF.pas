@@ -951,6 +951,43 @@ type PELFIdent=^TELFIdent;
 
      TPACCLinker_ELF_ELF=class;
 
+     TPACCLinker_ELF_ELF_Import=class
+      public
+       Used:boolean;
+       SymbolName:TPUCUUTF8String;
+       ImportLibraryName:TPUCUUTF8String;
+       ImportName:TPUCUUTF8String;
+       CodeSectionOffset:TPACCUInt64;
+       NameOffset:TPACCUInt64;
+     end;
+
+     TPACCLinker_ELF_ELF_ImportList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Import;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Import);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Import read GetItem write SetItem; default;
+     end;
+
+     TPACCLinker_ELF_ELF_Export=class
+      public
+       Used:boolean;
+       SymbolName:TPUCUUTF8String;
+       ExportName:TPUCUUTF8String;
+     end;
+
+     TPACCLinker_ELF_ELF_ExportList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Export;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Export);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Export read GetItem write SetItem; default;
+     end;
+
      TPACCLinker_ELF_ELF_Section=class;
 
      TPACCLinker_ELF_ELF_Symbol=class
@@ -1129,41 +1166,46 @@ type PELFIdent=^TELFIdent;
        property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Section read GetItem write SetItem; default;
      end;
 
-     TPACCLinker_ELF_ELF_Import=class
+     TPACCLinker_ELF_ELF_Image=class
+      private
+
+       fLinker:TPACCLinker_ELF_ELF;
+
+       fName:TPACCRawByteString;
+
+       fSections:TPACCLinker_ELF_ELF_SectionList;
+
+       fSymbols:TPACCLinker_ELF_ELF_SymbolList;
+
+       fActive:boolean;
+
       public
-       Used:boolean;
-       SymbolName:TPUCUUTF8String;
-       ImportLibraryName:TPUCUUTF8String;
-       ImportName:TPUCUUTF8String;
-       CodeSectionOffset:TPACCUInt64;
-       NameOffset:TPACCUInt64;
+
+       constructor Create(const ALinker:TPACCLinker_ELF_ELF); reintroduce;
+       destructor Destroy; override;
+
+      published
+
+       property Linker:TPACCLinker_ELF_ELF read fLinker;
+
+       property Name:TPACCRawByteString read fName write fName;
+
+       property Sections:TPACCLinker_ELF_ELF_SectionList read fSections write fSections;
+
+       property Symbols:TPACCLinker_ELF_ELF_SymbolList read fSymbols write fSymbols;
+
+       property Active:boolean read fActive write fActive;
+
      end;
 
-     TPACCLinker_ELF_ELF_ImportList=class(TList)
+     TPACCLinker_ELF_ELF_ImageList=class(TList)
       private
-       function GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Import;
-       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Import);
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Image;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Image);
       public
        constructor Create;
        destructor Destroy; override;
-       property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Import read GetItem write SetItem; default;
-     end;
-
-     TPACCLinker_ELF_ELF_Export=class
-      public
-       Used:boolean;
-       SymbolName:TPUCUUTF8String;
-       ExportName:TPUCUUTF8String;
-     end;
-
-     TPACCLinker_ELF_ELF_ExportList=class(TList)
-      private
-       function GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Export;
-       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Export);
-      public
-       constructor Create;
-       destructor Destroy; override;
-       property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Export read GetItem write SetItem; default;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Image read GetItem write SetItem; default;
      end;
 
      TPACCLinker_ELF_ELF=class(TPACCLinker)
@@ -1173,9 +1215,7 @@ type PELFIdent=^TELFIdent;
 
        fMachine:TPACCInt32;
 
-       fSections:TPACCLinker_ELF_ELF_SectionList;
-
-       fSymbols:TPACCLinker_ELF_ELF_SymbolList;
+       fImages:TPACCLinker_ELF_ELF_ImageList;
 
        fImports:TPACCLinker_ELF_ELF_ImportList;
        fImportSymbolNameHashMap:TPACCRawByteStringHashMap;
@@ -1204,9 +1244,7 @@ type PELFIdent=^TELFIdent;
 
        property Machine:TPACCInt32 read fMachine write fMachine;
 
-       property Sections:TPACCLinker_ELF_ELF_SectionList read fSections;
-
-       property Symbols:TPACCLinker_ELF_ELF_SymbolList read fSymbols;
+       property Images:TPACCLinker_ELF_ELF_ImageList read fImages;
 
        property Imports_:TPACCLinker_ELF_ELF_ImportList read fImports;
 
@@ -1430,7 +1468,7 @@ procedure TPACCLinker_ELF_ELF_RelocationList.SetItem(const AIndex:TPACCInt;const
 begin
  inherited Items[AIndex]:=pointer(AItem);
 end;
- 
+
 constructor TPACCLinker_ELF_ELF_Section.Create(const ALinker:TPACCLinker_ELF_ELF);
 var Index:TPACCInt32;
 begin
@@ -1482,29 +1520,23 @@ begin
  inherited Items[AIndex]:=pointer(AItem);
 end;
 
-constructor TPACCLinker_ELF_ELF.Create(const AInstance:TObject);
+constructor TPACCLinker_ELF_ELF_Image.Create(const ALinker:TPACCLinker_ELF_ELF);
 begin
- inherited Create(AInstance);
+ inherited Create;
 
- fIs64Bit:=false;
+ fLinker:=ALinker;
 
- if TPACCInstance(Instance).Target is TPACCTarget_x86_32_ELF_ELF then begin
-  fMachine:=EM_386;
- end; 
+ fName:='';
 
  fSections:=TPACCLinker_ELF_ELF_SectionList.Create;
 
  fSymbols:=TPACCLinker_ELF_ELF_SymbolList.Create;
 
- fImports:=TPACCLinker_ELF_ELF_ImportList.Create;
- fImportSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
-
- fExports:=TPACCLinker_ELF_ELF_ExportList.Create;
- fExportSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
+ fActive:=true;
 
 end;
 
-destructor TPACCLinker_ELF_ELF.Destroy;
+destructor TPACCLinker_ELF_ELF_Image.Destroy;
 begin
 
  while fSymbols.Count>0 do begin
@@ -1518,6 +1550,58 @@ begin
   fSections.Delete(fSections.Count-1);
  end;
  fSections.Free;
+
+ inherited Destroy;
+end;
+
+constructor TPACCLinker_ELF_ELF_ImageList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCLinker_ELF_ELF_ImageList.Destroy;
+begin
+ while Count>0 do begin
+  Items[Count-1].Free;
+  Delete(Count-1);
+ end;
+ inherited Destroy;
+end;
+
+function TPACCLinker_ELF_ELF_ImageList.GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Image;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCLinker_ELF_ELF_ImageList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Image);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
+constructor TPACCLinker_ELF_ELF.Create(const AInstance:TObject);
+begin
+ inherited Create(AInstance);
+
+ fIs64Bit:=false;
+
+ if TPACCInstance(Instance).Target is TPACCTarget_x86_32_ELF_ELF then begin
+  fMachine:=EM_386;
+ end;
+
+ fImages:=TPACCLinker_ELF_ELF_ImageList.Create;
+
+ fImports:=TPACCLinker_ELF_ELF_ImportList.Create;
+ fImportSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
+
+ fExports:=TPACCLinker_ELF_ELF_ExportList.Create;
+ fExportSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
+
+end;
+
+destructor TPACCLinker_ELF_ELF.Destroy;
+begin
+
+ fImages.Free;
 
  fImports.Free;
  fImportSymbolNameHashMap.Free;
@@ -1566,7 +1650,7 @@ var SectionIndex,SymTabSectionIndex,SymbolIndex:TPACCInt32;
     ELF3264Sym:TELF3264Sym;
     ELF3264Rel:TELF3264Rel;
     ELF3264Rela:TELF3264Rela;
-    LocalSections:TPACCLinker_ELF_ELF_SectionList;
+    Image:TPACCLinker_ELF_ELF_Image;
     Section,SHStrTabSection,StrTabSection,SymTabSection,TargetSection:TPACCLinker_ELF_ELF_Section;
     Symbol:TPACCLinker_ELF_ELF_Symbol;
     Relocation:TPACCLinker_ELF_ELF_Relocation;
@@ -1647,14 +1731,15 @@ begin
   TPACCInstance(Instance).AddError('Stream seek error',nil,true);
  end;
 
- LocalSections:=TPACCLinker_ELF_ELF_SectionList.Create;
+ Image:=TPACCLinker_ELF_ELF_Image.Create(self);
+ Images.Add(Image);
+
  try
 
   for SectionIndex:=0 to ELF3264EHdr.ELF64EHdr.e_shnum-1 do begin
 
    Section:=TPACCLinker_ELF_ELF_Section.Create(self);
-   Sections.Add(Section);
-   LocalSections.Add(Section);
+   Image.Sections.Add(Section);
 
    if fIs64Bit then begin
 
@@ -1690,8 +1775,8 @@ begin
 
   end;
 
-  for SectionIndex:=0 to LocalSections.Count-1 do begin
-   Section:=LocalSections[SectionIndex];
+  for SectionIndex:=0 to Image.Sections.Count-1 do begin
+   Section:=Image.Sections[SectionIndex];
    if Section.sh_size>0 then begin
     if AObjectStream.Seek(Section.sh_offset,soBeginning)<>Section.sh_offset then begin
      TPACCInstance(Instance).AddError('Stream seek error',nil,true);
@@ -1702,8 +1787,8 @@ begin
    end;
   end;
 
-  if ELF3264EHdr.ELF64EHdr.e_shstrndx<LocalSections.Count then begin
-   SHStrTabSection:=LocalSections[ELF3264EHdr.ELF64EHdr.e_shstrndx];
+  if ELF3264EHdr.ELF64EHdr.e_shstrndx<Image.Sections.Count then begin
+   SHStrTabSection:=Image.Sections[ELF3264EHdr.ELF64EHdr.e_shstrndx];
   end else begin
    SHStrTabSection:=nil;
    TPACCInstance(Instance).AddError('No ".shstrtab" section',nil,true);
@@ -1714,8 +1799,8 @@ begin
 
   SymTabSectionIndex:=-1;
 
-  for SectionIndex:=0 to LocalSections.Count-1 do begin
-   Section:=LocalSections[SectionIndex];
+  for SectionIndex:=0 to Image.Sections.Count-1 do begin
+   Section:=Image.Sections[SectionIndex];
    if Section.sh_name>0 then begin
     if SHStrTabSection.Stream.Seek(Section.sh_name,soBeginning)<>Section.sh_name then begin
      TPACCInstance(Instance).AddError('Stream seek error',nil,true);
@@ -1754,7 +1839,7 @@ begin
   SymTabSection.Stream.Seek(0,soBeginning);
   while SymTabSection.Stream.Position<SymTabSection.Stream.Size do begin
    Symbol:=TPACCLinker_ELF_ELF_Symbol.Create(self);
-   Symbols.Add(Symbol);
+   Image.Symbols.Add(Symbol);
    if fIs64Bit then begin
     SymTabSection.Stream.ReadBuffer(ELF3264Sym.ELF64Sym,SizeOf(TELF64Sym));
     Symbol.st_name:=ELF3264Sym.ELF64Sym.st_name;
@@ -1789,8 +1874,8 @@ begin
    end;
    if Symbol.st_shndx=SHN_UNDEF then begin
     Symbol.Section:=nil;
-   end else if Symbol.st_shndx<LocalSections.Count then begin
-    Symbol.Section:=LocalSections[Symbol.st_shndx];
+   end else if Symbol.st_shndx<Image.Sections.Count then begin
+    Symbol.Section:=Image.Sections[Symbol.st_shndx];
     Symbol.Section.Symbols.Add(Symbol);
    end else if Symbol.st_shndx<SHN_LORESERVE then begin
     TPACCInstance(Instance).AddError('Symbol section index out of range',nil,true);
@@ -1799,12 +1884,12 @@ begin
    end;
   end;
 
-  for SectionIndex:=0 to LocalSections.Count-1 do begin
-   Section:=LocalSections[SectionIndex];
+  for SectionIndex:=0 to Image.Sections.Count-1 do begin
+   Section:=Image.Sections[SectionIndex];
    case Section.sh_type of
     SHT_REL,SHT_RELA:begin
-     if Section.sh_info<LocalSections.Count then begin
-      TargetSection:=LocalSections[Section.sh_info];
+     if Section.sh_info<Image.Sections.Count then begin
+      TargetSection:=Image.Sections[Section.sh_info];
       if (((Section.sh_type=SHT_REL) and (Section.Name=('.rel'+TargetSection.Name))) or
           ((Section.sh_type=SHT_RELA) and (Section.Name=('.rela'+TargetSection.Name)))) and
          (Section.sh_link=SymTabSectionIndex) then begin
@@ -1842,8 +1927,8 @@ begin
          end;
         end;
         SymbolIndex:=Relocation.r_info shr 32;
-        if SymbolIndex<Symbols.Count then begin
-         Relocation.Symbol:=Symbols[SymbolIndex];
+        if SymbolIndex<Image.Symbols.Count then begin
+         Relocation.Symbol:=Image.Symbols[SymbolIndex];
         end else begin
          TPACCInstance(Instance).AddError('Section "'+Section.Name+'" relocation symbol index out of range',nil,true);
         end;
@@ -1857,9 +1942,8 @@ begin
     end;
    end;
   end;
-  
+
  finally
-  LocalSections.Free;
  end;
 
 end;
