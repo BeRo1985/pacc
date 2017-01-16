@@ -1951,10 +1951,30 @@ end;
 
 procedure TPACCLinker_ELF_ELF.Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
 var OutputImage:TPACCLinker_ELF_ELF_Image;
+    ImageIndex,ImageSectionIndex:TPACCInt32;
+    Image:TPACCLinker_ELF_ELF_Image;
+    ImageSection:TPACCLinker_ELF_ELF_Section;
 begin
+
  OutputImage:=TPACCLinker_ELF_ELF_Image.Create(self);
  try
+
   OutputImage.Name:=AOutputFileName;
+
+  for ImageIndex:=0 to Images.Count-1 do begin
+
+   Image:=Images[ImageIndex];
+
+   for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
+
+    ImageSection:=Image.Sections[ImageSectionIndex];
+
+    
+
+   end;
+
+  end;
+
  finally
   OutputImage.Free;
  end;
