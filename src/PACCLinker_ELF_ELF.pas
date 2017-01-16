@@ -820,6 +820,28 @@ type PELFIdent=^TELFIdent;
       r_addend:TELFSXWord;
      end;
 
+     PELF3264Rel=^TELF3264Rel;
+     TELF3264Rel=packed record
+      case TPACCInt of
+       32:(
+        ELF32Rel:TELF32Rel;
+       );
+       64:(
+        ELF64Rel:TELF64Rel;
+       );
+     end;
+
+     PELF3264Rela=^TELF3264Rela;
+     TELF3264Rela=packed record
+      case TPACCInt of
+       32:(
+        ELF32Rela:TELF32Rela;
+       );
+       64:(
+        ELF64Rela:TELF64Rela;
+       );
+     end;
+
      // Dynamic structure
      PELF32Dyn=^TELF32Dyn;
      TELF32Dyn=packed record
@@ -1439,6 +1461,8 @@ var SectionIndex,SymTabSectionIndex:TPACCInt32;
     ELF3264EHdr:TELF3264EHdr;
     ELF3264SHdr:TELF3264SHdr;
     ELF3264Sym:TELF3264Sym;
+    ELF3264Rel:TELF3264Rel;
+    ELF3264Rela:TELF3264Rela;
     LocalSections:TPACCLinker_ELF_ELF_SectionList;
     Section,SHStrTabSection,StrTabSection,SymTabSection,TargetSection:TPACCLinker_ELF_ELF_Section;
     Symbol:TPACCLinker_ELF_ELF_Symbol;
@@ -1676,11 +1700,28 @@ begin
     SHT_REL,SHT_RELA:begin
      if Section.sh_info<LocalSections.Count then begin
       TargetSection:=LocalSections[Section.sh_info];
-      if ((Section.Name=('.rel'+TargetSection.Name)) or
-          (Section.Name=('.rela'+TargetSection.Name))) and
+      if (((Section.sh_type=SHT_REL) and (Section.Name=('.rel'+TargetSection.Name))) or
+          ((Section.sh_type=SHT_RELA) and (Section.Name=('.rela'+TargetSection.Name)))) and
          (Section.sh_link=SymTabSectionIndex) then begin
        Section.Stream.Seek(0,soBeginning);
-       
+       while Section.Stream.Position<Section.Stream.Size do begin
+        case Section.sh_type of
+         SHT_REL:begin
+          if Is64Bit then begin
+           Section.Stream.ReadBuffer(ELF3264Rel.ELF64Rel,SizeOf(TELF64Rel));
+          end else begin
+           Section.Stream.ReadBuffer(ELF3264Rel.ELF32Rel,SizeOf(TELF32Rel));
+          end;
+         end;
+         else {SHT_RELA:}begin
+          if Is64Bit then begin
+           Section.Stream.ReadBuffer(ELF3264Rela.ELF64Rela,SizeOf(TELF64Rela));
+          end else begin
+           Section.Stream.ReadBuffer(ELF3264Rela.ELF32Rela,SizeOf(TELF32Rela));
+          end;
+         end;
+        end;
+       end;
       end else begin
        TPACCInstance(Instance).AddError('Corrupt relocation section "'+Section.Name+'"',nil,true);
       end;
