@@ -1658,6 +1658,7 @@ begin
    end;
    if Symbol.st_shndx<LocalSections.Count then begin
     Symbol.Section:=LocalSections[Symbol.st_shndx];
+    Symbol.Section.Symbols.Add(Symbol);    
    end else begin
     Symbol.Section:=nil;
     if Symbol.st_shndx<SHN_LORESERVE then begin
