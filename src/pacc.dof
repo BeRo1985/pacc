@@ -100,7 +100,7 @@ Conditionals=
 DebugSourceDirs=
 UsePackages=0
 [Parameters]
-RunParams=helloworld_win32.asm
+RunParams=-t x86_32_elf_elf elf32.asm
 HostApplication=
 Launcher=
 UseLauncher=0

@@ -1397,7 +1397,7 @@ var SectionIndex:TPACCInt32;
     ELF3264EHdr:TELF3264EHdr;
     ELF3264SHdr:TELF3264SHdr;
     LocalSections:TPACCLinker_ELF_ELF_SectionList;
-    Section,SHStrTabSection:TPACCLinker_ELF_ELF_Section;
+    Section,SHStrTabSection,StrTabSection,SymTabSection:TPACCLinker_ELF_ELF_Section;
     Name:TPACCRawByteString;
     c:AnsiChar;
 begin
@@ -1534,8 +1534,11 @@ begin
    SHStrTabSection:=LocalSections[ELF3264EHdr.ELF64EHdr.e_shstrndx];
   end else begin
    SHStrTabSection:=nil;
-   TPACCInstance(Instance).AddError('No .shstrtab section',nil,true);
+   TPACCInstance(Instance).AddError('No ".shstrtab" section',nil,true);
   end;
+
+  StrTabSection:=nil;
+  SymTabSection:=nil;
 
   for SectionIndex:=0 to LocalSections.Count-1 do begin
    Section:=LocalSections[SectionIndex];
@@ -1553,8 +1556,27 @@ begin
      end;
     end;
     Section.Name:=Name;
+    if Name='.strtab' then begin
+     StrTabSection:=Section;
+    end else if Name='.symtab' then begin
+     SymTabSection:=Section;
+    end;
    end;
   end;
+
+  if SHStrTabSection.Name<>'.shstrtab' then begin
+   TPACCInstance(Instance).AddError('".shstrtab" section have wrong name',nil,true);
+  end;
+
+  if not assigned(StrTabSection) then begin
+   TPACCInstance(Instance).AddError('No ".strtab" section',nil,true);
+  end;
+
+  if not assigned(SymTabSection) then begin
+   TPACCInstance(Instance).AddError('No ".symtab" section',nil,true);
+  end;
+
+  
 
  finally
   LocalSections.Free;
