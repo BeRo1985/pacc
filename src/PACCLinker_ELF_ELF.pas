@@ -1005,6 +1005,54 @@ type PELFIdent=^TELFIdent;
        property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Symbol read GetItem write SetItem; default;
      end;
 
+     TPACCLinker_ELF_ELF_Relocation=class
+      private
+
+       fLinker:TPACCLinker_ELF_ELF;
+
+       fName:TPACCRawByteString;
+
+       fSection:TPACCLinker_ELF_ELF_Section;
+
+       fSymbol:TPACCLinker_ELF_ELF_Symbol;
+
+       fr_offset:TELF64Addr;
+       fr_info:TELFXWord;
+       fr_addend:TELFSXWord;
+
+       fActive:boolean;
+
+      public
+
+       constructor Create(const ALinker:TPACCLinker_ELF_ELF); reintroduce;
+       destructor Destroy; override;
+
+      published
+
+       property Linker:TPACCLinker_ELF_ELF read fLinker;
+
+       property Name:TPACCRawByteString read fName write fName;
+
+       property Section:TPACCLinker_ELF_ELF_Section read fSection write fSection;
+
+       property r_offset:TELF64Addr read fr_offset write fr_offset;
+       property r_info:TELFXWord read fr_info write fr_info;
+       property r_addend:TELFSXWord read fr_addend write fr_addend;
+
+       property Active:boolean read fActive write fActive;
+
+     end;
+
+     TPACCLinker_ELF_ELF_RelocationList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Relocation;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Relocation);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCLinker_ELF_ELF_Relocation read GetItem write SetItem; default;
+     end;
+
      TPACCLinker_ELF_ELF_Section=class
       private
 
@@ -1029,6 +1077,8 @@ type PELFIdent=^TELFIdent;
        fsh_entsize:TPACCUInt64;
 
        fSymbols:TPACCLinker_ELF_ELF_SymbolList;
+
+       fRelocations:TPACCLinker_ELF_ELF_RelocationList;
 
        fActive:boolean;
 
@@ -1060,6 +1110,8 @@ type PELFIdent=^TELFIdent;
        property sh_entsize:TPACCUInt64 read fsh_entsize write fsh_entsize;
 
        property Symbols:TPACCLinker_ELF_ELF_SymbolList read fSymbols;
+
+       property Relocations:TPACCLinker_ELF_ELF_RelocationList read fRelocations;
 
        property Active:boolean read fActive write fActive;
 
@@ -1245,20 +1297,6 @@ begin
  end;
 end;
 
-constructor TPACCLinker_ELF_ELF_Symbol.Create(const ALinker:TPACCLinker_ELF_ELF);
-begin
- inherited Create;
-
- fLinker:=ALinker;
-
- fName:='';
-
- fSection:=nil;
-
- fActive:=true;
-
-end;
-
 constructor TPACCLinker_ELF_ELF_ImportList.Create;
 begin
  inherited Create;
@@ -1307,6 +1345,20 @@ begin
  inherited Items[AIndex]:=pointer(AItem);
 end;
 
+constructor TPACCLinker_ELF_ELF_Symbol.Create(const ALinker:TPACCLinker_ELF_ELF);
+begin
+ inherited Create;
+
+ fLinker:=ALinker;
+
+ fName:='';
+
+ fSection:=nil;
+
+ fActive:=true;
+
+end;
+
 destructor TPACCLinker_ELF_ELF_Symbol.Destroy;
 begin
  inherited Destroy;
@@ -1332,6 +1384,51 @@ begin
  inherited Items[AIndex]:=pointer(AItem);
 end;
 
+constructor TPACCLinker_ELF_ELF_Relocation.Create(const ALinker:TPACCLinker_ELF_ELF);
+begin
+ inherited Create;
+
+ fLinker:=ALinker;
+
+ fName:='';
+
+ fSection:=nil;
+
+ fSymbol:=nil;
+
+ fActive:=true;
+
+end;
+
+destructor TPACCLinker_ELF_ELF_Relocation.Destroy;
+begin
+ inherited Destroy;
+end;
+
+constructor TPACCLinker_ELF_ELF_RelocationList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCLinker_ELF_ELF_RelocationList.Destroy;
+begin
+ while Count>0 do begin
+  Items[Count-1].Free;
+  Delete(Count-1);
+ end;
+ inherited Destroy;
+end;
+
+function TPACCLinker_ELF_ELF_RelocationList.GetItem(const AIndex:TPACCInt):TPACCLinker_ELF_ELF_Relocation;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCLinker_ELF_ELF_RelocationList.SetItem(const AIndex:TPACCInt;const AItem:TPACCLinker_ELF_ELF_Relocation);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+ 
 constructor TPACCLinker_ELF_ELF_Section.Create(const ALinker:TPACCLinker_ELF_ELF);
 var Index:TPACCInt32;
 begin
@@ -1345,6 +1442,8 @@ begin
 
  fSymbols:=TPACCLinker_ELF_ELF_SymbolList.Create;
 
+ fRelocations:=TPACCLinker_ELF_ELF_RelocationList.Create;
+
  fActive:=true;
 
 end;
@@ -1355,6 +1454,8 @@ begin
  fStream.Free;
 
  fSymbols.Free;
+
+ fRelocations.Free;
 
  inherited Destroy;
 end;
@@ -1466,6 +1567,7 @@ var SectionIndex,SymTabSectionIndex:TPACCInt32;
     LocalSections:TPACCLinker_ELF_ELF_SectionList;
     Section,SHStrTabSection,StrTabSection,SymTabSection,TargetSection:TPACCLinker_ELF_ELF_Section;
     Symbol:TPACCLinker_ELF_ELF_Symbol;
+    Relocation:TPACCLinker_ELF_ELF_Relocation;
     Name:TPACCRawByteString;
     c:AnsiChar;
 begin
@@ -1705,19 +1807,34 @@ begin
          (Section.sh_link=SymTabSectionIndex) then begin
        Section.Stream.Seek(0,soBeginning);
        while Section.Stream.Position<Section.Stream.Size do begin
+        Relocation:=TPACCLinker_ELF_ELF_Relocation.Create(self);
+        TargetSection.Relocations.Add(Relocation);
+        Relocation.Section:=TargetSection;
         case Section.sh_type of
          SHT_REL:begin
           if Is64Bit then begin
            Section.Stream.ReadBuffer(ELF3264Rel.ELF64Rel,SizeOf(TELF64Rel));
+           Relocation.r_offset:=ELF3264Rel.ELF64Rel.r_offset;
+           Relocation.r_info:=ELF3264Rel.ELF64Rel.r_info;
+           Relocation.r_addend:=0;
           end else begin
            Section.Stream.ReadBuffer(ELF3264Rel.ELF32Rel,SizeOf(TELF32Rel));
+           Relocation.r_offset:=ELF3264Rel.ELF32Rel.r_offset;
+           Relocation.r_info:=((TELFXWord(ELF3264Rel.ELF32Rel.r_info) and $ffffff00) shl 24) or (ELF3264Rel.ELF32Rel.r_info and $ff);
+           Relocation.r_addend:=0;
           end;
          end;
          else {SHT_RELA:}begin
           if Is64Bit then begin
            Section.Stream.ReadBuffer(ELF3264Rela.ELF64Rela,SizeOf(TELF64Rela));
+           Relocation.r_offset:=ELF3264Rela.ELF64Rela.r_offset;
+           Relocation.r_info:=ELF3264Rela.ELF64Rela.r_info;
+           Relocation.r_addend:=ELF3264Rela.ELF64Rela.r_addend;
           end else begin
            Section.Stream.ReadBuffer(ELF3264Rela.ELF32Rela,SizeOf(TELF32Rela));
+           Relocation.r_offset:=ELF3264Rela.ELF32Rela.r_offset;
+           Relocation.r_info:=((TELFXWord(ELF3264Rela.ELF32Rela.r_info) and $ffffff00) shl 24) or (ELF3264Rela.ELF32Rela.r_info and $ff);
+           Relocation.r_addend:=ELF3264Rela.ELF32Rela.r_addend;
           end;
          end;
         end;
