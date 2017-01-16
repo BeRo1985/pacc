@@ -1787,14 +1787,15 @@ begin
     end;
     Symbol.Name:=Name;
    end;
-   if Symbol.st_shndx<LocalSections.Count then begin
+   if Symbol.st_shndx=SHN_UNDEF then begin
+    Symbol.Section:=nil;
+   end else if Symbol.st_shndx<LocalSections.Count then begin
     Symbol.Section:=LocalSections[Symbol.st_shndx];
     Symbol.Section.Symbols.Add(Symbol);
+   end else if Symbol.st_shndx<SHN_LORESERVE then begin
+    TPACCInstance(Instance).AddError('Symbol section index out of range',nil,true);
    end else begin
     Symbol.Section:=nil;
-    if Symbol.st_shndx<SHN_LORESERVE then begin
-     TPACCInstance(Instance).AddError('Symbol section index out of range',nil,true);
-    end;
    end;
   end;
 
@@ -1843,8 +1844,6 @@ begin
         SymbolIndex:=Relocation.r_info shr 32;
         if SymbolIndex<Symbols.Count then begin
          Relocation.Symbol:=Symbols[SymbolIndex];
-         if assigned(Relocation.Symbol) then begin
-         end;
         end else begin
          TPACCInstance(Instance).AddError('Section "'+Section.Name+'" relocation symbol index out of range',nil,true);
         end;
