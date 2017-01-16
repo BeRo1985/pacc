@@ -1177,6 +1177,12 @@ type PELFIdent=^TELFIdent;
 
        fSymbols:TPACCLinker_ELF_ELF_SymbolList;
 
+       fSHStrTabSection:TPACCLinker_ELF_ELF_Section;
+
+       fStrTabSection:TPACCLinker_ELF_ELF_Section;
+
+       fSymTabSection:TPACCLinker_ELF_ELF_Section;
+
        fActive:boolean;
 
       public
@@ -1193,6 +1199,12 @@ type PELFIdent=^TELFIdent;
        property Sections:TPACCLinker_ELF_ELF_SectionList read fSections write fSections;
 
        property Symbols:TPACCLinker_ELF_ELF_SymbolList read fSymbols write fSymbols;
+
+       property SHStrTabSection:TPACCLinker_ELF_ELF_Section read fSHStrTabSection write fSHStrTabSection;
+
+       property StrTabSection:TPACCLinker_ELF_ELF_Section read fStrTabSection write fStrTabSection;
+
+       property SymTabSection:TPACCLinker_ELF_ELF_Section read fSymTabSection write fSymTabSection;
 
        property Active:boolean read fActive write fActive;
 
@@ -1651,7 +1663,7 @@ var SectionIndex,SymTabSectionIndex,SymbolIndex:TPACCInt32;
     ELF3264Rel:TELF3264Rel;
     ELF3264Rela:TELF3264Rela;
     Image:TPACCLinker_ELF_ELF_Image;
-    Section,SHStrTabSection,StrTabSection,SymTabSection,TargetSection:TPACCLinker_ELF_ELF_Section;
+    Section,TargetSection:TPACCLinker_ELF_ELF_Section;
     Symbol:TPACCLinker_ELF_ELF_Symbol;
     Relocation:TPACCLinker_ELF_ELF_Relocation;
     Name:TPACCRawByteString;
@@ -1788,26 +1800,26 @@ begin
  end;
 
  if ELF3264EHdr.ELF64EHdr.e_shstrndx<Image.Sections.Count then begin
-  SHStrTabSection:=Image.Sections[ELF3264EHdr.ELF64EHdr.e_shstrndx];
+  Image.SHStrTabSection:=Image.Sections[ELF3264EHdr.ELF64EHdr.e_shstrndx];
  end else begin
-  SHStrTabSection:=nil;
+  Image.SHStrTabSection:=nil;
   TPACCInstance(Instance).AddError('No ".shstrtab" section',nil,true);
  end;
 
- StrTabSection:=nil;
- SymTabSection:=nil;
+ Image.StrTabSection:=nil;
+ Image.SymTabSection:=nil;
 
  SymTabSectionIndex:=-1;
 
  for SectionIndex:=0 to Image.Sections.Count-1 do begin
   Section:=Image.Sections[SectionIndex];
   if Section.sh_name>0 then begin
-   if SHStrTabSection.Stream.Seek(Section.sh_name,soBeginning)<>Section.sh_name then begin
+   if Image.SHStrTabSection.Stream.Seek(Section.sh_name,soBeginning)<>Section.sh_name then begin
     TPACCInstance(Instance).AddError('Stream seek error',nil,true);
    end;
    Name:='';
-   while SHStrTabSection.Stream.Position<SHStrTabSection.Stream.Size do begin
-    SHStrTabSection.Stream.ReadBuffer(c,SizeOf(AnsiChar));
+   while Image.SHStrTabSection.Stream.Position<Image.SHStrTabSection.Stream.Size do begin
+    Image.SHStrTabSection.Stream.ReadBuffer(c,SizeOf(AnsiChar));
     if c=#0 then begin
      break;
     end else begin
@@ -1816,32 +1828,32 @@ begin
    end;
    Section.Name:=Name;
    if Name='.strtab' then begin
-    StrTabSection:=Section;
+    Image.StrTabSection:=Section;
    end else if Name='.symtab' then begin
-    SymTabSection:=Section;
+    Image.SymTabSection:=Section;
     SymTabSectionIndex:=SectionIndex;
    end;
   end;
  end;
 
- if SHStrTabSection.Name<>'.shstrtab' then begin
+ if Image.SHStrTabSection.Name<>'.shstrtab' then begin
   TPACCInstance(Instance).AddError('".shstrtab" section have wrong name',nil,true);
  end;
 
- if not assigned(StrTabSection) then begin
+ if not assigned(Image.StrTabSection) then begin
   TPACCInstance(Instance).AddError('No ".strtab" section',nil,true);
  end;
 
- if not assigned(SymTabSection) then begin
+ if not assigned(Image.SymTabSection) then begin
   TPACCInstance(Instance).AddError('No ".symtab" section',nil,true);
  end;
 
- SymTabSection.Stream.Seek(0,soBeginning);
- while SymTabSection.Stream.Position<SymTabSection.Stream.Size do begin
+ Image.SymTabSection.Stream.Seek(0,soBeginning);
+ while Image.SymTabSection.Stream.Position<Image.SymTabSection.Stream.Size do begin
   Symbol:=TPACCLinker_ELF_ELF_Symbol.Create(self);
   Image.Symbols.Add(Symbol);
   if fIs64Bit then begin
-   SymTabSection.Stream.ReadBuffer(ELF3264Sym.ELF64Sym,SizeOf(TELF64Sym));
+   Image.SymTabSection.Stream.ReadBuffer(ELF3264Sym.ELF64Sym,SizeOf(TELF64Sym));
    Symbol.st_name:=ELF3264Sym.ELF64Sym.st_name;
    Symbol.st_info:=ELF3264Sym.ELF64Sym.st_info;
    Symbol.st_other:=ELF3264Sym.ELF64Sym.st_other;
@@ -1849,7 +1861,7 @@ begin
    Symbol.st_value:=ELF3264Sym.ELF64Sym.st_value;
    Symbol.st_size:=ELF3264Sym.ELF64Sym.st_size;
   end else begin
-   SymTabSection.Stream.ReadBuffer(ELF3264Sym.ELF32Sym,SizeOf(TELF32Sym));
+   Image.SymTabSection.Stream.ReadBuffer(ELF3264Sym.ELF32Sym,SizeOf(TELF32Sym));
    Symbol.st_name:=ELF3264Sym.ELF32Sym.st_name;
    Symbol.st_info:=ELF3264Sym.ELF32Sym.st_info;
    Symbol.st_other:=ELF3264Sym.ELF32Sym.st_other;
@@ -1858,12 +1870,12 @@ begin
    Symbol.st_size:=ELF3264Sym.ELF32Sym.st_size;
   end;
   if Symbol.st_name>0 then begin
-   if StrTabSection.Stream.Seek(Symbol.st_name,soBeginning)<>Symbol.st_name then begin
+   if Image.StrTabSection.Stream.Seek(Symbol.st_name,soBeginning)<>Symbol.st_name then begin
     TPACCInstance(Instance).AddError('Stream seek error',nil,true);
    end;
    Name:='';
-   while StrTabSection.Stream.Position<StrTabSection.Stream.Size do begin
-    StrTabSection.Stream.ReadBuffer(c,SizeOf(AnsiChar));
+   while Image.StrTabSection.Stream.Position<Image.StrTabSection.Stream.Size do begin
+    Image.StrTabSection.Stream.ReadBuffer(c,SizeOf(AnsiChar));
     if c=#0 then begin
      break;
     end else begin
@@ -1968,8 +1980,6 @@ begin
    for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
 
     ImageSection:=Image.Sections[ImageSectionIndex];
-
-    
 
    end;
 
