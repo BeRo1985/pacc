@@ -1734,216 +1734,213 @@ begin
  Image:=TPACCLinker_ELF_ELF_Image.Create(self);
  Images.Add(Image);
 
- try
+ Image.Name:=AObjectFileName;
 
-  for SectionIndex:=0 to ELF3264EHdr.ELF64EHdr.e_shnum-1 do begin
+ for SectionIndex:=0 to ELF3264EHdr.ELF64EHdr.e_shnum-1 do begin
 
-   Section:=TPACCLinker_ELF_ELF_Section.Create(self);
-   Image.Sections.Add(Section);
+  Section:=TPACCLinker_ELF_ELF_Section.Create(self);
+  Image.Sections.Add(Section);
 
-   if fIs64Bit then begin
+  if fIs64Bit then begin
 
-    AObjectStream.ReadBuffer(ELF3264SHdr.ELF64SHdr,SizeOf(TELF64SHdr));
+   AObjectStream.ReadBuffer(ELF3264SHdr.ELF64SHdr,SizeOf(TELF64SHdr));
 
-    Section.sh_name:=ELF3264SHdr.ELF64SHdr.sh_name;
-    Section.sh_type:=ELF3264SHdr.ELF64SHdr.sh_type;
-    Section.sh_flags:=ELF3264SHdr.ELF64SHdr.sh_flags;
-    Section.sh_addr:=ELF3264SHdr.ELF64SHdr.sh_addr;
-    Section.sh_offset:=ELF3264SHdr.ELF64SHdr.sh_offset;
-    Section.sh_size:=ELF3264SHdr.ELF64SHdr.sh_size;
-    Section.sh_link:=ELF3264SHdr.ELF64SHdr.sh_link;
-    Section.sh_info:=ELF3264SHdr.ELF64SHdr.sh_info;
-    Section.sh_addralign:=ELF3264SHdr.ELF64SHdr.sh_addralign;
-    Section.sh_entsize:=ELF3264SHdr.ELF64SHdr.sh_entsize;
+   Section.sh_name:=ELF3264SHdr.ELF64SHdr.sh_name;
+   Section.sh_type:=ELF3264SHdr.ELF64SHdr.sh_type;
+   Section.sh_flags:=ELF3264SHdr.ELF64SHdr.sh_flags;
+   Section.sh_addr:=ELF3264SHdr.ELF64SHdr.sh_addr;
+   Section.sh_offset:=ELF3264SHdr.ELF64SHdr.sh_offset;
+   Section.sh_size:=ELF3264SHdr.ELF64SHdr.sh_size;
+   Section.sh_link:=ELF3264SHdr.ELF64SHdr.sh_link;
+   Section.sh_info:=ELF3264SHdr.ELF64SHdr.sh_info;
+   Section.sh_addralign:=ELF3264SHdr.ELF64SHdr.sh_addralign;
+   Section.sh_entsize:=ELF3264SHdr.ELF64SHdr.sh_entsize;
 
-   end else begin
-
-    AObjectStream.ReadBuffer(ELF3264SHdr.ELF32SHdr,SizeOf(TELF32SHdr));
-
-    Section.sh_name:=ELF3264SHdr.ELF32SHdr.sh_name;
-    Section.sh_type:=ELF3264SHdr.ELF32SHdr.sh_type;
-    Section.sh_flags:=ELF3264SHdr.ELF32SHdr.sh_flags;
-    Section.sh_addr:=ELF3264SHdr.ELF32SHdr.sh_addr;
-    Section.sh_offset:=ELF3264SHdr.ELF32SHdr.sh_offset;
-    Section.sh_size:=ELF3264SHdr.ELF32SHdr.sh_size;
-    Section.sh_link:=ELF3264SHdr.ELF32SHdr.sh_link;
-    Section.sh_info:=ELF3264SHdr.ELF32SHdr.sh_info;
-    Section.sh_addralign:=ELF3264SHdr.ELF32SHdr.sh_addralign;
-    Section.sh_entsize:=ELF3264SHdr.ELF32SHdr.sh_entsize;
-
-   end;
-
-  end;
-
-  for SectionIndex:=0 to Image.Sections.Count-1 do begin
-   Section:=Image.Sections[SectionIndex];
-   if Section.sh_size>0 then begin
-    if AObjectStream.Seek(Section.sh_offset,soBeginning)<>Section.sh_offset then begin
-     TPACCInstance(Instance).AddError('Stream seek error',nil,true);
-    end;
-    if Section.Stream.CopyFrom(AObjectStream,Section.sh_size)<>Section.sh_size then begin
-     TPACCInstance(Instance).AddError('Stream read error',nil,true);
-    end;
-   end;
-  end;
-
-  if ELF3264EHdr.ELF64EHdr.e_shstrndx<Image.Sections.Count then begin
-   SHStrTabSection:=Image.Sections[ELF3264EHdr.ELF64EHdr.e_shstrndx];
   end else begin
-   SHStrTabSection:=nil;
-   TPACCInstance(Instance).AddError('No ".shstrtab" section',nil,true);
+
+   AObjectStream.ReadBuffer(ELF3264SHdr.ELF32SHdr,SizeOf(TELF32SHdr));
+
+   Section.sh_name:=ELF3264SHdr.ELF32SHdr.sh_name;
+   Section.sh_type:=ELF3264SHdr.ELF32SHdr.sh_type;
+   Section.sh_flags:=ELF3264SHdr.ELF32SHdr.sh_flags;
+   Section.sh_addr:=ELF3264SHdr.ELF32SHdr.sh_addr;
+   Section.sh_offset:=ELF3264SHdr.ELF32SHdr.sh_offset;
+   Section.sh_size:=ELF3264SHdr.ELF32SHdr.sh_size;
+   Section.sh_link:=ELF3264SHdr.ELF32SHdr.sh_link;
+   Section.sh_info:=ELF3264SHdr.ELF32SHdr.sh_info;
+   Section.sh_addralign:=ELF3264SHdr.ELF32SHdr.sh_addralign;
+   Section.sh_entsize:=ELF3264SHdr.ELF32SHdr.sh_entsize;
+
   end;
 
-  StrTabSection:=nil;
-  SymTabSection:=nil;
+ end;
 
-  SymTabSectionIndex:=-1;
-
-  for SectionIndex:=0 to Image.Sections.Count-1 do begin
-   Section:=Image.Sections[SectionIndex];
-   if Section.sh_name>0 then begin
-    if SHStrTabSection.Stream.Seek(Section.sh_name,soBeginning)<>Section.sh_name then begin
-     TPACCInstance(Instance).AddError('Stream seek error',nil,true);
-    end;
-    Name:='';
-    while SHStrTabSection.Stream.Position<SHStrTabSection.Stream.Size do begin
-     SHStrTabSection.Stream.ReadBuffer(c,SizeOf(AnsiChar));
-     if c=#0 then begin
-      break;
-     end else begin
-      Name:=Name+c;
-     end;
-    end;
-    Section.Name:=Name;
-    if Name='.strtab' then begin
-     StrTabSection:=Section;
-    end else if Name='.symtab' then begin
-     SymTabSection:=Section;
-     SymTabSectionIndex:=SectionIndex;
-    end;
+ for SectionIndex:=0 to Image.Sections.Count-1 do begin
+  Section:=Image.Sections[SectionIndex];
+  if Section.sh_size>0 then begin
+   if AObjectStream.Seek(Section.sh_offset,soBeginning)<>Section.sh_offset then begin
+    TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+   end;
+   if Section.Stream.CopyFrom(AObjectStream,Section.sh_size)<>Section.sh_size then begin
+    TPACCInstance(Instance).AddError('Stream read error',nil,true);
    end;
   end;
+ end;
 
-  if SHStrTabSection.Name<>'.shstrtab' then begin
-   TPACCInstance(Instance).AddError('".shstrtab" section have wrong name',nil,true);
-  end;
+ if ELF3264EHdr.ELF64EHdr.e_shstrndx<Image.Sections.Count then begin
+  SHStrTabSection:=Image.Sections[ELF3264EHdr.ELF64EHdr.e_shstrndx];
+ end else begin
+  SHStrTabSection:=nil;
+  TPACCInstance(Instance).AddError('No ".shstrtab" section',nil,true);
+ end;
 
-  if not assigned(StrTabSection) then begin
-   TPACCInstance(Instance).AddError('No ".strtab" section',nil,true);
-  end;
+ StrTabSection:=nil;
+ SymTabSection:=nil;
 
-  if not assigned(SymTabSection) then begin
-   TPACCInstance(Instance).AddError('No ".symtab" section',nil,true);
-  end;
+ SymTabSectionIndex:=-1;
 
-  SymTabSection.Stream.Seek(0,soBeginning);
-  while SymTabSection.Stream.Position<SymTabSection.Stream.Size do begin
-   Symbol:=TPACCLinker_ELF_ELF_Symbol.Create(self);
-   Image.Symbols.Add(Symbol);
-   if fIs64Bit then begin
-    SymTabSection.Stream.ReadBuffer(ELF3264Sym.ELF64Sym,SizeOf(TELF64Sym));
-    Symbol.st_name:=ELF3264Sym.ELF64Sym.st_name;
-    Symbol.st_info:=ELF3264Sym.ELF64Sym.st_info;
-    Symbol.st_other:=ELF3264Sym.ELF64Sym.st_other;
-    Symbol.st_shndx:=ELF3264Sym.ELF64Sym.st_shndx;
-    Symbol.st_value:=ELF3264Sym.ELF64Sym.st_value;
-    Symbol.st_size:=ELF3264Sym.ELF64Sym.st_size;
-   end else begin
-    SymTabSection.Stream.ReadBuffer(ELF3264Sym.ELF32Sym,SizeOf(TELF32Sym));
-    Symbol.st_name:=ELF3264Sym.ELF32Sym.st_name;
-    Symbol.st_info:=ELF3264Sym.ELF32Sym.st_info;
-    Symbol.st_other:=ELF3264Sym.ELF32Sym.st_other;
-    Symbol.st_shndx:=ELF3264Sym.ELF32Sym.st_shndx;
-    Symbol.st_value:=ELF3264Sym.ELF32Sym.st_value;
-    Symbol.st_size:=ELF3264Sym.ELF32Sym.st_size;
+ for SectionIndex:=0 to Image.Sections.Count-1 do begin
+  Section:=Image.Sections[SectionIndex];
+  if Section.sh_name>0 then begin
+   if SHStrTabSection.Stream.Seek(Section.sh_name,soBeginning)<>Section.sh_name then begin
+    TPACCInstance(Instance).AddError('Stream seek error',nil,true);
    end;
-   if Symbol.st_name>0 then begin
-    if StrTabSection.Stream.Seek(Symbol.st_name,soBeginning)<>Symbol.st_name then begin
-     TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+   Name:='';
+   while SHStrTabSection.Stream.Position<SHStrTabSection.Stream.Size do begin
+    SHStrTabSection.Stream.ReadBuffer(c,SizeOf(AnsiChar));
+    if c=#0 then begin
+     break;
+    end else begin
+     Name:=Name+c;
     end;
-    Name:='';
-    while StrTabSection.Stream.Position<StrTabSection.Stream.Size do begin
-     StrTabSection.Stream.ReadBuffer(c,SizeOf(AnsiChar));
-     if c=#0 then begin
-      break;
-     end else begin
-      Name:=Name+c;
-     end;
-    end;
-    Symbol.Name:=Name;
    end;
-   if Symbol.st_shndx=SHN_UNDEF then begin
-    Symbol.Section:=nil;
-   end else if Symbol.st_shndx<Image.Sections.Count then begin
-    Symbol.Section:=Image.Sections[Symbol.st_shndx];
-    Symbol.Section.Symbols.Add(Symbol);
-   end else if Symbol.st_shndx<SHN_LORESERVE then begin
-    TPACCInstance(Instance).AddError('Symbol section index out of range',nil,true);
-   end else begin
-    Symbol.Section:=nil;
+   Section.Name:=Name;
+   if Name='.strtab' then begin
+    StrTabSection:=Section;
+   end else if Name='.symtab' then begin
+    SymTabSection:=Section;
+    SymTabSectionIndex:=SectionIndex;
    end;
   end;
+ end;
 
-  for SectionIndex:=0 to Image.Sections.Count-1 do begin
-   Section:=Image.Sections[SectionIndex];
-   case Section.sh_type of
-    SHT_REL,SHT_RELA:begin
-     if Section.sh_info<Image.Sections.Count then begin
-      TargetSection:=Image.Sections[Section.sh_info];
-      if (((Section.sh_type=SHT_REL) and (Section.Name=('.rel'+TargetSection.Name))) or
-          ((Section.sh_type=SHT_RELA) and (Section.Name=('.rela'+TargetSection.Name)))) and
-         (Section.sh_link=SymTabSectionIndex) then begin
-       Section.Stream.Seek(0,soBeginning);
-       while Section.Stream.Position<Section.Stream.Size do begin
-        Relocation:=TPACCLinker_ELF_ELF_Relocation.Create(self);
-        TargetSection.Relocations.Add(Relocation);
-        Relocation.Section:=TargetSection;
-        case Section.sh_type of
-         SHT_REL:begin
-          if Is64Bit then begin
-           Section.Stream.ReadBuffer(ELF3264Rel.ELF64Rel,SizeOf(TELF64Rel));
-           Relocation.r_offset:=ELF3264Rel.ELF64Rel.r_offset;
-           Relocation.r_info:=ELF3264Rel.ELF64Rel.r_info;
-           Relocation.r_addend:=0;
-          end else begin
-           Section.Stream.ReadBuffer(ELF3264Rel.ELF32Rel,SizeOf(TELF32Rel));
-           Relocation.r_offset:=ELF3264Rel.ELF32Rel.r_offset;
-           Relocation.r_info:=((TELFXWord(ELF3264Rel.ELF32Rel.r_info) and $ffffff00) shl 24) or (ELF3264Rel.ELF32Rel.r_info and $ff);
-           Relocation.r_addend:=0;
-          end;
-         end;
-         else {SHT_RELA:}begin
-          if Is64Bit then begin
-           Section.Stream.ReadBuffer(ELF3264Rela.ELF64Rela,SizeOf(TELF64Rela));
-           Relocation.r_offset:=ELF3264Rela.ELF64Rela.r_offset;
-           Relocation.r_info:=ELF3264Rela.ELF64Rela.r_info;
-           Relocation.r_addend:=ELF3264Rela.ELF64Rela.r_addend;
-          end else begin
-           Section.Stream.ReadBuffer(ELF3264Rela.ELF32Rela,SizeOf(TELF32Rela));
-           Relocation.r_offset:=ELF3264Rela.ELF32Rela.r_offset;
-           Relocation.r_info:=((TELFXWord(ELF3264Rela.ELF32Rela.r_info) and $ffffff00) shl 24) or (ELF3264Rela.ELF32Rela.r_info and $ff);
-           Relocation.r_addend:=ELF3264Rela.ELF32Rela.r_addend;
-          end;
+ if SHStrTabSection.Name<>'.shstrtab' then begin
+  TPACCInstance(Instance).AddError('".shstrtab" section have wrong name',nil,true);
+ end;
+
+ if not assigned(StrTabSection) then begin
+  TPACCInstance(Instance).AddError('No ".strtab" section',nil,true);
+ end;
+
+ if not assigned(SymTabSection) then begin
+  TPACCInstance(Instance).AddError('No ".symtab" section',nil,true);
+ end;
+
+ SymTabSection.Stream.Seek(0,soBeginning);
+ while SymTabSection.Stream.Position<SymTabSection.Stream.Size do begin
+  Symbol:=TPACCLinker_ELF_ELF_Symbol.Create(self);
+  Image.Symbols.Add(Symbol);
+  if fIs64Bit then begin
+   SymTabSection.Stream.ReadBuffer(ELF3264Sym.ELF64Sym,SizeOf(TELF64Sym));
+   Symbol.st_name:=ELF3264Sym.ELF64Sym.st_name;
+   Symbol.st_info:=ELF3264Sym.ELF64Sym.st_info;
+   Symbol.st_other:=ELF3264Sym.ELF64Sym.st_other;
+   Symbol.st_shndx:=ELF3264Sym.ELF64Sym.st_shndx;
+   Symbol.st_value:=ELF3264Sym.ELF64Sym.st_value;
+   Symbol.st_size:=ELF3264Sym.ELF64Sym.st_size;
+  end else begin
+   SymTabSection.Stream.ReadBuffer(ELF3264Sym.ELF32Sym,SizeOf(TELF32Sym));
+   Symbol.st_name:=ELF3264Sym.ELF32Sym.st_name;
+   Symbol.st_info:=ELF3264Sym.ELF32Sym.st_info;
+   Symbol.st_other:=ELF3264Sym.ELF32Sym.st_other;
+   Symbol.st_shndx:=ELF3264Sym.ELF32Sym.st_shndx;
+   Symbol.st_value:=ELF3264Sym.ELF32Sym.st_value;
+   Symbol.st_size:=ELF3264Sym.ELF32Sym.st_size;
+  end;
+  if Symbol.st_name>0 then begin
+   if StrTabSection.Stream.Seek(Symbol.st_name,soBeginning)<>Symbol.st_name then begin
+    TPACCInstance(Instance).AddError('Stream seek error',nil,true);
+   end;
+   Name:='';
+   while StrTabSection.Stream.Position<StrTabSection.Stream.Size do begin
+    StrTabSection.Stream.ReadBuffer(c,SizeOf(AnsiChar));
+    if c=#0 then begin
+     break;
+    end else begin
+     Name:=Name+c;
+    end;
+   end;
+   Symbol.Name:=Name;
+  end;
+  if Symbol.st_shndx=SHN_UNDEF then begin
+   Symbol.Section:=nil;
+  end else if Symbol.st_shndx<Image.Sections.Count then begin
+   Symbol.Section:=Image.Sections[Symbol.st_shndx];
+   Symbol.Section.Symbols.Add(Symbol);
+  end else if Symbol.st_shndx<SHN_LORESERVE then begin
+   TPACCInstance(Instance).AddError('Symbol section index out of range',nil,true);
+  end else begin
+   Symbol.Section:=nil;
+  end;
+ end;
+
+ for SectionIndex:=0 to Image.Sections.Count-1 do begin
+  Section:=Image.Sections[SectionIndex];
+  case Section.sh_type of
+   SHT_REL,SHT_RELA:begin
+    if Section.sh_info<Image.Sections.Count then begin
+     TargetSection:=Image.Sections[Section.sh_info];
+     if (((Section.sh_type=SHT_REL) and (Section.Name=('.rel'+TargetSection.Name))) or
+         ((Section.sh_type=SHT_RELA) and (Section.Name=('.rela'+TargetSection.Name)))) and
+        (Section.sh_link=SymTabSectionIndex) then begin
+      Section.Stream.Seek(0,soBeginning);
+      while Section.Stream.Position<Section.Stream.Size do begin
+       Relocation:=TPACCLinker_ELF_ELF_Relocation.Create(self);
+       TargetSection.Relocations.Add(Relocation);
+       Relocation.Section:=TargetSection;
+       case Section.sh_type of
+        SHT_REL:begin
+         if Is64Bit then begin
+          Section.Stream.ReadBuffer(ELF3264Rel.ELF64Rel,SizeOf(TELF64Rel));
+          Relocation.r_offset:=ELF3264Rel.ELF64Rel.r_offset;
+          Relocation.r_info:=ELF3264Rel.ELF64Rel.r_info;
+          Relocation.r_addend:=0;
+         end else begin
+          Section.Stream.ReadBuffer(ELF3264Rel.ELF32Rel,SizeOf(TELF32Rel));
+          Relocation.r_offset:=ELF3264Rel.ELF32Rel.r_offset;
+          Relocation.r_info:=((TELFXWord(ELF3264Rel.ELF32Rel.r_info) and $ffffff00) shl 24) or (ELF3264Rel.ELF32Rel.r_info and $ff);
+          Relocation.r_addend:=0;
          end;
         end;
-        SymbolIndex:=Relocation.r_info shr 32;
-        if SymbolIndex<Image.Symbols.Count then begin
-         Relocation.Symbol:=Image.Symbols[SymbolIndex];
-        end else begin
-         TPACCInstance(Instance).AddError('Section "'+Section.Name+'" relocation symbol index out of range',nil,true);
+        else {SHT_RELA:}begin
+         if Is64Bit then begin
+          Section.Stream.ReadBuffer(ELF3264Rela.ELF64Rela,SizeOf(TELF64Rela));
+          Relocation.r_offset:=ELF3264Rela.ELF64Rela.r_offset;
+          Relocation.r_info:=ELF3264Rela.ELF64Rela.r_info;
+          Relocation.r_addend:=ELF3264Rela.ELF64Rela.r_addend;
+         end else begin
+          Section.Stream.ReadBuffer(ELF3264Rela.ELF32Rela,SizeOf(TELF32Rela));
+          Relocation.r_offset:=ELF3264Rela.ELF32Rela.r_offset;
+          Relocation.r_info:=((TELFXWord(ELF3264Rela.ELF32Rela.r_info) and $ffffff00) shl 24) or (ELF3264Rela.ELF32Rela.r_info and $ff);
+          Relocation.r_addend:=ELF3264Rela.ELF32Rela.r_addend;
+         end;
         end;
        end;
-      end else begin
-       TPACCInstance(Instance).AddError('Corrupt relocation section "'+Section.Name+'"',nil,true);
+       SymbolIndex:=Relocation.r_info shr 32;
+       if SymbolIndex<Image.Symbols.Count then begin
+        Relocation.Symbol:=Image.Symbols[SymbolIndex];
+       end else begin
+        TPACCInstance(Instance).AddError('Section "'+Section.Name+'" relocation symbol index out of range',nil,true);
+       end;
       end;
      end else begin
-      TPACCInstance(Instance).AddError('Section "'+Section.Name+'" section index out of range',nil,true);
+      TPACCInstance(Instance).AddError('Corrupt relocation section "'+Section.Name+'"',nil,true);
      end;
+    end else begin
+     TPACCInstance(Instance).AddError('Section "'+Section.Name+'" section index out of range',nil,true);
     end;
    end;
   end;
-
- finally
  end;
 
 end;
@@ -1953,7 +1950,14 @@ begin
 end;
 
 procedure TPACCLinker_ELF_ELF.Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
+var OutputImage:TPACCLinker_ELF_ELF_Image;
 begin
+ OutputImage:=TPACCLinker_ELF_ELF_Image.Create(self);
+ try
+  OutputImage.Name:=AOutputFileName;
+ finally
+  OutputImage.Free;
+ end;
 end;
 
 end.
