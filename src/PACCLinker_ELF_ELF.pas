@@ -1035,6 +1035,8 @@ type PELFIdent=^TELFIdent;
 
        property Section:TPACCLinker_ELF_ELF_Section read fSection write fSection;
 
+       property Symbol:TPACCLinker_ELF_ELF_Symbol read fSymbol write fSymbol;
+
        property r_offset:TELF64Addr read fr_offset write fr_offset;
        property r_info:TELFXWord read fr_info write fr_info;
        property r_addend:TELFSXWord read fr_addend write fr_addend;
@@ -1558,7 +1560,7 @@ begin
 end;
 
 procedure TPACCLinker_ELF_ELF.AddObject(const AObjectStream:TStream;const AObjectFileName:TPUCUUTF8String='');
-var SectionIndex,SymTabSectionIndex:TPACCInt32;
+var SectionIndex,SymTabSectionIndex,SymbolIndex:TPACCInt32;
     ELF3264EHdr:TELF3264EHdr;
     ELF3264SHdr:TELF3264SHdr;
     ELF3264Sym:TELF3264Sym;
@@ -1837,6 +1839,14 @@ begin
            Relocation.r_addend:=ELF3264Rela.ELF32Rela.r_addend;
           end;
          end;
+        end;
+        SymbolIndex:=Relocation.r_info shr 32;
+        if SymbolIndex<Symbols.Count then begin
+         Relocation.Symbol:=Symbols[SymbolIndex];
+         if assigned(Relocation.Symbol) then begin
+         end;
+        end else begin
+         TPACCInstance(Instance).AddError('Section "'+Section.Name+'" relocation symbol index out of range',nil,true);
         end;
        end;
       end else begin
