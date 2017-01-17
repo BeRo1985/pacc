@@ -400,6 +400,11 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
  var Index,ReturnSize,RemainingRegisterSize,Size:TPACCInt32;
      Parameter:TPACCAbstractSyntaxTreeNode;
  begin
+  for Index:=0 to Node.Parameters.Count-1 do begin
+   Parameter:=Node.Parameters[Index];
+   if assigned(Parameter) then begin
+   end;
+  end;
   GetCodeLevel(0)^.TextSectionStringList.Add('');
   GetCodeLevel(0)^.TextSectionStringList.Add('.align(16)');
   if (Node.Type_^.Flags*[tfStatic,tfInline])=[] then begin
