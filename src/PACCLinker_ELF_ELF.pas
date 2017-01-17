@@ -323,7 +323,7 @@ const ET_NONE=0;
       SHT_RELA=4;
       SHT_HASH=5; 
       SHT_DYNAMIC=6;
-      SHT_NOTE=7; 
+      SHT_NOTE=7;
       SHT_NOBITS=8; 
       SHT_REL=9; 
       SHT_SHLIB=10; 
@@ -371,7 +371,7 @@ const ET_NONE=0;
       STB_HIPROC=15; 
 
       // Symbol types
-      STT_NOTYPE=0; 
+      STT_NOTYPE=0;
       STT_OBJECT=1; 
       STT_FUNC=2;
       STT_SECTION=3; 
@@ -448,7 +448,7 @@ const ET_NONE=0;
       PT_LOAD=1;
       PT_DYNAMIC=2;
       PT_INTERP=3;
-      PT_NOTE=4; 
+      PT_NOTE=4;
       PT_SHLIB=5; 
       PT_PHDR=6; 
       PT_TLS=7; 
@@ -489,7 +489,7 @@ const ET_NONE=0;
       DT_DEBUG=21; 
       DT_TEXTREL=22; 
       DT_JMPREL=23; 
-      DT_BIND_NOW=24; 
+      DT_BIND_NOW=24;
       DT_INIT_ARRAY=25;
       DT_FINI_ARRAY=26; 
       DT_INIT_ARRAYSZ=27; 
@@ -2313,6 +2313,7 @@ var OutputImage:TPACCLinker_ELF_ELF_Image;
     Position,SectionHeaderOffset:TPACCInt64;
     OutputImageSymbolNameHashMap:TPACCRawByteStringHashMap;
     ELF3264EHdr:TELF3264EHdr;
+    ELF3264SHdr:TELF3264SHdr;
  function FindSymbol(const SymbolName:TPACCRawByteString):TPACCLinker_ELF_ELF_Symbol;
  begin
   result:=OutputImageSymbolNameHashMap[SymbolName];
@@ -2694,6 +2695,18 @@ begin
      OutputImageSection.sh_info:=0;
     end;
 
+    OutputImage.SHStrTabSection.Stream.WriteBuffer(NullBytes,1);
+    for OutputImageSectionIndex:=0 to OutputImage.Sections.Count-1 do begin
+     OutputImageSection:=OutputImage.Sections[OutputImageSectionIndex];
+     if length(OutputImageSection.fName)>0 then begin
+      OutputImageSection.sh_name:=OutputImage.SHStrTabSection.Stream.Position;
+      OutputImage.SHStrTabSection.Stream.WriteBuffer(OutputImageSection.fName[1],length(OutputImageSection.fName));
+      OutputImage.SHStrTabSection.Stream.WriteBuffer(NullBytes,1);
+     end else begin
+      OutputImageSection.sh_name:=0;
+     end;
+    end;
+
     SectionHeaderOffset:=0;
 
     FillChar(ELF3264EHdr,SizeOf(TELF3264EHdr),#0);
@@ -2775,7 +2788,45 @@ begin
      WriteNullPadding(AOutputStream,Max(0,(TPACCInt64(AOutputStream.Position+63) and not TPACCInt64(63))-AOutputStream.Position));
 
      SectionHeaderOffset:=AOutputStream.Position;
-     
+     for OutputImageSectionIndex:=0 to OutputImage.Sections.Count-1 do begin
+      OutputImageSection:=OutputImage.Sections[OutputImageSectionIndex];
+      OutputImageSection.sh_size:=OutputImageSection.Stream.Size;
+      if fIs64Bit then begin
+       ELF3264SHdr.ELF64SHdr.sh_name:=OutputImageSection.sh_name;
+       ELF3264SHdr.ELF64SHdr.sh_type:=OutputImageSection.sh_type;
+       ELF3264SHdr.ELF64SHdr.sh_flags:=OutputImageSection.sh_flags;
+       ELF3264SHdr.ELF64SHdr.sh_addr:=OutputImageSection.sh_addr;
+       ELF3264SHdr.ELF64SHdr.sh_offset:=OutputImageSection.sh_offset;
+       ELF3264SHdr.ELF64SHdr.sh_size:=OutputImageSection.sh_size;
+       ELF3264SHdr.ELF64SHdr.sh_link:=OutputImageSection.sh_link;
+       ELF3264SHdr.ELF64SHdr.sh_info:=OutputImageSection.sh_info;
+       ELF3264SHdr.ELF64SHdr.sh_addralign:=OutputImageSection.sh_addralign;
+       ELF3264SHdr.ELF64SHdr.sh_entsize:=OutputImageSection.sh_entsize;
+       AOutputStream.WriteBuffer(ELF3264SHdr.ELF64SHdr,SizeOf(TELF64SHdr));
+      end else begin
+       ELF3264SHdr.ELF32SHdr.sh_name:=OutputImageSection.sh_name;
+       ELF3264SHdr.ELF32SHdr.sh_type:=OutputImageSection.sh_type;
+       ELF3264SHdr.ELF32SHdr.sh_flags:=OutputImageSection.sh_flags;
+       ELF3264SHdr.ELF32SHdr.sh_addr:=OutputImageSection.sh_addr;
+       ELF3264SHdr.ELF32SHdr.sh_offset:=OutputImageSection.sh_offset;
+       ELF3264SHdr.ELF32SHdr.sh_size:=OutputImageSection.sh_size;
+       ELF3264SHdr.ELF32SHdr.sh_link:=OutputImageSection.sh_link;
+       ELF3264SHdr.ELF32SHdr.sh_info:=OutputImageSection.sh_info;
+       ELF3264SHdr.ELF32SHdr.sh_addralign:=OutputImageSection.sh_addralign;
+       ELF3264SHdr.ELF32SHdr.sh_entsize:=OutputImageSection.sh_entsize;
+       AOutputStream.WriteBuffer(ELF3264SHdr.ELF32SHdr,SizeOf(TELF32SHdr));
+      end;
+     end;
+
+     for OutputImageSectionIndex:=0 to OutputImage.Sections.Count-1 do begin
+      OutputImageSection:=OutputImage.Sections[OutputImageSectionIndex];
+      if OutputImageSection.sh_type<>SHT_NOBITS then begin
+       WriteNullPadding(AOutputStream,Max(0,(TPACCInt64(AOutputStream.Position+Max(64,OutputImageSection.sh_addralign)) and not TPACCInt64(Max(64,OutputImageSection.sh_addralign)))-AOutputStream.Position));
+       OutputImageSection.sh_offset:=AOutputStream.Position;
+       OutputImageSection.Stream.Seek(0,soBeginning);
+       AOutputStream.CopyFrom(OutputImageSection.Stream,OutputImageSection.Stream.Size);
+      end;
+     end;
 
     end;
 
