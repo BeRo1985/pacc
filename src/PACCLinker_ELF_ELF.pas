@@ -466,7 +466,7 @@ const ET_NONE=0;
 
       // Dynamic Array Tags
       DT_NULL=0; 
-      DT_NEEDED=1; 
+      DT_NEEDED=1;
       DT_PLTRELSZ=2; 
       DT_PLTGOT=3; 
       DT_HASH=4; 
@@ -498,7 +498,7 @@ const ET_NONE=0;
       DT_FLAGS=30;
       DT_ENCODING=32; 
       DT_PREINIT_ARRAY=32; 
-      DT_PREINIT_ARRAYSZ=33; 
+      DT_PREINIT_ARRAYSZ=33;
       DT_MAXPOSTAGS=34; 
       DT_LOOS=$6000000d; 
       DT_HIOS=$6ffff000; 
@@ -1006,6 +1006,8 @@ type PELFIdent=^TELFIdent;
        fst_value:TPACCUInt64;
        fst_size:TPACCUInt64;
 
+       fMergedSymbol:TPACCLinker_ELF_ELF_Symbol;
+
        fActive:boolean;
 
       public
@@ -1027,6 +1029,8 @@ type PELFIdent=^TELFIdent;
        property st_shndx:TPACCUInt64 read fst_shndx write fst_shndx;
        property st_value:TPACCUInt64 read fst_value write fst_value;
        property st_size:TPACCUInt64 read fst_size write fst_size;
+
+       property MergedSymbol:TPACCLinker_ELF_ELF_Symbol read fMergedSymbol write fMergedSymbol;
 
        property Active:boolean read fActive write fActive;
 
@@ -1129,6 +1133,8 @@ type PELFIdent=^TELFIdent;
 
        fMerged:boolean;
 
+       fLinkOnce:boolean;
+
        fActive:boolean;
 
       public
@@ -1171,6 +1177,8 @@ type PELFIdent=^TELFIdent;
        property InfoSection:TPACCLinker_ELF_ELF_Section read fInfoSection write fInfoSection;
 
        property Merged:boolean read fMerged write fMerged;
+
+       property LinkOnce:boolean read fLinkOnce write fLinkOnce;
 
        property Active:boolean read fActive write fActive;
 
@@ -1435,6 +1443,8 @@ begin
  fName:='';
 
  fSection:=nil;
+
+ fMergedSymbol:=nil;
 
  fActive:=true;
 
@@ -2252,140 +2262,162 @@ var OutputImage:TPACCLinker_ELF_ELF_Image;
     ImageSymbol:TPACCLinker_ELF_ELF_Symbol;
     STabSym:PSTabSym;
     Position:TPACCInt64;
+    OutputImageSymbolNameHashMap:TPACCRawByteStringHashMap;
+ function FindSymbol(const SymbolName:TPACCRawByteString):TPACCLinker_ELF_ELF_Symbol;
+ begin
+  result:=OutputImageSymbolNameHashMap[SymbolName];
+ end;
 begin
 
- OutputImage:=TPACCLinker_ELF_ELF_Image.Create(self);
+ OutputImageSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
  try
 
-  OutputImage.Name:=AOutputFileName;
+  OutputImage:=TPACCLinker_ELF_ELF_Image.Create(self);
+  try
 
-  HasGNULinkOnce:=false;
+   OutputImage.Name:=AOutputFileName;
 
-  for ImageIndex:=0 to Images.Count-1 do begin
+   HasGNULinkOnce:=false;
 
-   Image:=Images[ImageIndex];
+   for ImageIndex:=0 to Images.Count-1 do begin
 
-   SymbolOffsetIndex:=OutputImage.Symbols.Count;
+    Image:=Images[ImageIndex];
 
-   ImageSectionSTab:=nil;
-   ImageSectionSTabStr:=nil;
+    SymbolOffsetIndex:=OutputImage.Symbols.Count;
 
-   for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
+    ImageSectionSTab:=nil;
+    ImageSectionSTabStr:=nil;
 
-    ImageSection:=Image.Sections[ImageSectionIndex];
+    for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
 
-    ImageSection.Merged:=false;
+     ImageSection:=Image.Sections[ImageSectionIndex];
 
-    if (ImageSection.sh_type in [SHT_NULL,
-                                 SHT_PROGBITS,
-                                 SHT_REL,
-                                 SHT_RELA,
-                                 SHT_NOBITS,
-                                 SHT_PREINIT_ARRAY,
-                                 SHT_INIT_ARRAY,
-                                 SHT_FINI_ARRAY]) and
-       (ImageSection.Name<>'.stabstr') and
-       ((not HasGNULinkOnce) or (HasGNULinkOnce and (ImageSection.Name<>'.gnu.linkonce'))) then begin
+     ImageSection.Merged:=false;
 
-     if (not HasGNULinkOnce) and (ImageSection.Name='.gnu.linkonce') then begin
-      HasGNULinkOnce:=true;
-     end;
+     ImageSection.LinkOnce:=HasGNULinkOnce and (ImageSection.Name='.gnu.linkonce');
 
-     OutputImageSection:=nil;
-     for OutputImageSectionIndex:=0 to OutputImage.Sections.Count-1 do begin
-      CurrentOutputImageSection:=OutputImage.Sections[OutputImageSectionIndex];
-      if CurrentOutputImageSection.Name=ImageSection.Name then begin
-       OutputImageSection:=CurrentOutputImageSection;
-       break;
+     if (ImageSection.sh_type in [SHT_NULL,
+                                  SHT_PROGBITS,
+                                  SHT_REL,
+                                  SHT_RELA,
+                                  SHT_NOBITS,
+                                  SHT_PREINIT_ARRAY,
+                                  SHT_INIT_ARRAY,
+                                  SHT_FINI_ARRAY]) and
+        (ImageSection.Name<>'.stabstr') and
+        ((not HasGNULinkOnce) or (HasGNULinkOnce and (ImageSection.Name<>'.gnu.linkonce'))) then begin
+
+      if (not HasGNULinkOnce) and (ImageSection.Name='.gnu.linkonce') then begin
+       HasGNULinkOnce:=true;
       end;
-     end;
 
-     if assigned(OutputImageSection) then begin
-      OutputImageSection.sh_addralign:=Max(OutputImageSection.sh_addralign,ImageSection.sh_addralign);
-     end else begin
-      OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
-      OutputImage.Sections.Add(OutputImageSection);
-      OutputImageSection.Name:=ImageSection.Name;
-      OutputImageSection.sh_type:=ImageSection.sh_type;
-      OutputImageSection.sh_flags:=ImageSection.sh_flags;
-      OutputImageSection.sh_addralign:=Max(1,ImageSection.sh_addralign);
-      OutputImageSection.sh_entsize:=ImageSection.sh_entsize;
-      OutputImageSection.sh_link:=0;
-      OutputImageSection.sh_info:=0;
-     end;
+      OutputImageSection:=nil;
+      for OutputImageSectionIndex:=0 to OutputImage.Sections.Count-1 do begin
+       CurrentOutputImageSection:=OutputImage.Sections[OutputImageSectionIndex];
+       if CurrentOutputImageSection.Name=ImageSection.Name then begin
+        OutputImageSection:=CurrentOutputImageSection;
+        break;
+       end;
+      end;
 
-     ImageSection.Stream.Seek(0,soBeginning);
-     OutputImageSection.Stream.Seek(OutputImageSection.Stream.Size,soBeginning);
-     if ImageSection.Name='.stab' then begin
-      ImageSectionSTab:=ImageSection;
-     end else if ImageSection.Name='.stabstr' then begin
-      ImageSectionSTabStr:=ImageSection;
-     end else begin
-      WriteNullPadding(OutputImageSection.Stream,Max(0,TPACCInt64((OutputImageSection.Stream.Size+TPACCInt64(ImageSection.sh_addralign-1)) and not TPACCInt64(ImageSection.sh_addralign-1))-OutputImageSection.Stream.Size));
-     end;
-     ImageSection.MergedOffset:=OutputImageSection.Stream.Size;
-     ImageSection.MergedToSection:=OutputImageSection;
-     if ImageSection.sh_type=SHT_NOBITS then begin
-      WriteNullPadding(OutputImageSection.Stream,ImageSection.Stream.Size);
-     end else begin
-      OutputImageSection.Stream.CopyFrom(ImageSection.Stream,ImageSection.Stream.Size);
-     end;
-
-     ImageSection.Merged:=true;
-
-    end;
-
-   end;
-
-   if assigned(ImageSectionSTab) and assigned(ImageSectionSTabStr) and
-      ImageSectionSTab.Merged and ImageSectionSTabStr.Merged then begin
-    Position:=0;
-    while (Position+SizeOf(TSTabSym))<=ImageSectionSTab.Stream.Size do begin
-     STabSym:=pointer(@PPACCUInt8s(ImageSectionSTab.MergedToSection.Stream.Memory)^[ImageSectionSTab.MergedOffset+Position]);
-     inc(STabSym^.n_strx,ImageSectionSTabStr.MergedOffset);
-     inc(Position,SizeOf(TSTabSym));
-    end;
-   end;
-
-   for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
-    ImageSection:=Image.Sections[ImageSectionIndex];
-    if ImageSection.Merged and (ImageSection.MergedOffset=0) then begin
-     if assigned(ImageSection.LinkSection) then begin
-      OutputImageSection:=ImageSection.MergedToSection;
-      OutputImageSection.LinkSection:=ImageSection.LinkSection.MergedToSection;
-      if assigned(OutputImageSection.LinkSection) then begin
-       OutputImageSection.sh_link:=OutputImage.Sections.IndexOf(OutputImageSection.LinkSection);
+      if assigned(OutputImageSection) then begin
+       OutputImageSection.sh_addralign:=Max(OutputImageSection.sh_addralign,ImageSection.sh_addralign);
       end else begin
+       OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+       OutputImage.Sections.Add(OutputImageSection);
+       OutputImageSection.Name:=ImageSection.Name;
+       OutputImageSection.sh_type:=ImageSection.sh_type;
+       OutputImageSection.sh_flags:=ImageSection.sh_flags;
+       OutputImageSection.sh_addralign:=Max(1,ImageSection.sh_addralign);
+       OutputImageSection.sh_entsize:=ImageSection.sh_entsize;
        OutputImageSection.sh_link:=0;
+       OutputImageSection.sh_info:=0;
       end;
+
+      ImageSection.Stream.Seek(0,soBeginning);
+      OutputImageSection.Stream.Seek(OutputImageSection.Stream.Size,soBeginning);
+      if ImageSection.Name='.stab' then begin
+       ImageSectionSTab:=ImageSection;
+      end else if ImageSection.Name='.stabstr' then begin
+       ImageSectionSTabStr:=ImageSection;
+      end else begin
+       WriteNullPadding(OutputImageSection.Stream,Max(0,TPACCInt64((OutputImageSection.Stream.Size+TPACCInt64(ImageSection.sh_addralign-1)) and not TPACCInt64(ImageSection.sh_addralign-1))-OutputImageSection.Stream.Size));
+      end;
+      ImageSection.MergedOffset:=OutputImageSection.Stream.Size;
+      ImageSection.MergedToSection:=OutputImageSection;
+      if ImageSection.sh_type=SHT_NOBITS then begin
+       WriteNullPadding(OutputImageSection.Stream,ImageSection.Stream.Size);
+      end else begin
+       OutputImageSection.Stream.CopyFrom(ImageSection.Stream,ImageSection.Stream.Size);
+      end;
+
+      ImageSection.Merged:=true;
+
      end;
-     case ImageSection.sh_type of
-      SHT_REL,SHT_RELA:begin
-       if assigned(ImageSection.InfoSection) and assigned(ImageSection.InfoSection.MergedToSection) then begin
-        OutputImageSection:=ImageSection.MergedToSection;
-        OutputImageSection.InfoSection:=ImageSection.InfoSection.MergedToSection;
-        OutputImageSection.sh_info:=Max(0,OutputImage.Sections.IndexOf(OutputImageSection.InfoSection));
+
+    end;
+
+    if assigned(ImageSectionSTab) and assigned(ImageSectionSTabStr) and
+       ImageSectionSTab.Merged and ImageSectionSTabStr.Merged then begin
+     Position:=0;
+     while (Position+SizeOf(TSTabSym))<=ImageSectionSTab.Stream.Size do begin
+      STabSym:=pointer(@PPACCUInt8s(ImageSectionSTab.MergedToSection.Stream.Memory)^[ImageSectionSTab.MergedOffset+Position]);
+      inc(STabSym^.n_strx,ImageSectionSTabStr.MergedOffset);
+      inc(Position,SizeOf(TSTabSym));
+     end;
+    end;
+
+    for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
+     ImageSection:=Image.Sections[ImageSectionIndex];
+     if ImageSection.Merged and (ImageSection.MergedOffset=0) then begin
+      if assigned(ImageSection.LinkSection) then begin
+       OutputImageSection:=ImageSection.MergedToSection;
+       OutputImageSection.LinkSection:=ImageSection.LinkSection.MergedToSection;
+       if assigned(OutputImageSection.LinkSection) then begin
+        OutputImageSection.sh_link:=OutputImage.Sections.IndexOf(OutputImageSection.LinkSection);
        end else begin
-        ImageSection.MergedToSection.sh_info:=0;
+        OutputImageSection.sh_link:=0;
+       end;
+      end;
+      case ImageSection.sh_type of
+       SHT_REL,SHT_RELA:begin
+        if assigned(ImageSection.InfoSection) and assigned(ImageSection.InfoSection.MergedToSection) then begin
+         OutputImageSection:=ImageSection.MergedToSection;
+         OutputImageSection.InfoSection:=ImageSection.InfoSection.MergedToSection;
+         OutputImageSection.sh_info:=Max(0,OutputImage.Sections.IndexOf(OutputImageSection.InfoSection));
+        end else begin
+         ImageSection.MergedToSection.sh_info:=0;
+        end;
        end;
       end;
      end;
     end;
+
+    for ImageSymbolIndex:=0 to Image.Symbols.Count-1 do begin
+     ImageSymbol:=Image.Symbols[ImageSymbolIndex];
+     if (ImageSymbol.st_shndx<>SHN_UNDEF) and (ImageSymbol.st_shndx<SHN_LORESERVE) then begin
+      ImageSection:=ImageSymbol.Section;
+      if assigned(ImageSection) then begin
+       if ImageSection.LinkOnce then begin
+        if ELF_ST_BIND(ImageSymbol.st_info)<>STB_LOCAL then begin
+         ImageSymbol.MergedSymbol:=FindSymbol(ImageSymbol.Name);
+        end;
+        continue;
+       end;
+      end;
+     end;
+    end;
+
    end;
 
-   for ImageSymbolIndex:=0 to Image.Symbols.Count-1 do begin
-
-    ImageSymbol:=Image.Symbols[ImageSymbolIndex];
-
-
-
-   end;
-
+  finally
+   OutputImage.Free;
   end;
 
  finally
-  OutputImage.Free;
+  OutputImageSymbolNameHashMap.Free;
  end;
+
 end;
 
 end.
