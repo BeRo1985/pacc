@@ -467,7 +467,7 @@ var CurrentState:TState;
  end;
  procedure EnsureLValue(const Node:TPACCAbstractSyntaxTreeNode);
  begin
-  if assigned(Node) and (tfConstant in Node.Type_^.Flags) then begin
+  if assigned(Node) and (afConstant in Node.Type_^.Attribute.Flags) then begin
    AddError('Expression must be a modifiable lvalue',nil,false);
   end;
   if (not assigned(Node)) or not (Node.Kind in [astnkLVAR,astnkGVAR,astnkDEREF,astnkSTRUCT_REF]) then begin
@@ -1578,18 +1578,20 @@ var CurrentState:TState;
  begin
   result:=nil;
  end;
- function ParseDeclaratorSpecifier(ResultStorageClass:PPACCInt32):PPACCType; forward;
+ function ParseDeclaratorSpecifier(ResultStorageClass:PPACCInt32;var Attribute:TPACCAttribute):PPACCType; forward;
  function ParseDeclarator(out Name:TPACCRawByteString;const BaseType:PPACCType;const Parameters:TPACCAbstractSyntaxTreeNodeList;Context:TPACCInt32):PPACCType;
   function ParseDeclaratorFunction(const BaseType:PPACCType;const Parameters:TPACCAbstractSyntaxTreeNodeList):PPACCType;
    function ParseDeclaratorFunctionParameterList(const ParameterVariables:TPACCAbstractSyntaxTreeNodeList;const ReturnType:PPACCType):PPACCType;
     function ParseFunctionParameter(out Name:TPACCRawByteString;Optional:boolean):PPACCType;
-    var StorageClass:TPACCInt32;
+    var StorageClass,CallingConvention:TPACCInt32;
         BaseType:PPACCType;
+        Attribute:TPACCAttribute;
     begin
      StorageClass:=0;
+     Attribute:=PACCEmptyAttribute;
      BaseType:=TPACCInstance(Instance).TypeINT;
      if IsType(CurrentState.Token) then begin
-      BaseType:=ParseDeclaratorSpecifier(@StorageClass);
+      BaseType:=ParseDeclaratorSpecifier(@StorageClass,Attribute);
      end else if Optional then begin
       AddError('Type expected, but got "'+TPACCLexer(TPACCInstance(Instance).Lexer).TokenStrings[CurrentState.Token^.TokenType]+'"',nil,true);
      end;
@@ -1598,6 +1600,7 @@ var CurrentState:TState;
      end else begin
       result:=ParseDeclarator(Name,BaseType,nil,DECL_PARAM);
      end;
+     result^.Attribute:=Attribute;
      case result^.Kind of
       tkARRAY:begin
        // C11 6.7.6.3p7: Array of T is adjusted to pointer to T in a function parameter list.
@@ -1827,8 +1830,11 @@ var CurrentState:TState;
   result:=ParseDeclarator(n,BaseType,nil,DECL_CAST);
  end;
  function ParseCastType:PPACCType;
+ var Attribute:TPACCAttribute;
  begin
-  result:=ParseAbstractDeclarator(ParseDeclaratorSpecifier(nil));
+  Attribute:=PACCEmptyAttribute;
+  result:=ParseAbstractDeclarator(ParseDeclaratorSpecifier(nil,Attribute));
+  result^.Attribute:=Attribute;
  end;
  procedure ParseStaticAssert;
  var Value:TPACCInt64;
@@ -2473,7 +2479,7 @@ var CurrentState:TState;
    raise;
   end;
  end;
- function ParseDeclaratorSpecifier(ResultStorageClass:PPACCInt32):PPACCType;
+ function ParseDeclaratorSpecifier(ResultStorageClass:PPACCInt32;var Attribute:TPACCAttribute):PPACCType;
   function ParseBitSize(const Name:TPACCRawByteString;const Type_:PPACCType):TPACCInt;
   var MaxSize:TPACCInt64;
   begin
@@ -2635,6 +2641,7 @@ var CurrentState:TState;
        Index,Count:TPACCInt;
        Name:TPACCRawByteString;
        Fields:TPACCStructFields;
+       Attribute:TPACCAttribute;
    begin
     result:=nil;
     if CurrentState.Token^.TokenType=TOK_LBRA then begin
@@ -2648,7 +2655,12 @@ var CurrentState:TState;
         ParseStaticAssert;
        end else begin
         if IsType(CurrentState.Token) then begin
-         BaseType:=ParseDeclaratorSpecifier(nil);
+         Attribute:=PACCEmptyAttribute;
+         BaseType:=ParseDeclaratorSpecifier(nil,Attribute);
+         BaseType.Attribute:=Attribute;
+         if Attribute.Alignment>=0 then begin
+          BaseType.Alignment:=Attribute.Alignment;
+         end;
          if (BaseType^.Kind=tkSTRUCT) and (CurrentState.Token^.TokenType=TOK_SEMICOLON) then begin
           Index:=Count;
           inc(Count);
@@ -2747,7 +2759,7 @@ var CurrentState:TState;
   begin
    Size:=0;
    Alignment:=1;
-   if tfPacked in Type_^.Flags then begin
+   if afPacked in Type_^.Attribute.Flags then begin
     MaxAlignment:=1;
    end else if PragmaPack>0 then begin
     MaxAlignment:=PragmaPack;
@@ -2944,17 +2956,17 @@ var CurrentState:TState;
        end;
       end;
      end else if (AttributeName='packed') or (AttributeName='__packed__') then begin
-      Include(TypeFlags,tfPacked);
+      Include(Attribute.Flags,afPacked);
      end else if (AttributeName='noinline') or (AttributeName='__noinline__') then begin
-      Include(TypeFlags,tfNoInline);
+      Include(Attribute.Flags,afNoInline);
      end else if (AttributeName='noreturn') or (AttributeName='__noreturn__') then begin
-      Include(TypeFlags,tfNoReturn);
+      Include(Attribute.Flags,afNoReturn);
      end else if (AttributeName='const') or (AttributeName='__const__') then begin
-      Include(TypeFlags,tfConstant);
+      Include(Attribute.Flags,afConstant);
      end else if (AttributeName='volatile') or (AttributeName='__volatile__') then begin
-      Include(TypeFlags,tfVolatile);
+      Include(Attribute.Flags,afVolatile);
      end else if (AttributeName='restrict') or (AttributeName='__restrict__') then begin
-      Include(TypeFlags,tfRestrict);
+      Include(Attribute.Flags,afRestrict);
      end else begin
       AddError('Attribute name expect',@CurrentState.Token^.SourceLocation,true);
      end;
@@ -3049,23 +3061,23 @@ var CurrentState:TState;
      end;
      TOK_CONST:begin
       NextToken;
-      Include(TypeFlags,tfConstant);
+      Include(Attribute.Flags,afConstant);
      end;
      TOK_VOLATILE:begin
       NextToken;
-      Include(TypeFlags,tfVolatile);
+      Include(Attribute.Flags,afVolatile);
      end;
      TOK_RESTRICT:begin
       NextToken;
-      Include(TypeFlags,tfRestrict);
+      Include(Attribute.Flags,afRestrict);
      end;
      TOK_INLINE:begin
       NextToken;
-      Include(TypeFlags,tfInline);
+      Include(Attribute.Flags,afInline);
      end;
      TOK_NORETURN:begin
       NextToken;
-      Include(TypeFlags,tfNoReturn);
+      Include(Attribute.Flags,afNoReturn);
      end;
      TOK_VOID:begin
       if Kind<>0 then begin
@@ -3200,8 +3212,8 @@ var CurrentState:TState;
      if TypeFlags<>[] then begin
       result:=TPACCInstance(Instance).CopyType(UserType);
       result^.Flags:=result^.Flags+TypeFlags;
-      if tfPacked in result^.Flags then begin
-       result^.Alignment:=1;
+      if afPacked in Attribute.Flags then begin
+       Attribute.Alignment:=1;
       end;
      end else begin
       result:=UserType;
@@ -3212,12 +3224,13 @@ var CurrentState:TState;
      case result^.Kind of
       tkSTRUCT:begin
        FinalizeStructUnion(result,StructFields);
-       if tfPacked in result^.Flags then begin
-        result^.Alignment:=1;
+       if afPacked in Attribute.Flags then begin
+        Attribute.Alignment:=1;
        end;
       end;
       tkENUM:begin
-       if tfPacked in result^.Flags then begin
+       if afPacked in Attribute.Flags then begin
+        Exclude(Attribute.Flags,afPacked);
         if (result^.MinValue>=low(TPACCInt8)) and (result^.MaxValue<=high(TPACCInt8)) then begin
          result:=TPACCInstance(Instance).TypeCHAR;
         end else if (result^.MinValue>=low(TPACCInt16)) and (result^.MaxValue<=high(TPACCInt16)) then begin
@@ -3228,8 +3241,8 @@ var CurrentState:TState;
        end;
       end;
       else begin
-       if tfPacked in result^.Flags then begin
-        result^.Alignment:=1;
+       if afPacked in Attribute.Flags then begin
+        Attribute.Alignment:=1;
        end;
       end;
      end;
@@ -3278,16 +3291,16 @@ var CurrentState:TState;
       AddError('Internal error: 2016-12-31-21-58-0000',nil,true);
      end;
     end;
-    if tfPacked in result^.Flags then begin
-     result^.Alignment:=1;
+    if afPacked in Attribute.Flags then begin
+     Attribute.Alignment:=1;
     end else if Alignment>=0 then begin
-     result^.Alignment:=Alignment;
+     Attribute.Alignment:=Alignment;
     end;
     result^.Flags:=result^.Flags+TypeFlags;
    end;
    if CallingConvention>=0 then begin
-    if result^.CallingConvention<0 then begin
-     result^.CallingConvention:=CallingConvention;
+     if Attribute.CallingConvention<0 then begin
+     Attribute.CallingConvention:=CallingConvention;
     end else begin
      AddError('Calling convention already defined',nil,false);
     end;
@@ -3296,10 +3309,10 @@ var CurrentState:TState;
    AddError('Type name expected, but got "'+TPACCLexer(TPACCInstance(Instance).Lexer).TokenStrings[CurrentState.Token^.TokenType]+'"',nil,true);
   end;
  end;
- function ParseDeclaratorWithOptionalSpecifier(StorageClass:PPACCInt32):PPACCType;
+ function ParseDeclaratorWithOptionalSpecifier(StorageClass:PPACCInt32;var Attribute:TPACCAttribute):PPACCType;
  begin
   if IsType(CurrentState.Token) then begin
-   result:=ParseDeclaratorSpecifier(StorageClass);
+   result:=ParseDeclaratorSpecifier(StorageClass,Attribute);
   end else begin
    AddWarning('Type specifier missing, assuming int');
    result:=TPACCInstance(Instance).TypeINT;
@@ -3397,14 +3410,16 @@ var CurrentState:TState;
      FunctionName,FunctionBody,Parameter:TPACCAbstractSyntaxTreeNode;
      First:boolean;
      RelevantSourceLocation:TPACCSourceLocation;
+     Attribute:TPACCAttribute;
  begin
   if CurrentState.Token^.TokenType=TOK_SEMICOLON then begin
    NextToken;
   end else begin
    StorageClass:=0;
+   Attribute:=PACCEmptyAttribute;
    Parameters:=nil;
    RelevantSourceLocation:=CurrentState.Token^.SourceLocation;
-   BaseType:=ParseDeclaratorWithOptionalSpecifier(@StorageClass);
+   BaseType:=ParseDeclaratorWithOptionalSpecifier(@StorageClass,Attribute);
    if CurrentState.Token^.TokenType=TOK_SEMICOLON then begin
     NextToken;
    end else begin
@@ -3441,6 +3456,7 @@ var CurrentState:TState;
        end else begin
         Exclude(CurrentType^.Flags,tfStatic);
        end;
+       CurrentType^.Attribute:=Attribute;
        Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkGVAR,CurrentType,RelevantSourceLocation,Name,0,Name);
        Assert(assigned(GlobalScope));
        GlobalScope[Name]:=Variable;

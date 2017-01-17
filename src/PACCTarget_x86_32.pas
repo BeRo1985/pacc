@@ -407,7 +407,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
   end;
   GetCodeLevel(0)^.TextSectionStringList.Add('');
   GetCodeLevel(0)^.TextSectionStringList.Add('.align(16)');
-  if (Node.Type_^.Flags*[tfStatic,tfInline])=[] then begin
+  if not ((tfStatic in Node.Type_^.Flags) or (afInline in Node.Type_^.Attribute.Flags)) then begin
    GetCodeLevel(0)^.TextSectionStringList.Add('.public('+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Variable))+' = "'+Node.FunctionName+'")');
   end;
   GetCodeLevel(0)^.TextSectionStringList.Add(GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Variable))+':');
@@ -419,7 +419,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
   if (Node.FunctionName='main') and (Node.Type_^.ReturnType^.Kind=tkVOID) then begin
    GetCodeLevel(0)^.TextSectionStringList.Add('xor eax,eax');
   end;
-  case Node.Type_^.CallingConvention of
+  case Node.Type_^.Attribute.CallingConvention of
    ccSTDCALL:begin
     ReturnSize:=0;
     for Index:=0 to Node.Parameters.Count-1 do begin

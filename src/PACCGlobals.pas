@@ -48,16 +48,8 @@ type PPACCEncoding=^TPACCEncoding;
 
       // Function
       tfVarArgs,
-      tfOldStyle,
+      tfOldStyle
 
-      tfConstant,
-      tfVolatile,
-      tfInline,
-      tfNoInline,
-      tfNoReturn,
-      tfRestrict,
-      tfPacked
-      
      );
 
      PPACCTypeFlags=^TPACCTypeFlags;
@@ -97,8 +89,28 @@ type PPACCEncoding=^TPACCEncoding;
 
      TPACCStructFields=array of TPACCStructField;
 
+     PPACCAttributeFlag=^TPACCAttributeFlag;
+     TPACCAttributeFlag=(
+      afConstant,
+      afVolatile,
+      afInline,
+      afNoInline,
+      afNoReturn,
+      afRestrict,
+      afPacked
+     );
+
+     TPACCAttributeFlags=set of TPACCAttributeFlag;
+
+     PPACCAttribute=^TPACCAttribute;
+     TPACCAttribute=record
+      CallingConvention:TPACCInt32;
+      Alignment:TPACCInt32;
+      Flags:TPACCAttributeFlags;
+     end;
+
      TPACCType=record
-     
+
       Previous:PPACCType;
       Next:PPACCType;
 
@@ -108,6 +120,8 @@ type PPACCEncoding=^TPACCEncoding;
 
       Flags:TPACCTypeFlags;
 
+      Attribute:TPACCAttribute;
+                
       // Pointer/Array
       ChildType:PPACCType;
 
@@ -129,7 +143,6 @@ type PPACCEncoding=^TPACCEncoding;
       // Function
       ReturnType:PPACCType;
       Parameters:TPPACCTypes;
-      CallingConvention:TPACCInt32;
 
      end;
 
@@ -149,6 +162,12 @@ const PACCDefaultOptions:TPACCOptions=
         HandleUTF8:false;
         CreateSharedLibrary:false;
         StaticLinking:false;
+       );
+
+       PACCEmptyAttribute:TPACCAttribute=(
+        CallingConvention:-1;
+        Alignment:-1;
+        Flags:[];
        );
 
 var NullBytes:array[0..65535] of TPACCUInt8;

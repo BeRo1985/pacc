@@ -272,7 +272,7 @@ begin
   FirstType:=result;
  end;
  LastType:=result;
- result^.CallingConvention:=-1;
+ result^.Attribute:=PACCEmptyAttribute;
 end;
 
 function TPACCInstance.CopyType(const FromType:PPACCType):PPACCType;
@@ -320,7 +320,7 @@ begin
   result^.BitSize:=FromType^.BitSize;
   result^.ReturnType:=FromType^.ReturnType;
   result^.Parameters:=FromType^.Parameters;
-  result^.CallingConvention:=FromType^.CallingConvention;
+  result^.Attribute:=FromType^.Attribute;
  end;
 end;
 
