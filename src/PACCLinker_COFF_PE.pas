@@ -3243,7 +3243,7 @@ var Relocations:TRelocations;
        ((Symbol.SymbolKind=plcpskNormal) and not assigned(Symbol.Section))) and
        not assigned(Symbol.Alias) then begin
     Symbol.Alias:=ExternalAvailableSymbolHashMap[Symbol.Name];
-    if not assigned(Symbol.Alias) then begin
+    if (Symbol.Name<>'@feat.00') and not assigned(Symbol.Alias) then begin
      UnresolvableExternalSymbols:=true;
      TPACCInstance(Instance).AddError('Unresolvable external symbol "'+Symbol.Name+'"',nil,false);
     end;

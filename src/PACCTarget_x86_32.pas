@@ -128,7 +128,24 @@ begin
 end;
 
 procedure TPACCTarget_x86_32.GenerateCode(const ARoot:TPACCAbstractSyntaxTreeNode;const AOutputStream:TStream);
+var CodeStringList:TStringList;
 begin
+ CodeStringList:=TStringList.Create;
+ try
+  CodeStringList.Add('.cpu(all)');
+  CodeStringList.Add('.target(coff32)');
+  if self is TPACCTarget_x86_32_COFF_PE then begin
+   CodeStringList.Add('.section(".text",'+IntToStr(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+   CodeStringList.Add('}');
+   CodeStringList.Add('.section(".data",'+IntToStr(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+   CodeStringList.Add('}');
+   CodeStringList.Add('.section(".bss",'+IntToStr(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+   CodeStringList.Add('}');
+  end;
+  CodeStringList.SaveToStream(AOutputStream);
+ finally
+  CodeStringList.Free;
+ end;
 end;
 
 procedure TPACCTarget_x86_32.AssembleCode(const AInputStream,AOutputStream:TStream;const AInputFileName:TPUCUUTF8String='');
