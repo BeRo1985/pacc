@@ -102,6 +102,8 @@ type EPACCError=class(Exception)
 
        function EvaluateIntegerExpression(const Node:TPACCAbstractSyntaxTreeNode;const Address:PPACCAbstractSyntaxTreeNode):TPACCInt64;
 
+       function EvaluateFloatExpression(const Node:TPACCAbstractSyntaxTreeNode;const Kind:TPACCTypeKind):TPACCLongDouble;
+
      end;
 
 implementation
@@ -631,16 +633,16 @@ begin
     result:=TPACCAbstractSyntaxTreeNodeIntegerValue(Node).Value;
    end else begin
     result:=0;
-    AddError('Integer expression expected',nil,false);
+    AddError('Integer expression expected',@Node.SourceLocation,false);
    end;
   end;
   astnkFLOAT:begin
    result:=0;
-   AddError('Integer expression expected',nil,false);
+   AddError('Integer expression expected',@Node.SourceLocation,false);
   end;
   astnkSTRING:begin
    result:=0;
-   AddError('Integer expression expected',nil,false);
+   AddError('Integer expression expected',@Node.SourceLocation,false);
   end;
   astnkOP_LOG_NOT:begin
    if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address)<>0 then begin
@@ -670,7 +672,7 @@ begin
      result:=0;
     end else begin
      result:=0;
-     AddError('Integer expression expected',nil,false);
+     AddError('Integer expression expected',@Node.SourceLocation,false);
     end;
    end;
   end;
@@ -680,7 +682,7 @@ begin
     result:=0;
    end else begin
     result:=0;
-    AddError('Integer expression expected',nil,false);
+    AddError('Integer expression expected',@Node.SourceLocation,false);
    end;
   end;
   astnkDEREF:begin
@@ -688,7 +690,7 @@ begin
     result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address);
    end else begin
     result:=0;
-    AddError('Integer expression expected',nil,false);
+    AddError('Integer expression expected',@Node.SourceLocation,false);
    end;
   end;
   astnkTERNARY:begin
@@ -789,9 +791,46 @@ begin
   end;
   else begin
    result:=0;
-   AddError('Integer expression expected',nil,false);
+   AddError('Integer expression expected',@Node.SourceLocation,false);
   end;
  end;
 end;
+
+function TPACCInstance.EvaluateFloatExpression(const Node:TPACCAbstractSyntaxTreeNode;const Kind:TPACCTypeKind):TPACCLongDouble;
+begin
+ case Node.Kind of
+  astnkINTEGER:begin
+   if IsIntType(Node.Type_) then begin
+    result:=TPACCAbstractSyntaxTreeNodeIntegerValue(Node).Value;
+   end else begin
+    result:=0;
+    AddError('Float expression expected',@Node.SourceLocation,false);
+   end;
+  end;
+  astnkFLOAT:begin
+   if IsFloatType(Node.Type_) then begin
+    result:=TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value;
+   end else begin
+    result:=0;
+    AddError('Float expression expected',@Node.SourceLocation,false);
+   end;
+  end;
+  astnkSTRING:begin
+   result:=0;
+   AddError('Float expression expected',@Node.SourceLocation,false);
+  end;
+  astnkOP_CAST:begin
+   result:=EvaluateFloatExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Kind);
+  end;
+  astnkCONV:begin
+   result:=EvaluateFloatExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Kind);
+  end;
+  else begin
+   result:=0;
+   AddError('Float expression expected',nil,false);
+  end;
+ end;
+end;
+
 
 end.

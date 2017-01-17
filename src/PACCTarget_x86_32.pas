@@ -149,13 +149,11 @@ var CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringL
  begin
   case Type_^.Kind of
    tkFLOAT:begin
-    Assert(Node is TPACCAbstractSyntaxTreeNodeFloatValue);
-    f:=TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value;
+    f:=TPACCInstance(Instance).EvaluateFloatExpression(Node,tkFLOAT);
     DataSectionStringList.Add('dd 0x'+IntToHex(TPACCUInt32(pointer(@f)^),8));
    end;
    tkDOUBLE:begin
-    Assert(Node is TPACCAbstractSyntaxTreeNodeFloatValue);
-    d:=TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value;
+    d:=TPACCInstance(Instance).EvaluateFloatExpression(Node,tkDOUBLE);
     DataSectionStringList.Add('dq 0x'+IntToHex(TPACCUInt64(pointer(@d)^),16));
    end;
    tkBOOL:begin
@@ -236,21 +234,34 @@ var CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringL
     dec(Size,Node.ToType^.Size);
    end;
    if Value.Kind=astnkADDR then begin
-
+    case TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand.Kind of
+     astnkLVAR:begin
+      DataSectionStringList.Add(GetVariableLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand))+':');
+      ProcessInitializerList(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).LocalVariableInitialization,
+                             TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).Type_.Size,
+                             0,
+                             Depth+1);
+     end;
+     astnkGVAR:begin
+      DataSectionStringList.Add('dd offset '+GetVariableLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand)));
+     end;
+     else begin
+      TPACCInstance(Instance).AddError('Internal error 2017-01-17-11-06-0000',@Node.SourceLocation,true);
+     end;
+    end;
    end else if (Value.Kind=astnkLVAR) and assigned(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Value).LocalVariableInitialization) then begin
+    ProcessInitializerList(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Value).LocalVariableInitialization,
+                           TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Value).Type_.Size,
+                           0,
+                           Depth);
    end else begin
     EmitPrimitiveTypeData(Node.ToType,Node.InitializionValue,Depth);
    end;
    inc(Index);
   end;
-
   if Size>0 then begin
    DataSectionStringList.Add('db '+IntToStr(Size)+' dup(0)');
   end;
-{ if Node.Kind=astnkINIT then begin
-  end else begin
-   TPACCInstance(Instance).AddError('Internal error 2017-01-17-09-24-0000',@Node.SourceLocation,true);
-  end;{}
  end;
  procedure ProcessDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
  var Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
@@ -261,7 +272,7 @@ var CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringL
     if Node.DeclarationVariable.Kind=astnkGVAR then begin
      Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable);
      if assigned(Node.DeclarationInitialization) then begin
-      BSSSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
+      DataSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
       if not (tfStatic in Variable.Type_^.Flags) then begin
        DataSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
       end;
