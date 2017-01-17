@@ -397,6 +397,8 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
   end;
  end;
  procedure EmitFunction(const Node:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
+ var Index,ReturnSize,RemainingRegisterSize,Size:TPACCInt32;
+     Parameter:TPACCAbstractSyntaxTreeNode;
  begin
   GetCodeLevel(0)^.TextSectionStringList.Add('');
   GetCodeLevel(0)^.TextSectionStringList.Add('.align(16)');
@@ -404,7 +406,74 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
    GetCodeLevel(0)^.TextSectionStringList.Add('.public('+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Variable))+' = "'+Node.FunctionName+'")');
   end;
   GetCodeLevel(0)^.TextSectionStringList.Add(GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Variable))+':');
-  GetCodeLevel(0)^.TextSectionStringList.Add('ret');
+  GetCodeLevel(0)^.TextSectionStringList.Add('push ebp');
+  GetCodeLevel(0)^.TextSectionStringList.Add('mov ebp,esp');
+  // ..
+  GetCodeLevel(0)^.TextSectionStringList.Add('mov esp,ebp');
+  GetCodeLevel(0)^.TextSectionStringList.Add('pop ebp');
+  if (Node.FunctionName='main') and (Node.Type_^.ReturnType^.Kind=tkVOID) then begin
+   GetCodeLevel(0)^.TextSectionStringList.Add('xor eax,eax');
+  end;
+  case Node.Type_^.CallingConvention of
+   ccSTDCALL:begin
+    ReturnSize:=0;
+    for Index:=0 to Node.Parameters.Count-1 do begin
+     Parameter:=Node.Parameters[Index];
+     case Parameter.Type_^.Size of
+      1,2,4:begin
+       inc(ReturnSize,4);
+      end;
+      8:begin
+       inc(ReturnSize,8);
+      end;
+      else begin
+       inc(ReturnSize,(Parameter.Type_^.Size+3) and not TPACCInt32(3));
+      end;
+     end;
+    end;
+   end;
+   ccFASTCALL:begin
+    // Microsoft or GCC __fastcall convention passes the first two arguments (evaluated left to right)
+    // that fit into ECX and EDX. Remaining arguments are pushed onto the stack from right to left.
+    RemainingRegisterSize:=8;
+    ReturnSize:=0;
+    for Index:=0 to Node.Parameters.Count-1 do begin
+     Parameter:=Node.Parameters[Index];
+     case Parameter.Type_^.Size of
+      1,2,4:begin
+       if RemainingRegisterSize>=4 then begin
+        dec(ReturnSize,4);
+       end else begin
+        inc(ReturnSize,4);
+       end;
+      end;
+      8:begin
+       if RemainingRegisterSize>=8 then begin
+        dec(ReturnSize,8);
+       end else begin
+        inc(ReturnSize,8);
+       end;
+      end;
+      else begin
+       Size:=(Parameter.Type_^.Size+3) and not TPACCInt32(3);
+       if RemainingRegisterSize>=Size then begin
+        dec(ReturnSize,Size);
+       end else begin
+        inc(ReturnSize,Size);
+       end;
+      end;
+     end;
+    end;
+   end;
+   else {ccCDECL:}begin
+    ReturnSize:=0; // Because it is the callee task in this case
+   end;
+  end;
+  if ReturnSize>0 then begin
+   GetCodeLevel(0)^.TextSectionStringList.Add('ret '+IntToStr(ReturnSize));
+  end else begin
+   GetCodeLevel(0)^.TextSectionStringList.Add('ret');
+  end;
  end;
  procedure ProcessRootNode(const Node:TPACCAbstractSyntaxTreeNode);
  begin
