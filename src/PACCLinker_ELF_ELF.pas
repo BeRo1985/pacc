@@ -1119,6 +1119,12 @@ type PELFIdent=^TELFIdent;
 
        fRelocations:TPACCLinker_ELF_ELF_RelocationList;
 
+       fMergedOffset:TPACCInt64;
+
+       fMergedToSection:TPACCLinker_ELF_ELF_Section;
+
+       fMerged:boolean;
+
        fActive:boolean;
 
       public
@@ -1151,6 +1157,12 @@ type PELFIdent=^TELFIdent;
        property Symbols:TPACCLinker_ELF_ELF_SymbolList read fSymbols;
 
        property Relocations:TPACCLinker_ELF_ELF_RelocationList read fRelocations;
+
+       property MergedOffset:TPACCInt64 read fMergedOffset write fMergedOffset;
+
+       property MergedToSection:TPACCLinker_ELF_ELF_Section read fMergedToSection write fMergedToSection;
+
+       property Merged:boolean read fMerged write fMerged;
 
        property Active:boolean read fActive write fActive;
 
@@ -1283,6 +1295,15 @@ function ELF_HASH(Name:PAnsiChar):TPACCUInt64;
 implementation
 
 uses PACCInstance,PACCTarget_x86_32;
+
+type PSTabSym=^TSTabSym;
+     TSTabSym=packed record
+      n_strx:TPACCUInt32; // index into string table of name
+      n_type:TPACCUInt8; // type of symbol
+      n_other:TPACCUInt8; // misc info (usually empty)
+      n_desc:TPACCUInt16; // description field
+      n_value:TPACCUInt32; // value of symbol
+     end;
 
 function ELF_ST_BIND(const i:TELFWord):TELFWord;
 begin
@@ -1962,6 +1983,8 @@ begin
 end;
 
 procedure TPACCLinker_ELF_ELF.Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
+type PPACCUInt8s=^TPACCUInt8s;
+     TPACCUInt8s=array[0..65535] of TPACCUInt8;
  procedure WriteNullPadding(const Stream:TStream;Value:TPACCInt64);
  var PartCount:TPACCInt64;
  begin
@@ -2198,11 +2221,15 @@ procedure TPACCLinker_ELF_ELF.Link(const AOutputStream:TStream;const AOutputFile
   end;
  end;
 var OutputImage:TPACCLinker_ELF_ELF_Image;
-    ImageIndex,ImageSectionIndex,OutputImageSectionIndex:TPACCInt32;
+    ImageIndex,ImageSectionIndex,OutputImageSectionIndex,
+    SymbolOffsetIndex,ImageSymbolIndex:TPACCInt32;
     Image:TPACCLinker_ELF_ELF_Image;
-    ImageSection,OutputImageSection,CurrentOutputImageSection:TPACCLinker_ELF_ELF_Section;
+    ImageSection,ImageSectionSTab,ImageSectionSTabStr,
+    OutputImageSection,CurrentOutputImageSection:TPACCLinker_ELF_ELF_Section;
     HasGNULinkOnce:boolean;
-    Offset:TPACCInt64;
+    ImageSymbol:TPACCLinker_ELF_ELF_Symbol;
+    STabSym:PSTabSym;
+    Position:TPACCInt64;
 begin
 
  OutputImage:=TPACCLinker_ELF_ELF_Image.Create(self);
@@ -2216,9 +2243,16 @@ begin
 
    Image:=Images[ImageIndex];
 
+   SymbolOffsetIndex:=OutputImage.Symbols.Count;
+
+   ImageSectionSTab:=nil;
+   ImageSectionSTabStr:=nil;
+
    for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
 
     ImageSection:=Image.Sections[ImageSectionIndex];
+
+    ImageSection.Merged:=false;
 
     if (ImageSection.sh_type in [SHT_PROGBITS,
                                  SHT_REL,
@@ -2257,13 +2291,42 @@ begin
 
      ImageSection.Stream.Seek(0,soBeginning);
      OutputImageSection.Stream.Seek(OutputImageSection.Stream.Size,soBeginning);
-     WriteNullPadding(OutputImageSection.Stream,Max(0,TPACCInt64((OutputImageSection.Stream.Size+TPACCInt64(ImageSection.sh_addralign-1)) and not TPACCInt64(ImageSection.sh_addralign-1))-OutputImageSection.Stream.Size));
-     Offset:=OutputImageSection.Stream.Size;
-     if Offset<>0 then begin
+     if ImageSection.Name='.stab' then begin
+      ImageSectionSTab:=ImageSection;
+     end else if ImageSection.Name='.stabstr' then begin
+      ImageSectionSTabStr:=ImageSection;
+     end else begin
+      WriteNullPadding(OutputImageSection.Stream,Max(0,TPACCInt64((OutputImageSection.Stream.Size+TPACCInt64(ImageSection.sh_addralign-1)) and not TPACCInt64(ImageSection.sh_addralign-1))-OutputImageSection.Stream.Size));
      end;
-     OutputImageSection.Stream.CopyFrom(ImageSection.Stream,ImageSection.Stream.Size);
+     ImageSection.MergedOffset:=OutputImageSection.Stream.Size;
+     ImageSection.MergedToSection:=OutputImageSection;
+     if ImageSection.sh_type=SHT_NOBITS then begin
+      WriteNullPadding(OutputImageSection.Stream,ImageSection.Stream.Size);
+     end else begin
+      OutputImageSection.Stream.CopyFrom(ImageSection.Stream,ImageSection.Stream.Size);
+     end;
+
+     ImageSection.Merged:=true;
 
     end;
+
+   end;
+
+   if assigned(ImageSectionSTab) and assigned(ImageSectionSTabStr) and
+      ImageSectionSTab.Merged and ImageSectionSTabStr.Merged then begin
+    Position:=0;
+    while (Position+SizeOf(TSTabSym))<=ImageSectionSTab.Stream.Size do begin
+     STabSym:=pointer(@PPACCUInt8s(ImageSectionSTab.MergedToSection.Stream.Memory)^[ImageSectionSTab.MergedOffset+Position]);
+     inc(STabSym^.n_strx,ImageSectionSTabStr.MergedOffset);
+     inc(Position,SizeOf(TSTabSym));
+    end;
+   end;
+
+   for ImageSymbolIndex:=0 to Image.Symbols.Count-1 do begin
+
+    ImageSymbol:=Image.Symbols[ImageSymbolIndex];
+
+    
 
    end;
 
