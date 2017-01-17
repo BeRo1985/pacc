@@ -2291,7 +2291,9 @@ var OutputImage:TPACCLinker_ELF_ELF_Image;
   result.st_shndx:=st_shndx;
   result.st_value:=st_value;
   result.st_size:=st_size;
-  OutputImageSymbolNameHashMap[SymbolName]:=result;
+  if ELF_ST_BIND(st_info)<>STB_LOCAL then begin
+   OutputImageSymbolNameHashMap[SymbolName]:=result;
+  end;
   if result.st_shndx=SHN_UNDEF then begin
    result.Section:=nil;
   end else if result.st_shndx<OutputImage.Sections.Count then begin
