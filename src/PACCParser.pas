@@ -498,39 +498,6 @@ var CurrentState:TState;
    NextToken;
   end;
  end;
- function TypeConversion(const Node:TPACCAbstractSyntaxTreeNode):TPACCAbstractSyntaxTreeNode;
- var Type_:PPACCType;
- begin
-  if assigned(Node) then begin
-   Type_:=Node.Type_;
-   case Type_^.Kind of
-    tkARRAY:begin
-     // C11 6.3.2.1p3: An array of T is converted to a pointer to T.
-     result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkCONV,TPACCInstance(Instance).NewPointerType(Type_^.ChildType),Node.SourceLocation,Node);
-    end;
-    tkFUNCTION:begin
-     // C11 6.3.2.1p4: A function designator is converted to a pointer to the function.
-     result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkADDR,TPACCInstance(Instance).NewPointerType(Type_),Node.SourceLocation,Node);
-    end;
-    tkSHORT,tkCHAR,tkBOOL:begin
-     // C11 6.3.1.1p2: The integer promotions
-     result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkCONV,TPACCInstance(Instance).TypeINT,Node.SourceLocation,Node);
-    end;
-    tkINT:begin
-     if Type_^.BitSize>0 then begin
-      result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkCONV,TPACCInstance(Instance).TypeINT,Node.SourceLocation,Node);
-     end else begin
-      result:=Node;
-     end;
-    end;
-    else begin
-     result:=Node;
-    end;
-   end;
-  end else begin
-   result:=nil;
-  end;
- end;
  function Wrap(const t:PPACCType;const Node:TPACCAbstractSyntaxTreeNode):TPACCAbstractSyntaxTreeNode;
  begin
   if TPACCInstance(Instance).SameArithmeticType(t,Node.Type_) then begin
@@ -589,185 +556,6 @@ var CurrentState:TState;
   end;
  end;
  procedure ParseDeclaration(const Block:TPACCAbstractSyntaxTreeNodeList;const IsGlobal,IsTop:boolean); forward;
- function EvaluateIntegerExpression(const Node:TPACCAbstractSyntaxTreeNode;const Address:PPACCAbstractSyntaxTreeNode):TPACCInt64; forward;
- function EvaluateStructReference(const Node:TPACCAbstractSyntaxTreeNode;const Offset:TPACCInt64):TPACCInt64;
- begin
-  if Node.Kind=astnkSTRUCT_REF then begin
-   result:=EvaluateStructReference(TPACCAbstractSyntaxTreeNodeStructReference(Node).Struct,Node.Type_^.Offset+Offset);
-  end else begin
-   result:=EvaluateIntegerExpression(Node,nil)+Offset;
-  end;
- end;
- function EvaluateIntegerExpression(const Node:TPACCAbstractSyntaxTreeNode;const Address:PPACCAbstractSyntaxTreeNode):TPACCInt64;
- begin
-  case Node.Kind of
-   astnkINTEGER:begin
-    if TPACCInstance(Instance).IsIntType(Node.Type_) then begin
-     result:=TPACCAbstractSyntaxTreeNodeIntegerValue(Node).Value;
-    end else begin
-     result:=0;
-     AddError('Integer expression expected',nil,false);
-    end;
-   end;
-   astnkFLOAT:begin
-    result:=0;
-    AddError('Integer expression expected',nil,false);
-   end;
-   astnkSTRING:begin
-    result:=0;
-    AddError('Integer expression expected',nil,false);
-   end;
-   astnkOP_LOG_NOT:begin
-    if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address)<>0 then begin
-     result:=0;
-    end else begin
-     result:=1;
-    end;
-   end;
-   astnkOP_NOT:begin
-    result:=not EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address);
-   end;
-   astnkOP_NEG:begin
-    result:=-EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address);
-   end;
-   astnkOP_CAST:begin
-    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address);
-   end;
-   astnkCONV:begin
-    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address);
-   end;
-   astnkADDR:begin
-    if TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Kind=astnkSTRUCT_REF then begin
-     result:=EvaluateStructReference(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,0);
-    end else begin
-     if assigned(Address) then begin
-      Address^:=TypeConversion(Node);
-      result:=0;
-     end else begin
-      result:=0;
-      AddError('Integer expression expected',nil,false);
-     end;
-    end;
-   end;
-   astnkGVAR:begin
-    if assigned(Address) then begin
-     Address^:=TypeConversion(Node);
-     result:=0;
-    end else begin
-     result:=0;
-     AddError('Integer expression expected',nil,false);
-    end;
-   end;
-   astnkDEREF:begin
-    if TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.Kind=tKPOINTER then begin
-     result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address);
-    end else begin
-     result:=0;
-     AddError('Integer expression expected',nil,false);
-    end;
-   end;
-   astnkTERNARY:begin
-    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Condition,Address);
-    if result<>0 then begin
-     if assigned(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Then_) then begin
-      result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Then_,Address);
-     end;
-    end else begin
-     result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Else_,Address);
-    end;
-   end;
-   astnkOP_ADD:begin
-    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)+EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
-   end;
-   astnkOP_SUB:begin
-    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)-EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
-   end;
-   astnkOP_MUL:begin
-    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)*EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
-   end;
-   astnkOP_DIV:begin
-    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) div EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
-   end;
-   astnkOP_A_AND:begin
-    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) and EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
-   end;
-   astnkOP_A_OR:begin
-    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) or EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
-   end;
-   astnkOP_A_XOR:begin
-    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) xor EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
-   end;
-   astnkOP_EQ:begin
-    if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address) then begin
-     result:=1;
-    end else begin
-     result:=0;
-    end;
-   end;
-   astnkOP_LE:begin
-    if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)<=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address) then begin
-     result:=1;
-    end else begin
-     result:=0;
-    end;
-   end;
-   astnkOP_NE:begin
-    if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)<>EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address) then begin
-     result:=1;
-    end else begin
-     result:=0;
-    end;
-   end;
-   astnkOP_GE:begin
-    if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)>=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address) then begin
-     result:=1;
-    end else begin
-     result:=0;
-    end;
-   end;
-   astnkOP_LT:begin
-    if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)<EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address) then begin
-     result:=1;
-    end else begin
-     result:=0;
-    end;
-   end;
-   astnkOP_GT:begin
-    if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)>EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address) then begin
-     result:=1;
-    end else begin
-     result:=0;
-    end;
-   end;
-   astnkOP_SHL:begin
-    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) shl EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
-   end;
-   astnkOP_SHR:begin
-    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) shr EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
-   end;
-   astnkOP_SAR:begin
-    result:=SARcint64(EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address),EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address));
-   end;
-   astnkOP_LOG_AND:begin
-    if (EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)<>0) and (EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address)<>0) then begin
-     result:=1;
-    end else begin
-     result:=0;
-    end;
-   end;
-   astnkOP_LOG_OR:begin
-    if (EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)<>0) or (EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address)<>0) then begin
-     result:=1;
-    end else begin
-     result:=0;
-    end;
-   end;
-   else begin
-    result:=0;
-    AddError('Integer expression expected',nil,false);
-   end;
-  end;
- end;
  function ParseIntegerExpression:TPACCInt64; forward;
  function ParseCastType:PPACCType; forward;
  function ParseCastExpression:TPACCAbstractSyntaxTreeNode; forward;
@@ -974,7 +762,7 @@ var CurrentState:TState;
     NextToken;
     break;
    end else begin
-    ArgumentNode:=TypeConversion(ParseAssignmentExpression);
+    ArgumentNode:=TPACCInstance(Instance).TypeConversion(ParseAssignmentExpression);
     if Index<length(Parameters) then begin
      ParameterType:=Parameters[Index];
      inc(Index);
@@ -1061,7 +849,7 @@ var CurrentState:TState;
   SubscriptionExpression:=ParseExpression;
   if assigned(SubscriptionExpression) then begin
    Expect(TOK_RBRK);
-   result:=BinaryOperation(astnkOP_ADD,TypeConversion(Node),TypeConversion(SubscriptionExpression));
+   result:=BinaryOperation(astnkOP_ADD,TPACCInstance(Instance).TypeConversion(Node),TPACCInstance(Instance).TypeConversion(SubscriptionExpression));
    result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkDEREF,result.Type_^.ChildType,result.SourceLocation,result);
   end else begin
    AddError('Subscription expected',nil,true);
@@ -1077,7 +865,7 @@ var CurrentState:TState;
     case CurrentState.Token^.TokenType of
      TOK_LPAR:begin
       NextToken;
-      result:=TypeConversion(result);
+      result:=TPACCInstance(Instance).TypeConversion(result);
       Type_:=result.Type_;
       if (Type_^.Kind<>tkPOINTER) or ((not assigned(Type_^.ChildType)) or (Type_^.ChildType^.Kind<>tkFUNCTION)) then begin
        AddError('Function expected',nil,false);
@@ -1158,13 +946,13 @@ var CurrentState:TState;
    end;
    TOK_DEC:begin
     NextToken;
-    result:=TypeConversion(ParseUnaryExpression);
+    result:=TPACCInstance(Instance).TypeConversion(ParseUnaryExpression);
     EnsureLValue(result);
     result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkOP_PRE_DEC,result.Type_,RelevantSourceLocation,result);
    end;
    TOK_INC:begin
     NextToken;
-    result:=TypeConversion(ParseUnaryExpression);
+    result:=TPACCInstance(Instance).TypeConversion(ParseUnaryExpression);
     EnsureLValue(result);
     result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkOP_PRE_INC,result.Type_,RelevantSourceLocation,result);
    end;
@@ -1182,13 +970,13 @@ var CurrentState:TState;
    TOK_AND:begin
     result:=ParseCastExpression;
     if result.Kind=astnkFUNCDESG then begin
-     result:=TypeConversion(result);
+     result:=TPACCInstance(Instance).TypeConversion(result);
     end;
     EnsureLValue(result);
     result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkADDR,TPACCInstance(Instance).NewPointerType(result.Type_),RelevantSourceLocation,result);
    end;
    TOK_MUL:begin
-    result:=TypeConversion(ParseCastExpression);
+    result:=TPACCInstance(Instance).TypeConversion(ParseCastExpression);
     if result.Type_^.Kind<>tkPOINTER then begin
      AddError('Pointer type expected',nil,false);
     end else if result.Type_^.Kind<>tkFUNCTION then begin
@@ -1199,16 +987,16 @@ var CurrentState:TState;
     result:=ParseCastExpression;
    end;
    TOK_SUB:begin
-    result:=TypeConversion(ParseCastExpression);
+    result:=TPACCInstance(Instance).TypeConversion(ParseCastExpression);
     EnsureArithmeticType(result);
     if TPACCInstance(Instance).IsIntType(result.Type_) then begin
-     result:=BinaryOperation(astnkOP_SUB,TypeConversion(TPACCAbstractSyntaxTreeNodeIntegerValue.Create(TPACCInstance(Instance),astnkINTEGER,result.Type_,RelevantSourceLocation,0)),TypeConversion(result));
+     result:=BinaryOperation(astnkOP_SUB,TPACCInstance(Instance).TypeConversion(TPACCAbstractSyntaxTreeNodeIntegerValue.Create(TPACCInstance(Instance),astnkINTEGER,result.Type_,RelevantSourceLocation,0)),TPACCInstance(Instance).TypeConversion(result));
     end else begin
      result:=BinaryOperation(astnkOP_SUB,TPACCAbstractSyntaxTreeNodeFloatValue.Create(TPACCInstance(Instance),astnkINTEGER,result.Type_,RelevantSourceLocation,0.0),result);
     end;
    end;
    TOK_NOT:begin
-    result:=TypeConversion(ParseCastExpression);
+    result:=TPACCInstance(Instance).TypeConversion(ParseCastExpression);
     if TPACCInstance(Instance).IsIntType(result.Type_) then begin
      result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkOP_NOT,result.Type_,RelevantSourceLocation,result);
     end else begin
@@ -1216,7 +1004,7 @@ var CurrentState:TState;
     end;
    end;
    TOK_LNOT:begin
-    result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkOP_LOG_NOT,TPACCInstance(Instance).TypeINT,RelevantSourceLocation,TypeConversion(ParseCastExpression));
+    result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkOP_LOG_NOT,TPACCInstance(Instance).TypeINT,RelevantSourceLocation,TPACCInstance(Instance).TypeConversion(ParseCastExpression));
    end;
    else begin
     result:=ParsePostfixExpression;
@@ -1467,7 +1255,7 @@ var CurrentState:TState;
   if (CurrentState.Token^.TokenType=TOK_LBRA) or TPACCInstance(Instance).IsStringType(Type_) then begin
    ParseInitializerList(result,Type_,0,false);
   end else begin
-   Node:=TypeConversion(ParseAssignmentExpression);
+   Node:=TPACCInstance(Instance).TypeConversion(ParseAssignmentExpression);
    if TPACCInstance(Instance).IsArithmeticType(Node.Type_) and (Node.Type_^.Kind<>Type_^.Kind) then begin
     Node:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkCONV,Type_,Node.SourceLocation,Node);
    end;
@@ -1516,15 +1304,15 @@ var CurrentState:TState;
    case CurrentState.Token^.TokenType of
     TOK_MUL:begin
      NextToken;
-     result:=BinaryOperation(astnkOP_MUL,TypeConversion(result),TypeConversion(ParseCastExpression));
+     result:=BinaryOperation(astnkOP_MUL,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseCastExpression));
     end;
     TOK_DIV:begin
      NextToken;
-     result:=BinaryOperation(astnkOP_DIV,TypeConversion(result),TypeConversion(ParseCastExpression));
+     result:=BinaryOperation(astnkOP_DIV,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseCastExpression));
     end;
     TOK_MOD:begin
      NextToken;
-     result:=BinaryOperation(astnkOP_MOD,TypeConversion(result),TypeConversion(ParseCastExpression));
+     result:=BinaryOperation(astnkOP_MOD,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseCastExpression));
     end;
     else begin
      break;
@@ -1539,11 +1327,11 @@ var CurrentState:TState;
    case CurrentState.Token^.TokenType of
     TOK_ADD:begin
      NextToken;
-     result:=BinaryOperation(astnkOP_ADD,TypeConversion(result),TypeConversion(ParseMultiplicativeExpression));
+     result:=BinaryOperation(astnkOP_ADD,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseMultiplicativeExpression));
     end;
     TOK_SUB:begin
      NextToken;
-     result:=BinaryOperation(astnkOP_SUB,TypeConversion(result),TypeConversion(ParseMultiplicativeExpression));
+     result:=BinaryOperation(astnkOP_SUB,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseMultiplicativeExpression));
     end;
     else begin
      break;
@@ -1578,7 +1366,7 @@ var CurrentState:TState;
    Right:=ParseAdditiveExpression;
    EnsureIntType(result);
    EnsureIntType(Right);
-   result:=BinaryOperation(Op,TypeConversion(result),TypeConversion(Right));
+   result:=BinaryOperation(Op,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(Right));
   until false;
  end;
  function ParseRelationalExpression:TPACCAbstractSyntaxTreeNode;
@@ -1588,19 +1376,19 @@ var CurrentState:TState;
    case CurrentState.Token^.TokenType of
     TOK_LT:begin
      NextToken;
-     result:=BinaryOperation(astnkOP_LT,TypeConversion(result),TypeConversion(ParseShiftExpression));
+     result:=BinaryOperation(astnkOP_LT,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseShiftExpression));
     end;
     TOK_GT:begin
      NextToken;
-     result:=BinaryOperation(astnkOP_GT,TypeConversion(result),TypeConversion(ParseShiftExpression));
+     result:=BinaryOperation(astnkOP_GT,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseShiftExpression));
     end;
     TOK_LE:begin
      NextToken;
-     result:=BinaryOperation(astnkOP_LE,TypeConversion(result),TypeConversion(ParseShiftExpression));
+     result:=BinaryOperation(astnkOP_LE,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseShiftExpression));
     end;
     TOK_GE:begin
      NextToken;
-     result:=BinaryOperation(astnkOP_GE,TypeConversion(result),TypeConversion(ParseShiftExpression));
+     result:=BinaryOperation(astnkOP_GE,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseShiftExpression));
     end;
     else begin
      break;
@@ -1618,7 +1406,7 @@ var CurrentState:TState;
    end;
    TOK_NE:begin
     NextToken;
-    result:=BinaryOperation(astnkOP_NE,TypeConversion(result),TypeConversion(ParseRelationalExpression));
+    result:=BinaryOperation(astnkOP_NE,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseRelationalExpression));
    end;
   end;
  end;
@@ -1627,7 +1415,7 @@ var CurrentState:TState;
   result:=ParseEqualityExpression;
   while CurrentState.Token^.TokenType=TOK_AND do begin
    NextToken;
-   result:=BinaryOperation(astnkOP_AND,TypeConversion(result),TypeConversion(ParseEqualityExpression));
+   result:=BinaryOperation(astnkOP_AND,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseEqualityExpression));
   end;
  end;
  function ParseBitXorExpression:TPACCAbstractSyntaxTreeNode;
@@ -1635,7 +1423,7 @@ var CurrentState:TState;
   result:=ParseBitAndExpression;
   while CurrentState.Token^.TokenType=TOK_XOR do begin
    NextToken;
-   result:=BinaryOperation(astnkOP_XOR,TypeConversion(result),TypeConversion(ParseBitAndExpression));
+   result:=BinaryOperation(astnkOP_XOR,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseBitAndExpression));
   end;
  end;
  function ParseBitOrExpression:TPACCAbstractSyntaxTreeNode;
@@ -1643,7 +1431,7 @@ var CurrentState:TState;
   result:=ParseBitXorExpression;
   while CurrentState.Token^.TokenType=TOK_OR do begin
    NextToken;
-   result:=BinaryOperation(astnkOP_OR,TypeConversion(result),TypeConversion(ParseBitXorExpression));
+   result:=BinaryOperation(astnkOP_OR,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseBitXorExpression));
   end;
  end;
  function ParseLogicalAndExpression:TPACCAbstractSyntaxTreeNode;
@@ -1671,9 +1459,9 @@ var CurrentState:TState;
   result:=Condition;
   if CurrentState.Token^.TokenType=TOK_QUEST then begin
    NextToken;
-   Then_:=TypeConversion(ParseCommaExpression);
+   Then_:=TPACCInstance(Instance).TypeConversion(ParseCommaExpression);
    Expect(TOK_COLON);
-   Else_:=TypeConversion(ParseConditionalExpression);
+   Else_:=TPACCInstance(Instance).TypeConversion(ParseConditionalExpression);
    if assigned(Then_) then begin
     t:=Then_.Type_;
    end else begin
@@ -1747,12 +1535,12 @@ var CurrentState:TState;
      end;
     end;
     NextToken;
-    Value:=TypeConversion(ParseAssignmentExpression);
+    Value:=TPACCInstance(Instance).TypeConversion(ParseAssignmentExpression);
     EnsureLValue(result);
     if Op=astnkOP_ASSIGN then begin
      Right:=Value;
     end else begin
-     Right:=BinaryOperation(Op,TypeConversion(result),Value);
+     Right:=BinaryOperation(Op,TPACCInstance(Instance).TypeConversion(result),Value);
     end;
     if TPACCInstance(Instance).IsArithmeticType(result.Type_) and (result.Type_.Kind<>Right.Type_.Kind) then begin
      Right:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkCONV,result.Type_,Right.SourceLocation,Right);
@@ -1784,7 +1572,7 @@ var CurrentState:TState;
  end;
  function ParseIntegerExpression:TPACCInt64;
  begin
-  result:=EvaluateIntegerExpression(ParseConditionalExpression,nil);
+  result:=TPACCInstance(Instance).EvaluateIntegerExpression(ParseConditionalExpression,nil);
  end;
  function ParseFunctionDefinition:pointer;
  begin
@@ -2102,7 +1890,7 @@ var CurrentState:TState;
        EnsureLValue(Expression);
       end else begin
        if pos('m',Constraint)=0 then begin
-        Expression:=TypeConversion(Expression);
+        Expression:=TPACCInstance(Instance).TypeConversion(Expression);
        end;
       end;
       Operand:=TPACCAbstractSyntaxTreeNodeAssemblerOperand.Create(TPACCInstance(Instance),astnkASSEMBLER_OPERAND,nil,RelevantSourceLocation,Identifier,Constraint,Expression);
@@ -2388,7 +2176,7 @@ var CurrentState:TState;
   RelevantSourceLocation:=CurrentState.Token^.SourceLocation;
   SwitchCases:=nil;
   Expect(TOK_LPAR);
-  ExpressionNode:=TypeConversion(ParseExpression);
+  ExpressionNode:=TPACCInstance(Instance).TypeConversion(ParseExpression);
   EnsureIntType(ExpressionNode);
   Expect(TOK_RPAR);
   OldCases:=Cases;

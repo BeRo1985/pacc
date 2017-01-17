@@ -135,16 +135,84 @@ var CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringL
  begin
   result:='__varlabel_'+IntToStr(TPACCPtrUInt(pointer(Variable)));
  end;
- procedure ProcessInitializer(const Node:TPACCAbstractSyntaxTreeNodeInitializer);
+ procedure EmitPrimitiveTypeData(const Type_:PPACCType;const Node:TPACCAbstractSyntaxTreeNode;const Depth:TPACCInt32);
+ var f:TPACCFloat;
+     d:TPACCDouble;
  begin
-  if Node.Kind=astnkINIT then begin
+  case Type_^.Kind of
+   tkFLOAT:begin
+    Assert(Node is TPACCAbstractSyntaxTreeNodeFloatValue);
+    f:=TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value;
+    DataSectionStringList.Add('dd 0x'+IntToHex(TPACCUInt32(pointer(@f)^),8));
+   end;
+   tkDOUBLE:begin
+    Assert(Node is TPACCAbstractSyntaxTreeNodeFloatValue);
+    d:=TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value;
+    DataSectionStringList.Add('dq 0x'+IntToHex(TPACCUInt64(pointer(@d)^),16));
+   end;
+   tkBOOL:begin
+    DataSectionStringList.Add('db '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
+   end;
+   tkCHAR:begin
+    DataSectionStringList.Add('db '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
+   end;
+   tkSHORT:begin
+    DataSectionStringList.Add('dw '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
+   end;
+   tkINT:begin
+    DataSectionStringList.Add('dd '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
+   end;
+   tkLONG,tkLLONG:begin
+    DataSectionStringList.Add('dq '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
+   end;
+   tkPOINTER:begin
+    DataSectionStringList.Add('dd '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
+   end;
+  end;
+ end;
+ procedure ProcessInitializerList(const Nodes:TPACCAbstractSyntaxTreeNodeList;Size,Offset:TPACCInt64;const Depth:TPACCInt32);
+ var Index:TPACCInt32;
+     Node:TPACCAbstractSyntaxTreeNodeInitializer;
+     Value:TPACCAbstractSyntaxTreeNode;
+     Delta:TPACCInt64;
+ begin
+  Index:=0;
+  while Index<Nodes.Count do begin
+
+   Node:=TPACCAbstractSyntaxTreeNodeInitializer(Nodes[Index]);
+
+   Value:=Node.InitializionValue;
+
+   Delta:=Node.InitializionOffset-Offset;
+   if Delta>0 then begin
+    DataSectionStringList.Add('db '+IntToStr(Delta)+' dup(0)');
+   end;
+
+   if Node.ToType^.BitSize>0 then begin
+
+   end else begin
+    inc(Offset,Node.ToType^.Size);
+    dec(Size,Node.ToType^.Size);
+   end;
+   if Value.Kind=astnkADDR then begin
+
+   end else if (Value.Kind=astnkLVAR) and assigned(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Value).LocalVariableInitialization) then begin
+   end else begin
+    EmitPrimitiveTypeData(Node.ToType,Node.InitializionValue,Depth);
+   end;
+   inc(Index);
+  end;
+
+  if Size>0 then begin
+   DataSectionStringList.Add('db '+IntToStr(Size)+' dup(0)');
+  end;
+{ if Node.Kind=astnkINIT then begin
   end else begin
    TPACCInstance(Instance).AddError('Internal error 2017-01-17-09-24-0000',@Node.SourceLocation,true);
-  end;
+  end;{}
  end;
  procedure ProcessDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
  var Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
-     Index:TPACCInt32;
  begin
   if assigned(Node.DeclarationVariable) then begin
    if assigned(CurrentFunction) then begin
@@ -152,14 +220,14 @@ var CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringL
     if Node.DeclarationVariable.Kind=astnkGVAR then begin
      Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable);
      if assigned(Node.DeclarationInitialization) then begin
+      BSSSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
       if not (tfStatic in Variable.Type_^.Flags) then begin
        DataSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
       end;
       DataSectionStringList.Add(GetVariableLabel(Variable)+':');
-      for Index:=0 to Node.DeclarationInitialization.Count-1 do begin
-       ProcessInitializer(TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[Index]));
-      end;
+      ProcessInitializerList(Node.DeclarationInitialization,0,0,0);
      end else begin
+      BSSSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
       if not (tfStatic in Variable.Type_^.Flags) then begin
        BSSSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
       end;

@@ -5,7 +5,7 @@ interface
 
 uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCRawByteStringHashMap,PACCTarget,
      PACCPreprocessor,PACCLexer,PACCParser,PACCAnalyzer,PACCHighLevelOptimizer,
-     PACCLinker;
+     PACCLinker,PACCAbstractSyntaxTree;
 
 type EPACCError=class(Exception)
       public
@@ -97,6 +97,10 @@ type EPACCError=class(Exception)
        function AreTypesCompatible(const a,b:PPACCType):boolean;
 
        function AreTypesEqual(const a,b:PPACCType):boolean;
+
+       function TypeConversion(const Node:TPACCAbstractSyntaxTreeNode):TPACCAbstractSyntaxTreeNode;
+
+       function EvaluateIntegerExpression(const Node:TPACCAbstractSyntaxTreeNode;const Address:PPACCAbstractSyntaxTreeNode):TPACCInt64;
 
      end;
 
@@ -574,6 +578,219 @@ begin
   end;
  end else begin
   result:=false;
+ end;
+end;
+
+function TPACCInstance.TypeConversion(const Node:TPACCAbstractSyntaxTreeNode):TPACCAbstractSyntaxTreeNode;
+var Type_:PPACCType;
+begin
+ if assigned(Node) then begin
+  Type_:=Node.Type_;
+  case Type_^.Kind of
+   tkARRAY:begin
+    // C11 6.3.2.1p3: An array of T is converted to a pointer to T.
+    result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(self,astnkCONV,NewPointerType(Type_^.ChildType),Node.SourceLocation,Node);
+   end;
+   tkFUNCTION:begin
+    // C11 6.3.2.1p4: A function designator is converted to a pointer to the function.
+    result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(self,astnkADDR,NewPointerType(Type_),Node.SourceLocation,Node);
+   end;
+   tkSHORT,tkCHAR,tkBOOL:begin
+    // C11 6.3.1.1p2: The integer promotions
+    result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(self,astnkCONV,TypeINT,Node.SourceLocation,Node);
+   end;
+   tkINT:begin
+    if Type_^.BitSize>0 then begin
+     result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(self,astnkCONV,TypeINT,Node.SourceLocation,Node);
+    end else begin
+     result:=Node;
+    end;
+   end;
+   else begin
+    result:=Node;
+   end;
+  end;
+ end else begin
+  result:=nil;
+ end;
+end;
+
+function TPACCInstance.EvaluateIntegerExpression(const Node:TPACCAbstractSyntaxTreeNode;const Address:PPACCAbstractSyntaxTreeNode):TPACCInt64;
+ function EvaluateStructReference(const Node:TPACCAbstractSyntaxTreeNode;const Offset:TPACCInt64):TPACCInt64;
+ begin
+  if Node.Kind=astnkSTRUCT_REF then begin
+   result:=EvaluateStructReference(TPACCAbstractSyntaxTreeNodeStructReference(Node).Struct,Node.Type_^.Offset+Offset);
+  end else begin
+   result:=EvaluateIntegerExpression(Node,nil)+Offset;
+  end;
+ end;
+begin
+ case Node.Kind of
+  astnkINTEGER:begin
+   if IsIntType(Node.Type_) then begin
+    result:=TPACCAbstractSyntaxTreeNodeIntegerValue(Node).Value;
+   end else begin
+    result:=0;
+    AddError('Integer expression expected',nil,false);
+   end;
+  end;
+  astnkFLOAT:begin
+   result:=0;
+   AddError('Integer expression expected',nil,false);
+  end;
+  astnkSTRING:begin
+   result:=0;
+   AddError('Integer expression expected',nil,false);
+  end;
+  astnkOP_LOG_NOT:begin
+   if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address)<>0 then begin
+    result:=0;
+   end else begin
+    result:=1;
+   end;
+  end;
+  astnkOP_NOT:begin
+   result:=not EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address);
+  end;
+  astnkOP_NEG:begin
+   result:=-EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address);
+  end;
+  astnkOP_CAST:begin
+   result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address);
+  end;
+  astnkCONV:begin
+   result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address);
+  end;
+  astnkADDR:begin
+   if TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Kind=astnkSTRUCT_REF then begin
+    result:=EvaluateStructReference(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,0);
+   end else begin
+    if assigned(Address) then begin
+     Address^:=TypeConversion(Node);
+     result:=0;
+    end else begin
+     result:=0;
+     AddError('Integer expression expected',nil,false);
+    end;
+   end;
+  end;
+  astnkGVAR:begin
+   if assigned(Address) then begin
+    Address^:=TypeConversion(Node);
+    result:=0;
+   end else begin
+    result:=0;
+    AddError('Integer expression expected',nil,false);
+   end;
+  end;
+  astnkDEREF:begin
+   if TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.Kind=tKPOINTER then begin
+    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Address);
+   end else begin
+    result:=0;
+    AddError('Integer expression expected',nil,false);
+   end;
+  end;
+  astnkTERNARY:begin
+   result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Condition,Address);
+   if result<>0 then begin
+    if assigned(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Then_) then begin
+     result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Then_,Address);
+    end;
+   end else begin
+    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Else_,Address);
+   end;
+  end;
+  astnkOP_ADD:begin
+   result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)+EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
+  end;
+  astnkOP_SUB:begin
+   result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)-EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
+  end;
+  astnkOP_MUL:begin
+   result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)*EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
+  end;
+  astnkOP_DIV:begin
+   result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) div EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
+  end;
+  astnkOP_A_AND:begin
+   result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) and EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
+  end;
+  astnkOP_A_OR:begin
+   result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) or EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
+  end;
+  astnkOP_A_XOR:begin
+   result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) xor EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
+  end;
+  astnkOP_EQ:begin
+   if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address) then begin
+    result:=1;
+   end else begin
+    result:=0;
+   end;
+  end;
+  astnkOP_LE:begin
+   if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)<=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address) then begin
+    result:=1;
+   end else begin
+    result:=0;
+   end;
+  end;
+  astnkOP_NE:begin
+   if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)<>EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address) then begin
+    result:=1;
+   end else begin
+    result:=0;
+   end;
+  end;
+  astnkOP_GE:begin
+   if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)>=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address) then begin
+    result:=1;
+   end else begin
+    result:=0;
+   end;
+  end;
+  astnkOP_LT:begin
+   if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)<EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address) then begin
+    result:=1;
+   end else begin
+    result:=0;
+   end;
+  end;
+  astnkOP_GT:begin
+   if EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)>EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address) then begin
+    result:=1;
+   end else begin
+    result:=0;
+   end;
+  end;
+  astnkOP_SHL:begin
+   result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) shl EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
+  end;
+  astnkOP_SHR:begin
+   result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) shr EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
+  end;
+  astnkOP_SAR:begin
+   result:=SARcint64(EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address),EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address));
+  end;
+  astnkOP_LOG_AND:begin
+   if (EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)<>0) and (EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address)<>0) then begin
+    result:=1;
+   end else begin
+    result:=0;
+   end;
+  end;
+  astnkOP_LOG_OR:begin
+   if (EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address)<>0) or (EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address)<>0) then begin
+    result:=1;
+   end else begin
+    result:=0;
+   end;
+  end;
+  else begin
+   result:=0;
+   AddError('Integer expression expected',nil,false);
+  end;
  end;
 end;
 
