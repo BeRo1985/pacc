@@ -177,7 +177,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
  end;
  function GetNodeLabelName(const Node:TPACCAbstractSyntaxTreeNode):TPACCRawByteString;
  begin
-  result:='$node$label_'+IntToStr(TPACCPtrUInt(pointer(Node)));
+  result:='_node@'+IntToStr(TPACCPtrUInt(pointer(Node)));
  end;
  procedure EmitPrimitiveTypeData(const Type_:PPACCType;const Node:TPACCAbstractSyntaxTreeNode;const Depth:TPACCInt32);
  var f:TPACCFloat;
@@ -220,7 +220,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
                 (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.ChildType^.Kind=tkCHAR) then begin
      GetCodeLevel(Depth+1)^.DataSectionStringList.Add('');
      GetCodeLevel(Depth+1)^.DataSectionStringList.Add('.align('+IntToStr(Max(4,TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.ChildType^.Alignment))+')');
-     GetCodeLevel(Depth+1)^.DataSectionStringList.Add('$_stringlabel_'+IntToStr(TPACCPtrUInt(pointer(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand)))+':');
+     GetCodeLevel(Depth+1)^.DataSectionStringList.Add(GetNodeLabelName(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand)+':');
      for i32:=1 to length(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Value) do begin
       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('db '+IntToStr(TPACCUInt8(AnsiChar(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Value[i32]))));
      end;
@@ -238,7 +238,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
        GetCodeLevel(Depth+1)^.DataSectionStringList.Add('db 0');
       end;
      end;
-     GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset $_stringlabel_'+IntToStr(TPACCPtrUInt(pointer(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand))));
+     GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand));
     end else if Node.Kind=astnkGVAR then begin
      GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)));
     end else begin
