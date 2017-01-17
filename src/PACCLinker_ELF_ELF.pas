@@ -8,7 +8,7 @@ uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCRawByteStringHashMap,P
 const ET_NONE=0;
       ET_REL=1;
       ET_EXEC=2;
-      ET_DYN=3; 
+      ET_DYN=3;
       ET_CORE=4; 
       ET_LOOS=$fe00; 
       ET_HIOS=$feff; 
@@ -322,7 +322,7 @@ const ET_NONE=0;
       SHT_STRTAB=3; 
       SHT_RELA=4;
       SHT_HASH=5; 
-      SHT_DYNAMIC=6; 
+      SHT_DYNAMIC=6;
       SHT_NOTE=7; 
       SHT_NOBITS=8; 
       SHT_REL=9; 
@@ -444,7 +444,7 @@ const ET_NONE=0;
       R_X86_64_GNU_VTENTRY=251; 
 
       // Segment types
-      PT_NULL=0; 
+      PT_NULL=0;
       PT_LOAD=1;
       PT_DYNAMIC=2;
       PT_INTERP=3;
@@ -476,7 +476,7 @@ const ET_NONE=0;
       DT_RELASZ=8; 
       DT_RELAENT=9;
       DT_STRSZ=10; 
-      DT_SYMENT=11; 
+      DT_SYMENT=11;
       DT_INIT=12; 
       DT_FINI=13;
       DT_SONAME=14;
@@ -508,7 +508,7 @@ const ET_NONE=0;
       // DT_FLAGS values
       DF_ORIGIN=$1; 
       DF_SYMBOLIC=$2; 
-      DF_TEXTREL=$4; 
+      DF_TEXTREL=$4;
       DF_BIND_NOW=$8; 
       DF_STATIC_TLS=$10;
 
@@ -548,6 +548,30 @@ const ET_NONE=0;
 
       // This entry gives some information about the FPU initialization performed by the kernel.
       AT_FPUCW=17; //  Used FPU control word.
+
+      EHDR32_SIZE=52;
+      EHDR64_SIZE=64;
+      EHDR_MAXSIZE=64;
+
+      SHDR32_SIZE=40;
+      SHDR64_SIZE=64;
+      SHDR_MAXSIZE=64;
+
+      SYMTAB32_SIZE=16;
+      SYMTAB64_SIZE=24;
+      SYMTAB_MAXSIZE=24;
+
+      SYMTAB32_ALIGN=4;
+      SYMTAB64_ALIGN=8;
+
+      RELOC32_SIZE=8;
+      RELOC32A_SIZE=12;
+      RELOC64_SIZE=16;
+      RELOC64A_SIZE=24;
+      RELOC_MAXSIZE=24;
+
+      RELOC32_ALIGN=4;
+      RELOC64_ALIGN=8;
 
 type PELFHalf=^TELFHalf;
      TELFHalf=TPACCUInt16;
@@ -1215,6 +1239,14 @@ type PELFIdent=^TELFIdent;
 
        fSymTabSection:TPACCLinker_ELF_ELF_Section;
 
+       fDynStrTabSection:TPACCLinker_ELF_ELF_Section;
+
+       fDynSymTabSection:TPACCLinker_ELF_ELF_Section;
+
+       fDynHashSection:TPACCLinker_ELF_ELF_Section;
+
+       fDynamicSection:TPACCLinker_ELF_ELF_Section;
+
        fActive:boolean;
 
       public
@@ -1237,6 +1269,14 @@ type PELFIdent=^TELFIdent;
        property StrTabSection:TPACCLinker_ELF_ELF_Section read fStrTabSection write fStrTabSection;
 
        property SymTabSection:TPACCLinker_ELF_ELF_Section read fSymTabSection write fSymTabSection;
+
+       property DynStrTabSection:TPACCLinker_ELF_ELF_Section read fDynStrTabSection write fDynStrTabSection;
+
+       property DynSymTabSection:TPACCLinker_ELF_ELF_Section read fDynSymTabSection write fDynSymTabSection;
+
+       property DynHashSection:TPACCLinker_ELF_ELF_Section read fDynHashSection write fDynHashSection;
+
+       property DynamicSection:TPACCLinker_ELF_ELF_Section read fDynamicSection write fDynamicSection;
 
        property Active:boolean read fActive write fActive;
 
@@ -2382,6 +2422,19 @@ begin
     OutputImageSection.sh_info:=0;
    end;
 
+   begin
+    OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+    OutputImage.SHStrTabSection:=OutputImageSection;
+    OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
+    OutputImageSection.Name:='.shstrtab';
+    OutputImageSection.sh_type:=SHT_STRTAB;
+    OutputImageSection.sh_flags:=0;
+    OutputImageSection.sh_addralign:=1;
+    OutputImageSection.sh_entsize:=0;
+    OutputImageSection.sh_link:=0;
+    OutputImageSection.sh_info:=0;
+   end;
+
    HasGNULinkOnce:=false;
 
    for ImageIndex:=0 to Images.Count-1 do begin
@@ -2551,6 +2604,76 @@ begin
       end;
      end;
     end;
+
+   if not TPACCInstance(Instance).Options.StaticLinking then begin
+
+    if not TPACCInstance(Instance).Options.CreateSharedLibrary then begin
+
+    end;
+
+    begin
+     OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+     OutputImage.DynSymTabSection:=OutputImageSection;
+     OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
+     OutputImageSection.Name:='.dynsym';
+     OutputImageSection.sh_type:=SHT_DYNSYM;
+     OutputImageSection.sh_flags:=SHF_ALLOC;
+     if Is64Bit then begin
+      OutputImageSection.sh_addralign:=SYMTAB64_ALIGN;
+      OutputImageSection.sh_entsize:=SYMTAB64_SIZE;
+     end else begin
+      OutputImageSection.sh_addralign:=SYMTAB32_ALIGN;
+      OutputImageSection.sh_entsize:=SYMTAB32_SIZE;
+     end;
+     OutputImageSection.sh_link:=0;
+     OutputImageSection.sh_info:=0;
+    end;
+
+    begin
+     OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+     OutputImage.DynStrTabSection:=OutputImageSection;
+     OutputImage.DynSymTabSection.LinkSection:=OutputImageSection;
+     OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
+     OutputImageSection.Name:='.dynstr';
+     OutputImageSection.sh_type:=SHT_STRTAB;
+     OutputImageSection.sh_flags:=0;
+     OutputImageSection.sh_addralign:=1;
+     OutputImageSection.sh_entsize:=0;
+     OutputImageSection.sh_link:=0;
+     OutputImageSection.sh_info:=0;
+    end;
+
+    begin
+     OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+     OutputImage.DynHashSection:=OutputImageSection;
+     OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
+     OutputImageSection.Name:='.hash';
+     OutputImageSection.sh_type:=0;
+     OutputImageSection.sh_flags:=SHF_ALLOC;
+     OutputImageSection.sh_addralign:=1;
+     OutputImageSection.sh_entsize:=0;
+     OutputImageSection.sh_link:=0;
+     OutputImageSection.sh_info:=0;
+    end;
+
+    begin
+     OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+     OutputImage.DynamicSection:=OutputImageSection;
+     OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
+     OutputImageSection.Name:='.dynamic';
+     OutputImageSection.sh_type:=SHT_DYNAMIC;
+     OutputImageSection.sh_flags:=SHF_ALLOC or SHF_WRITE;
+     OutputImageSection.sh_addralign:=1;
+     if Is64Bit then begin
+      OutputImageSection.sh_entsize:=SizeOf(TELF64Dyn);
+     end else begin
+      OutputImageSection.sh_entsize:=SizeOf(TELF32Dyn);
+     end;
+     OutputImageSection.sh_link:=0;
+     OutputImageSection.sh_info:=0;
+    end;
+
+   end;
 
 {   for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
      ImageSection:=Image.Sections[ImageSectionIndex];

@@ -24,6 +24,7 @@ type PPACCEncoding=^TPACCEncoding;
       WarningsAreErrors:boolean;
       HandleUTF8:boolean;
       CreateSharedLibrary:boolean;
+      StaticLinking:boolean;
      end;
 
      PPACCTokenSymbol=^TPACCTokenSymbol;
@@ -147,6 +148,7 @@ const PACCDefaultOptions:TPACCOptions=
         WarningsAreErrors:false;
         HandleUTF8:false;
         CreateSharedLibrary:false;
+        StaticLinking:false;
        );
 
 var NullBytes:array[0..65535] of TPACCUInt8;
