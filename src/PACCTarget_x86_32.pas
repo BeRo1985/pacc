@@ -133,11 +133,19 @@ var CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringL
     CurrentFunction:TPACCAbstractSyntaxTreeNode;
  function GetVariableLabel(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCRawByteString;
  begin
-  result:='__varlabel_'+IntToStr(TPACCPtrUInt(pointer(Variable)));
+  result:='$_varlabel_'+IntToStr(TPACCPtrUInt(pointer(Variable)));
+ end;
+ function GetLabelLabel(const Variable:TPACCAbstractSyntaxTreeNodeLabel):TPACCRawByteString;
+ begin
+  result:='$_labellabel_'+IntToStr(TPACCPtrUInt(pointer(Variable)));
  end;
  procedure EmitPrimitiveTypeData(const Type_:PPACCType;const Node:TPACCAbstractSyntaxTreeNode;const Depth:TPACCInt32);
  var f:TPACCFloat;
      d:TPACCDouble;
+     i32:TPACCInt32;
+     i64:TPACCInt64;
+     BaseNode:TPACCAbstractSyntaxTreeNode;
+     BaseType:PPACCType;
  begin
   case Type_^.Kind of
    tkFLOAT:begin
@@ -166,7 +174,40 @@ var CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringL
     DataSectionStringList.Add('dq '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
    end;
    tkPOINTER:begin
-    DataSectionStringList.Add('dd '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
+    if Node.Kind=astnkOP_LABEL_ADDR then begin
+     DataSectionStringList.Add('dd offset '+GetLabelLabel(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_)));
+    end else if (Node is TPACCAbstractSyntaxTreeNodeUnaryOperator) and
+                (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Kind=astnkSTRING) and
+                (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.Kind=tkARRAY) and
+                (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.ChildType^.Kind=tkCHAR) then begin
+     DataSectionStringList.Add('$_stringlabel_'+IntToStr(TPACCPtrUInt(pointer(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand)))+':');
+     for i32:=1 to length(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Value) do begin
+      DataSectionStringList.Add('db '+IntToStr(TPACCUInt8(AnsiChar(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Value[i32]))));
+     end;
+     DataSectionStringList.Add('dd 0');
+    end else if Node.Kind=astnkGVAR then begin
+     DataSectionStringList.Add('dd offset '+GetVariableLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)));
+    end else begin
+     BaseNode:=nil;
+     i64:=TPACCInstance(Instance).EvaluateIntegerExpression(Node,@BaseNode);
+     if assigned(BaseNode) then begin
+      BaseType:=BaseNode.Type_;
+      if BaseNode.Kind in [astnkCONV,astnkADDR] then begin
+       BaseNode:=TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand;
+      end;
+      if BaseNode.Kind=astnkGVAR then begin
+       Assert(assigned(BaseType.ChildType));
+       DataSectionStringList.Add('dd offset '+GetVariableLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))+' + '+IntToStr(i64*BaseType.ChildType^.Size));
+      end else begin
+       TPACCInstance(Instance).AddError('Global variable expected',@BaseNode.SourceLocation,true);
+      end;
+     end else begin
+      DataSectionStringList.Add('dd '+IntToStr(TPACCUInt32(i64) and $ffffffff));
+     end;
+    end;
+   end;
+   else begin
+    TPACCInstance(Instance).AddError('Internal error 2017-01-17-10-45-0000',@Node.SourceLocation,true);
    end;
   end;
  end;
