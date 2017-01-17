@@ -469,7 +469,7 @@ var CurrentState:TState;
  begin
   if assigned(Node) and (afConstant in Node.Type_^.Attribute.Flags) then begin
    AddError('Expression must be a modifiable lvalue',nil,false);
-  end;
+  end;                                                                    
   if (not assigned(Node)) or not (Node.Kind in [astnkLVAR,astnkGVAR,astnkDEREF,astnkSTRUCT_REF]) then begin
    AddError('lvalue expected',nil,true);
   end;
@@ -972,9 +972,10 @@ var CurrentState:TState;
     result:=ParseCastExpression;
     if result.Kind=astnkFUNCDESG then begin
      result:=TPACCInstance(Instance).TypeConversion(result);
+    end else begin
+     EnsureLValue(result);
+     result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkADDR,TPACCInstance(Instance).NewPointerType(result.Type_),RelevantSourceLocation,result);
     end;
-    EnsureLValue(result);
-    result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkADDR,TPACCInstance(Instance).NewPointerType(result.Type_),RelevantSourceLocation,result);
    end;
    TOK_MUL:begin
     NextToken;
