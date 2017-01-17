@@ -128,19 +128,98 @@ begin
 end;
 
 procedure TPACCTarget_x86_32.GenerateCode(const ARoot:TPACCAbstractSyntaxTreeNode;const AOutputStream:TStream);
-var CodeStringList:TStringList;
+var CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringList:TStringList;
+    SectionCounter:TPACCInt32;
+    CurrentFunction:TPACCAbstractSyntaxTreeNode;
+ function GetVariableLabel(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCRawByteString;
+ begin
+  result:='__varlabel_'+IntToStr(TPACCPtrUInt(pointer(Variable)));
+ end;
+ procedure ProcessDECL(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
+ var Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+ begin
+  if assigned(Node.DeclarationVariable) then begin
+   if assigned(CurrentFunction) then begin
+   end else begin
+    if Node.DeclarationVariable.Kind=astnkGVAR then begin
+     Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable);
+     if assigned(Node.DeclarationInitialization) then begin
+      if not (tfStatic in Variable.Type_^.Flags) then begin
+       DataSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
+      end;
+      DataSectionStringList.Add(GetVariableLabel(Variable)+':');
+     end else begin
+      if not (tfStatic in Variable.Type_^.Flags) then begin
+       BSSSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
+      end;
+      BSSSectionStringList.Add(GetVariableLabel(Variable)+':');
+      BSSSectionStringList.Add('resb '+IntToStr(Variable.Type_^.Size));
+     end;
+    end else begin
+     TPACCInstance(Instance).AddError('Internal error 2017-01-17-09-08-0000',@Node.SourceLocation,true);
+    end;
+   end;
+  end else begin
+   TPACCInstance(Instance).AddError('Internal error 2017-01-17-09-07-0000',@Node.SourceLocation,true);
+  end;
+ end;
+ procedure ProcessRootNode(const Node:TPACCAbstractSyntaxTreeNode);
+ begin
+  case Node.Kind of
+   astnkDECL:begin
+    ProcessDECL(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
+   end;
+   astnkFUNC:begin
+   end;
+   else begin
+    TPACCInstance(Instance).AddError('Internal error 2017-01-17-09-01-0000',@Node.SourceLocation,true);
+   end;
+  end;
+ end;
+var Index:TPACCInt32;
 begin
  CodeStringList:=TStringList.Create;
  try
-  CodeStringList.Add('.cpu(all)');
-  CodeStringList.Add('.target(coff32)');
-  if self is TPACCTarget_x86_32_COFF_PE then begin
-   CodeStringList.Add('.section(".text",'+IntToStr(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
-   CodeStringList.Add('}');
-   CodeStringList.Add('.section(".data",'+IntToStr(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
-   CodeStringList.Add('}');
-   CodeStringList.Add('.section(".bss",'+IntToStr(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
-   CodeStringList.Add('}');
+  TextSectionStringList:=TStringList.Create;
+  try
+   DataSectionStringList:=TStringList.Create;
+   try
+    BSSSectionStringList:=TStringList.Create;
+    try
+     CurrentFunction:=nil;
+     SectionCounter:=1;
+     for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(ARoot).Children.Count-1 do begin
+      ProcessRootNode(TPACCAbstractSyntaxTreeNodeStatements(ARoot).Children[Index]);
+     end;
+     if self is TPACCTarget_x86_32_COFF_PE then begin
+      CodeStringList.Add('.cpu(all)');
+      CodeStringList.Add('.target(coff32)');
+      CodeStringList.Add('.section(".text$0",'+IntToStr(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+      if TextSectionStringList.Count=0 then begin
+       CodeStringList.Add('  nop');
+      end else begin
+       CodeStringList.AddStrings(TextSectionStringList);
+      end;
+      CodeStringList.Add('}');
+      if DataSectionStringList.Count>0 then begin
+       CodeStringList.Add('.section(".data$0",'+IntToStr(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+       CodeStringList.AddStrings(DataSectionStringList);
+       CodeStringList.Add('}');
+      end;
+      if BSSSectionStringList.Count>0 then begin
+       CodeStringList.Add('.section(".bss$0",'+IntToStr(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+       CodeStringList.AddStrings(BSSSectionStringList);
+       CodeStringList.Add('}');
+      end;
+     end;
+    finally
+     BSSSectionStringList.Free;
+    end;
+   finally
+    DataSectionStringList.Free;
+   end;
+  finally
+   TextSectionStringList.Free;
   end;
   CodeStringList.SaveToStream(AOutputStream);
  finally
