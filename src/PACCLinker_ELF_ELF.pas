@@ -1055,8 +1055,6 @@ type PELFIdent=^TELFIdent;
 
        fLinker:TPACCLinker_ELF_ELF;
 
-       fName:TPACCRawByteString;
-
        fSection:TPACCLinker_ELF_ELF_Section;
 
        fSymbol:TPACCLinker_ELF_ELF_Symbol;
@@ -1075,8 +1073,6 @@ type PELFIdent=^TELFIdent;
       published
 
        property Linker:TPACCLinker_ELF_ELF read fLinker;
-
-       property Name:TPACCRawByteString read fName write fName;
 
        property Section:TPACCLinker_ELF_ELF_Section read fSection write fSection;
 
@@ -1488,8 +1484,6 @@ begin
  inherited Create;
 
  fLinker:=ALinker;
-
- fName:='';
 
  fSection:=nil;
 
@@ -2262,12 +2256,14 @@ type PPACCUInt8s=^TPACCUInt8s;
  end;
 var OutputImage:TPACCLinker_ELF_ELF_Image;
     ImageIndex,ImageSectionIndex,OutputImageSectionIndex,
-    SymbolOffsetIndex,ImageSymbolIndex:TPACCInt32;
+    SymbolOffsetIndex,ImageSymbolIndex,
+    ImageRelocationIndex,OutputImageRelocationIndex:TPACCInt32;
     Image:TPACCLinker_ELF_ELF_Image;
     ImageSection,ImageSectionSTab,ImageSectionSTabStr,
     OutputImageSection,CurrentOutputImageSection:TPACCLinker_ELF_ELF_Section;
     HasGNULinkOnce:boolean;
     ImageSymbol:TPACCLinker_ELF_ELF_Symbol;
+    ImageRelocation,OutputImageRelocation:TPACCLinker_ELF_ELF_Relocation;
     STabSym:PSTabSym;
     Position:TPACCInt64;
     OutputImageSymbolNameHashMap:TPACCRawByteStringHashMap;
@@ -2529,6 +2525,41 @@ begin
       end;
      end;
     end;
+
+    for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
+     ImageSection:=Image.Sections[ImageSectionIndex];
+     if ImageSection.Merged and
+        (ImageSection.sh_type in [SHT_REL,SHT_RELA]) and
+        assigned(ImageSection.MergedToSection) and
+        assigned(ImageSection.InfoSection) and
+        assigned(ImageSection.InfoSection.MergedToSection) then begin
+      for ImageRelocationIndex:=0 to ImageSection.InfoSection.Relocations.Count-1 do begin
+       ImageRelocation:=ImageSection.InfoSection.Relocations[ImageRelocationIndex];
+       if (not assigned(ImageRelocation.Symbol)) and not ImageRelocation.Symbol.Section.LinkOnce then begin
+        TPACCInstance(Instance).AddError('Invalid relocation',nil,false);
+       end else begin
+        if assigned(ImageRelocation.Symbol.MergedSymbol) then begin
+         OutputImageRelocation:=TPACCLinker_ELF_ELF_Relocation.Create(self);
+         ImageSection.InfoSection.MergedToSection.Relocations.Add(OutputImageRelocation);
+         OutputImageRelocation.Section:=ImageSection.InfoSection.MergedToSection;
+         OutputImageRelocation.Symbol:=ImageRelocation.Symbol.MergedSymbol;
+         OutputImageRelocation.r_offset:=ImageRelocation.r_offset+ImageSection.InfoSection.MergedOffset;
+         OutputImageRelocation.r_info:=ELF64_R_INFO(OutputImageRelocation.Symbol.Index_,ELF64_R_TYPE(OutputImageRelocation.r_info));
+         OutputImageRelocation.r_addend:=ImageRelocation.r_addend;
+        end;
+       end;
+      end;
+     end;
+    end;
+
+{   for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
+     ImageSection:=Image.Sections[ImageSectionIndex];
+     if ImageSection.Merged then begin
+      for ImageSymbolIndex:=0 to ImageSection.Symbols.Count-1 do begin
+       ImageSymbol:=ImageSection.Symbols[ImageSymbolIndex];
+      end;
+     end;
+    end;}
 
    end;
 
