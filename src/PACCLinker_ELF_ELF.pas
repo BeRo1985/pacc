@@ -1247,6 +1247,8 @@ type PELFIdent=^TELFIdent;
 
        fDynamicSection:TPACCLinker_ELF_ELF_Section;
 
+       fPLTSection:TPACCLinker_ELF_ELF_Section;
+
        fActive:boolean;
 
       public
@@ -1277,6 +1279,8 @@ type PELFIdent=^TELFIdent;
        property DynHashSection:TPACCLinker_ELF_ELF_Section read fDynHashSection write fDynHashSection;
 
        property DynamicSection:TPACCLinker_ELF_ELF_Section read fDynamicSection write fDynamicSection;
+
+       property PLTSection:TPACCLinker_ELF_ELF_Section read fPLTSection write fPLTSection;
 
        property Active:boolean read fActive write fActive;
 
@@ -2297,7 +2301,8 @@ type PPACCUInt8s=^TPACCUInt8s;
 var OutputImage:TPACCLinker_ELF_ELF_Image;
     ImageIndex,ImageSectionIndex,OutputImageSectionIndex,
     SymbolOffsetIndex,ImageSymbolIndex,
-    ImageRelocationIndex,OutputImageRelocationIndex:TPACCInt32;
+    ImageRelocationIndex,OutputImageRelocationIndex,
+    PassIndex:TPACCInt32;
     Image:TPACCLinker_ELF_ELF_Image;
     ImageSection,ImageSectionSTab,ImageSectionSTabStr,
     OutputImageSection,CurrentOutputImageSection:TPACCLinker_ELF_ELF_Section;
@@ -2305,8 +2310,9 @@ var OutputImage:TPACCLinker_ELF_ELF_Image;
     ImageSymbol:TPACCLinker_ELF_ELF_Symbol;
     ImageRelocation,OutputImageRelocation:TPACCLinker_ELF_ELF_Relocation;
     STabSym:PSTabSym;
-    Position:TPACCInt64;
+    Position,SectionHeaderOffset:TPACCInt64;
     OutputImageSymbolNameHashMap:TPACCRawByteStringHashMap;
+    ELF3264EHdr:TELF3264EHdr;
  function FindSymbol(const SymbolName:TPACCRawByteString):TPACCLinker_ELF_ELF_Symbol;
  begin
   result:=OutputImageSymbolNameHashMap[SymbolName];
@@ -2417,19 +2423,6 @@ begin
     OutputImageSection.sh_type:=0;
     OutputImageSection.sh_flags:=0;
     OutputImageSection.sh_addralign:=0;
-    OutputImageSection.sh_entsize:=0;
-    OutputImageSection.sh_link:=0;
-    OutputImageSection.sh_info:=0;
-   end;
-
-   begin
-    OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
-    OutputImage.SHStrTabSection:=OutputImageSection;
-    OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
-    OutputImageSection.Name:='.shstrtab';
-    OutputImageSection.sh_type:=SHT_STRTAB;
-    OutputImageSection.sh_flags:=0;
-    OutputImageSection.sh_addralign:=1;
     OutputImageSection.sh_entsize:=0;
     OutputImageSection.sh_link:=0;
     OutputImageSection.sh_info:=0;
@@ -2605,36 +2598,94 @@ begin
      end;
     end;
 
-   if not TPACCInstance(Instance).Options.StaticLinking then begin
+    if not TPACCInstance(Instance).Options.StaticLinking then begin
 
-    if not TPACCInstance(Instance).Options.CreateSharedLibrary then begin
+     if not TPACCInstance(Instance).Options.CreateSharedLibrary then begin
 
-    end;
-
-    begin
-     OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
-     OutputImage.DynSymTabSection:=OutputImageSection;
-     OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
-     OutputImageSection.Name:='.dynsym';
-     OutputImageSection.sh_type:=SHT_DYNSYM;
-     OutputImageSection.sh_flags:=SHF_ALLOC;
-     if Is64Bit then begin
-      OutputImageSection.sh_addralign:=SYMTAB64_ALIGN;
-      OutputImageSection.sh_entsize:=SYMTAB64_SIZE;
-     end else begin
-      OutputImageSection.sh_addralign:=SYMTAB32_ALIGN;
-      OutputImageSection.sh_entsize:=SYMTAB32_SIZE;
      end;
-     OutputImageSection.sh_link:=0;
-     OutputImageSection.sh_info:=0;
+
+     begin
+      OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+      OutputImage.DynSymTabSection:=OutputImageSection;
+      OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
+      OutputImageSection.Name:='.dynsym';
+      OutputImageSection.sh_type:=SHT_DYNSYM;
+      OutputImageSection.sh_flags:=SHF_ALLOC;
+      if Is64Bit then begin
+       OutputImageSection.sh_addralign:=SYMTAB64_ALIGN;
+       OutputImageSection.sh_entsize:=SYMTAB64_SIZE;
+      end else begin
+       OutputImageSection.sh_addralign:=SYMTAB32_ALIGN;
+       OutputImageSection.sh_entsize:=SYMTAB32_SIZE;
+      end;
+      OutputImageSection.sh_link:=0;
+      OutputImageSection.sh_info:=0;
+     end;
+
+     begin
+      OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+      OutputImage.DynStrTabSection:=OutputImageSection;
+      OutputImage.DynSymTabSection.LinkSection:=OutputImageSection;
+      OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
+      OutputImageSection.Name:='.dynstr';
+      OutputImageSection.sh_type:=SHT_STRTAB;
+      OutputImageSection.sh_flags:=0;
+      OutputImageSection.sh_addralign:=1;
+      OutputImageSection.sh_entsize:=0;
+      OutputImageSection.sh_link:=0;
+      OutputImageSection.sh_info:=0;
+     end;
+
+     begin
+      OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+      OutputImage.DynHashSection:=OutputImageSection;
+      OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
+      OutputImageSection.Name:='.hash';
+      OutputImageSection.sh_type:=0;
+      OutputImageSection.sh_flags:=SHF_ALLOC;
+      OutputImageSection.sh_addralign:=1;
+      OutputImageSection.sh_entsize:=0;
+      OutputImageSection.sh_link:=0;
+      OutputImageSection.sh_info:=0;
+     end;
+
+     begin
+      OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+      OutputImage.DynamicSection:=OutputImageSection;
+      OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
+      OutputImageSection.Name:='.dynamic';
+      OutputImageSection.sh_type:=SHT_DYNAMIC;
+      OutputImageSection.sh_flags:=SHF_ALLOC or SHF_WRITE;
+      OutputImageSection.sh_addralign:=1;
+      if Is64Bit then begin
+       OutputImageSection.sh_entsize:=SizeOf(TELF64Dyn);
+      end else begin
+       OutputImageSection.sh_entsize:=SizeOf(TELF32Dyn);
+      end;
+      OutputImageSection.sh_link:=0;
+      OutputImageSection.sh_info:=0;
+     end;
+
+     begin
+      OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+      OutputImage.PLTSection:=OutputImageSection;
+      OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
+      OutputImageSection.Name:='.plt';
+      OutputImageSection.sh_type:=SHT_PROGBITS;
+      OutputImageSection.sh_flags:=SHF_ALLOC or SHF_EXECINSTR;
+      OutputImageSection.sh_addralign:=1;
+      OutputImageSection.sh_entsize:=4;
+      OutputImageSection.sh_link:=0;
+      OutputImageSection.sh_info:=0;
+     end;
+
     end;
 
     begin
      OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
-     OutputImage.DynStrTabSection:=OutputImageSection;
-     OutputImage.DynSymTabSection.LinkSection:=OutputImageSection;
+     OutputImage.SHStrTabSection:=OutputImageSection;
      OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
-     OutputImageSection.Name:='.dynstr';
+     OutputImageSection.Name:='.shstrtab';
      OutputImageSection.sh_type:=SHT_STRTAB;
      OutputImageSection.sh_flags:=0;
      OutputImageSection.sh_addralign:=1;
@@ -2643,46 +2694,90 @@ begin
      OutputImageSection.sh_info:=0;
     end;
 
-    begin
-     OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
-     OutputImage.DynHashSection:=OutputImageSection;
-     OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
-     OutputImageSection.Name:='.hash';
-     OutputImageSection.sh_type:=0;
-     OutputImageSection.sh_flags:=SHF_ALLOC;
-     OutputImageSection.sh_addralign:=1;
-     OutputImageSection.sh_entsize:=0;
-     OutputImageSection.sh_link:=0;
-     OutputImageSection.sh_info:=0;
-    end;
+    SectionHeaderOffset:=0;
 
-    begin
-     OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
-     OutputImage.DynamicSection:=OutputImageSection;
-     OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
-     OutputImageSection.Name:='.dynamic';
-     OutputImageSection.sh_type:=SHT_DYNAMIC;
-     OutputImageSection.sh_flags:=SHF_ALLOC or SHF_WRITE;
-     OutputImageSection.sh_addralign:=1;
-     if Is64Bit then begin
-      OutputImageSection.sh_entsize:=SizeOf(TELF64Dyn);
-     end else begin
-      OutputImageSection.sh_entsize:=SizeOf(TELF32Dyn);
-     end;
-     OutputImageSection.sh_link:=0;
-     OutputImageSection.sh_info:=0;
-    end;
+    FillChar(ELF3264EHdr,SizeOf(TELF3264EHdr),#0);
 
-   end;
+    for PassIndex:=0 to 1 do begin
 
-{   for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
-     ImageSection:=Image.Sections[ImageSectionIndex];
-     if ImageSection.Merged then begin
-      for ImageSymbolIndex:=0 to ImageSection.Symbols.Count-1 do begin
-       ImageSymbol:=ImageSection.Symbols[ImageSymbolIndex];
+     AOutputStream.Seek(0,soBeginning);
+
+     if fIs64Bit then begin
+      ELF3264EHdr.ELF64EHdr.e_ident[0]:=ELFMAG0;
+      ELF3264EHdr.ELF64EHdr.e_ident[1]:=ELFMAG1;
+      ELF3264EHdr.ELF64EHdr.e_ident[2]:=ELFMAG2;
+      ELF3264EHdr.ELF64EHdr.e_ident[3]:=ELFMAG3;
+      ELF3264EHdr.ELF64EHdr.e_ident[4]:=ELFCLASS64;
+      ELF3264EHdr.ELF64EHdr.e_ident[5]:=ELFDATA2LSB;
+      ELF3264EHdr.ELF64EHdr.e_ident[6]:=EV_CURRENT;
+      ELF3264EHdr.ELF64EHdr.e_ident[7]:=ELFOSABI_NONE;
+      ELF3264EHdr.ELF64EHdr.e_ident[8]:=0;
+      ELF3264EHdr.ELF64EHdr.e_ident[9]:=0;
+      ELF3264EHdr.ELF64EHdr.e_ident[10]:=0;
+      ELF3264EHdr.ELF64EHdr.e_ident[11]:=0;
+      ELF3264EHdr.ELF64EHdr.e_ident[12]:=0;
+      ELF3264EHdr.ELF64EHdr.e_ident[13]:=0;
+      ELF3264EHdr.ELF64EHdr.e_ident[14]:=0;
+      ELF3264EHdr.ELF64EHdr.e_ident[15]:=0;
+      if TPACCInstance(Instance).Options.CreateSharedLibrary then begin
+       ELF3264EHdr.ELF64EHdr.e_type:=ET_DYN;
+      end else begin
+       ELF3264EHdr.ELF64EHdr.e_type:=ET_EXEC;
       end;
+      ELF3264EHdr.ELF64EHdr.e_machine:=fMachine;
+      ELF3264EHdr.ELF64EHdr.e_version:=EV_CURRENT;
+      ELF3264EHdr.ELF32EHdr.e_phoff:=0;
+      ELF3264EHdr.ELF32EHdr.e_shoff:=SectionHeaderOffset;
+      ELF3264EHdr.ELF32EHdr.e_flags:=0;
+      ELF3264EHdr.ELF64EHdr.e_ehsize:=EHDR64_SIZE;
+      ELF3264EHdr.ELF32EHdr.e_phentsize:=0;
+      ELF3264EHdr.ELF32EHdr.e_phnum:=0;
+      ELF3264EHdr.ELF64EHdr.e_shentsize:=SHDR64_SIZE;
+      ELF3264EHdr.ELF64EHdr.e_shnum:=OutputImage.Sections.Count;
+      ELF3264EHdr.ELF64EHdr.e_shstrndx:=OutputImage.SHStrTabSection.Index_;
+      AOutputStream.WriteBuffer(ELF3264EHdr.ELF64EHdr,SizeOf(TELF64EHdr));
+     end else begin
+      ELF3264EHdr.ELF32EHdr.e_ident[0]:=ELFMAG0;
+      ELF3264EHdr.ELF32EHdr.e_ident[1]:=ELFMAG1;
+      ELF3264EHdr.ELF32EHdr.e_ident[2]:=ELFMAG2;
+      ELF3264EHdr.ELF32EHdr.e_ident[3]:=ELFMAG3;
+      ELF3264EHdr.ELF32EHdr.e_ident[4]:=ELFCLASS32;
+      ELF3264EHdr.ELF32EHdr.e_ident[5]:=ELFDATA2LSB;
+      ELF3264EHdr.ELF32EHdr.e_ident[6]:=EV_CURRENT;
+      ELF3264EHdr.ELF32EHdr.e_ident[7]:=ELFOSABI_NONE;
+      ELF3264EHdr.ELF32EHdr.e_ident[8]:=0;
+      ELF3264EHdr.ELF32EHdr.e_ident[9]:=0;
+      ELF3264EHdr.ELF32EHdr.e_ident[10]:=0;
+      ELF3264EHdr.ELF32EHdr.e_ident[11]:=0;
+      ELF3264EHdr.ELF32EHdr.e_ident[12]:=0;
+      ELF3264EHdr.ELF32EHdr.e_ident[13]:=0;
+      ELF3264EHdr.ELF32EHdr.e_ident[14]:=0;
+      ELF3264EHdr.ELF32EHdr.e_ident[15]:=0;
+      if TPACCInstance(Instance).Options.CreateSharedLibrary then begin
+       ELF3264EHdr.ELF32EHdr.e_type:=ET_DYN;
+      end else begin
+       ELF3264EHdr.ELF32EHdr.e_type:=ET_EXEC;
+      end;
+      ELF3264EHdr.ELF32EHdr.e_machine:=fMachine;
+      ELF3264EHdr.ELF32EHdr.e_version:=EV_CURRENT;
+      ELF3264EHdr.ELF32EHdr.e_phoff:=0;
+      ELF3264EHdr.ELF32EHdr.e_shoff:=SectionHeaderOffset;
+      ELF3264EHdr.ELF32EHdr.e_flags:=0;
+      ELF3264EHdr.ELF32EHdr.e_ehsize:=EHDR32_SIZE;
+      ELF3264EHdr.ELF32EHdr.e_phentsize:=0;
+      ELF3264EHdr.ELF32EHdr.e_phnum:=0;
+      ELF3264EHdr.ELF32EHdr.e_shentsize:=SHDR32_SIZE;
+      ELF3264EHdr.ELF32EHdr.e_shnum:=OutputImage.Sections.Count;
+      ELF3264EHdr.ELF32EHdr.e_shstrndx:=OutputImage.SHStrTabSection.Index_;
+      AOutputStream.WriteBuffer(ELF3264EHdr.ELF32EHdr,SizeOf(TELF32EHdr));
      end;
-    end;}
+
+     WriteNullPadding(AOutputStream,Max(0,(TPACCInt64(AOutputStream.Position+63) and not TPACCInt64(63))-AOutputStream.Position));
+
+     SectionHeaderOffset:=AOutputStream.Position;
+     
+
+    end;
 
    end;
 
