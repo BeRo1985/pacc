@@ -2314,6 +2314,8 @@ var OutputImage:TPACCLinker_ELF_ELF_Image;
     OutputImageSymbolNameHashMap:TPACCRawByteStringHashMap;
     ELF3264EHdr:TELF3264EHdr;
     ELF3264SHdr:TELF3264SHdr;
+    ELF3264Rel:TELF3264Rel;
+    ELF3264Rela:TELF3264Rela;
  function FindSymbol(const SymbolName:TPACCRawByteString):TPACCLinker_ELF_ELF_Symbol;
  begin
   result:=OutputImageSymbolNameHashMap[SymbolName];
@@ -2693,6 +2695,45 @@ begin
      OutputImageSection.sh_entsize:=0;
      OutputImageSection.sh_link:=0;
      OutputImageSection.sh_info:=0;
+    end;
+
+    for OutputImageSectionIndex:=0 to OutputImage.Sections.Count-1 do begin
+     OutputImageSection:=OutputImage.Sections[OutputImageSectionIndex];
+     if OutputImageSection.sh_type in [SHT_REL,SHT_RELA] then begin
+      if assigned(OutputImageSection.InfoSection) then begin
+       OutputImageSection.Stream.Clear;
+       OutputImageSection.Stream.Seek(0,soBeginning);
+       for OutputImageRelocationIndex:=0 to OutputImageSection.InfoSection.Relocations.Count-1 do begin
+        OutputImageRelocation:=OutputImageSection.InfoSection.Relocations[OutputImageRelocationIndex];
+        case OutputImageSection.sh_type of
+         SHT_REL:begin
+          if Is64Bit then begin
+           ELF3264Rel.ELF64Rel.r_offset:=OutputImageRelocation.r_offset;
+           ELF3264Rel.ELF64Rel.r_info:=OutputImageRelocation.r_info;
+           OutputImageSection.Stream.WriteBuffer(ELF3264Rel.ELF64Rel,SizeOf(TELF64Rel));
+          end else begin
+           ELF3264Rel.ELF32Rel.r_offset:=OutputImageRelocation.r_offset;
+           ELF3264Rel.ELF32Rel.r_info:=(OutputImageRelocation.r_info and $ff) or ((OutputImageRelocation.r_info shr 24) and longword($ffffff00));
+           OutputImageSection.Stream.WriteBuffer(ELF3264Rel.ELF32Rel,SizeOf(TELF32Rel));
+          end;
+         end;
+         else {SHT_RELA:}begin
+          if Is64Bit then begin
+           ELF3264Rela.ELF64Rela.r_offset:=OutputImageRelocation.r_offset;
+           ELF3264Rela.ELF64Rela.r_info:=OutputImageRelocation.r_info;
+           ELF3264Rela.ELF64Rela.r_addend:=OutputImageRelocation.r_addend;
+           OutputImageSection.Stream.WriteBuffer(ELF3264Rela.ELF64Rela,SizeOf(TELF64Rela));
+          end else begin
+           ELF3264Rela.ELF32Rela.r_offset:=OutputImageRelocation.r_offset;
+           ELF3264Rela.ELF32Rela.r_info:=(OutputImageRelocation.r_info and $ff) or ((OutputImageRelocation.r_info shr 24) and longword($ffffff00));
+           ELF3264Rela.ELF32Rela.r_addend:=OutputImageRelocation.r_addend;
+           OutputImageSection.Stream.WriteBuffer(ELF3264Rela.ELF32Rela,SizeOf(TELF32Rela));
+          end;
+         end;
+        end;
+       end;
+      end;
+     end;
     end;
 
     OutputImage.SHStrTabSection.Stream.WriteBuffer(NullBytes,1);
