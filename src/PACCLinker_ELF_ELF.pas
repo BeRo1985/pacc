@@ -2409,7 +2409,21 @@ var OutputImage:TPACCLinker_ELF_ELF_Image;
    result:=PutSymbol(DestSection,SymbolName,st_value,st_size,st_info,st_other,st_shndx);
   end;
  end;
+ procedure AddRuntime;
+ var Stream:TMemoryStream;
+ begin
+{ Stream:=TMemoryStream.Create;
+  try
+   Stream.LoadFromFile('libc.a');
+   AddArchive(Stream,'c');
+  finally
+   Stream.Free;
+  end;}
+  // TODO
+ end;
 begin
+
+ AddRuntime;
 
  OutputImageSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
  try

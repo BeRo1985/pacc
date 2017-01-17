@@ -491,7 +491,8 @@ begin
 
      if not (OnlyRunPreprocessStep or
              OnlyRunPreprocessAndCompilationSteps or
-             OnlyRunPreprocessAndCompileAndAssembleSteps) then begin
+             OnlyRunPreprocessAndCompileAndAssembleSteps or
+             HasErrors) then begin
 
       OutputStream:=TMemoryStream.Create;
       try

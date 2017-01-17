@@ -280,45 +280,47 @@ var Stream:TMemoryStream;
     FileSize:TPACCInt64;
 begin
  AArchiveStream.Seek(0,soBeginning);
- AArchiveStream.ReadBuffer(Signature,SizeOf(TSignature));
- if (Signature[0]='!') and
-    (Signature[1]='<') and
-    (Signature[2]='a') and
-    (Signature[3]='r') and
-    (Signature[4]='c') and
-    (Signature[5]='h') and
-    (Signature[6]='>') and
-    (Signature[7]=#10) then begin
-  while (AArchiveStream.Position+SizeOf(Header))<AArchiveStream.Size do begin
-   AArchiveStream.ReadBuffer(Header,SizeOf(Header));
-   if (Header.HeaderEnd[0]=$60) and (Header.HeaderEnd[1]=$0a) then begin
-    Name:=TrimHeaderString(Header.Name);
-    writeln(Name);
-    FileSize:=StrToInt(TrimHeaderString(Header.FileSize));
-    if FileSize>0 then begin
-     Stream:=TMemoryStream.Create;
-     try
-      if Stream.CopyFrom(AArchiveStream,FileSize)<>FileSize then begin
-       raise EReadError.Create('Stream read error');
-      end;
-      Stream.Seek(0,soBeginning);
-      if (Name='\') or (Name='/') then begin
-      end else if (Name='\\') or (Name='//') then begin
-      end else begin
-       if (Stream.Size>SizeOf(TImportHeader)) and
-          (PImportHeader(Stream.Memory)^.Sig1=IMAGE_FILE_MACHINE_UNKNOWN) and
-          (PImportHeader(Stream.Memory)^.Sig2=$ffff) then begin
-        // TODO: Short import library parsing
-       end else begin
-        AddObject(Stream,Name);
+ if AArchiveStream.Size>=SizeOf(TSignature) then begin
+  AArchiveStream.ReadBuffer(Signature,SizeOf(TSignature));
+  if (Signature[0]='!') and
+     (Signature[1]='<') and
+     (Signature[2]='a') and
+     (Signature[3]='r') and
+     (Signature[4]='c') and
+     (Signature[5]='h') and
+     (Signature[6]='>') and
+     (Signature[7]=#10) then begin
+   while (AArchiveStream.Position+SizeOf(Header))<AArchiveStream.Size do begin
+    AArchiveStream.ReadBuffer(Header,SizeOf(Header));
+    if (Header.HeaderEnd[0]=$60) and (Header.HeaderEnd[1]=$0a) then begin
+     Name:=TrimHeaderString(Header.Name);
+     writeln(Name);
+     FileSize:=StrToInt(TrimHeaderString(Header.FileSize));
+     if FileSize>0 then begin
+      Stream:=TMemoryStream.Create;
+      try
+       if Stream.CopyFrom(AArchiveStream,FileSize)<>FileSize then begin
+        raise EReadError.Create('Stream read error');
        end;
+       Stream.Seek(0,soBeginning);
+       if (Name='\') or (Name='/') then begin
+       end else if (Name='\\') or (Name='//') then begin
+       end else begin
+        if (Stream.Size>SizeOf(TImportHeader)) and
+           (PImportHeader(Stream.Memory)^.Sig1=IMAGE_FILE_MACHINE_UNKNOWN) and
+           (PImportHeader(Stream.Memory)^.Sig2=$ffff) then begin
+         // TODO: Short import library parsing
+        end else begin
+         AddObject(Stream,Name);
+        end;
+       end;
+      finally
+       Stream.Free;
       end;
-     finally
-      Stream.Free;
      end;
+    end else begin
+     break;
     end;
-   end else begin
-    break;
    end;
   end;
  end;
