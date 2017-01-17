@@ -213,22 +213,61 @@ var CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringL
  var Index:TPACCInt32;
      Node:TPACCAbstractSyntaxTreeNodeInitializer;
      Value:TPACCAbstractSyntaxTreeNode;
-     Delta:TPACCInt64;
+     Delta,Data:TPACCInt64;
+     ToType:PPACCType;
  begin
   Index:=0;
   while Index<Nodes.Count do begin
-
    Node:=TPACCAbstractSyntaxTreeNodeInitializer(Nodes[Index]);
-
    Value:=Node.InitializionValue;
-
    Delta:=Node.InitializionOffset-Offset;
    if Delta>0 then begin
     DataSectionStringList.Add('db '+IntToStr(Delta)+' dup(0)');
    end;
-
    if Node.ToType^.BitSize>0 then begin
-
+    if Node.ToType^.BitOffset=0 then begin
+     Data:=TPACCInstance(Instance).EvaluateIntegerExpression(Value,nil);
+     ToType:=Node.ToType;
+     inc(Index);
+     while Index<Nodes.Count do begin
+      Node:=TPACCAbstractSyntaxTreeNodeInitializer(Nodes[Index]);
+      if Node.Type_.BitSize<=0 then begin
+       break;
+      end else begin
+       Value:=Node.InitializionValue;
+       ToType:=Node.ToType;
+       Data:=Data or ((TPACCInstance(Instance).EvaluateIntegerExpression(Value,nil) and ((TPACCInt64(1) shl (ToType^.BitSize))-1)) shl ToType^.BitOffset);
+       inc(Index);
+      end;
+     end;
+     case ToType^.Kind of
+      tkBOOL:begin
+       DataSectionStringList.Add('db '+IntToStr(Data));
+      end;
+      tkCHAR:begin
+       DataSectionStringList.Add('db '+IntToStr(Data));
+      end;
+      tkSHORT:begin
+       DataSectionStringList.Add('dw '+IntToStr(Data));
+      end;
+      tkINT:begin
+       DataSectionStringList.Add('dd '+IntToStr(Data));
+      end;
+      tkLONG,tkLLONG:begin
+       DataSectionStringList.Add('dq '+IntToStr(Data));
+      end;
+      else begin
+       TPACCInstance(Instance).AddError('Internal error 2017-01-17-11-27-0000',@Node.SourceLocation,true);
+      end;
+     end;
+     inc(Offset,ToType^.Size);
+     dec(Size,ToType^.Size);
+     if Index=Nodes.Count then begin
+      break;
+     end;
+    end else begin
+     TPACCInstance(Instance).AddError('Internal error 2017-01-17-11-21-0000',@Node.SourceLocation,true);
+    end;
    end else begin
     inc(Offset,Node.ToType^.Size);
     dec(Size,Node.ToType^.Size);
