@@ -319,11 +319,12 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
    if Value.Kind=astnkADDR then begin
     case TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand.Kind of
      astnkLVAR:begin
-      GetCodeLevel(Depth)^.DataSectionStringList.Add(GetVariableLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand))+':');
+      GetCodeLevel(Depth+1)^.DataSectionStringList.Add(GetVariableLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand))+':');
       ProcessInitializerList(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).LocalVariableInitialization,
                              TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).Type_.Size,
                              0,
                              Depth+1);
+      GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetVariableLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand)));
      end;
      astnkGVAR:begin
       GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetVariableLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand)));
@@ -422,7 +423,7 @@ begin
      if self is TPACCTarget_x86_32_COFF_PE then begin
       CodeStringList.Add('.cpu(all)');
       CodeStringList.Add('.target(coff32)');
-      CodeStringList.Add('.section(".text$0",'+IntToStr(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+      CodeStringList.Add('.section(".text",'+IntToStr(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
       if TextSectionStringList.Count=0 then begin
        CodeStringList.Add('  nop');
       end else begin
@@ -430,12 +431,12 @@ begin
       end;
       CodeStringList.Add('}');
       if DataSectionStringList.Count>0 then begin
-       CodeStringList.Add('.section(".data$0",'+IntToStr(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+       CodeStringList.Add('.section(".data",'+IntToStr(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
        CodeStringList.AddStrings(DataSectionStringList);
        CodeStringList.Add('}');
       end;
       if BSSSectionStringList.Count>0 then begin
-       CodeStringList.Add('.section(".bss$0",'+IntToStr(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+       CodeStringList.Add('.section(".bss",'+IntToStr(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
        CodeStringList.AddStrings(BSSSectionStringList);
        CodeStringList.Add('}');
       end;
