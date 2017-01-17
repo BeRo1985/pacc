@@ -343,6 +343,9 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
      astnkGVAR:begin
       GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand)));
      end;
+     astnkFUNCDESG:begin
+      GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).FunctionName);
+     end;
      else begin
       TPACCInstance(Instance).AddError('Internal error 2017-01-17-11-06-0000',@Node.SourceLocation,true);
      end;
@@ -411,6 +414,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
    GetCodeLevel(0)^.TextSectionStringList.Add('.public('+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Variable))+' = "'+Node.FunctionName+'")');
   end;
   GetCodeLevel(0)^.TextSectionStringList.Add(GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Variable))+':');
+  GetCodeLevel(0)^.TextSectionStringList.Add(Node.FunctionName+':');
   GetCodeLevel(0)^.TextSectionStringList.Add('push ebp');
   GetCodeLevel(0)^.TextSectionStringList.Add('mov ebp,esp');
   // ..

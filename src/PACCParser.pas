@@ -1267,7 +1267,9 @@ var CurrentState:TState;
     Node:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkCONV,Type_,Node.SourceLocation,Node);
    end;
    if (Node.Type_^.Kind=tkPOINTER) and (Type_^.Kind=tkPOINTER) and not TPACCInstance(Instance).AreTypesEqual(Node.Type_,Type_) then begin
-    AddWarning('Initialization from incompatible pointer type',@Node.SourceLocation);
+    if Type_^.ChildType^.Kind<>tkVOID then begin
+     AddWarning('Initialization from incompatible pointer type',@Node.SourceLocation);
+    end;
    end;
    result.Add(TPACCAbstractSyntaxTreeNodeInitializer.Create(TPACCInstance(Instance),astnkINIT,nil,Node.SourceLocation,Node,0,Type_));
   end;
