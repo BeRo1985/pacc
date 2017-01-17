@@ -1141,8 +1141,6 @@ type TBytes=array of TPACCUInt8;
        property Items[const AIndex:TPACCInt]:TResourceNodeItem read GetItem write SetItem; default;
      end;
 
-var NullBytes:array[0..65535] of TPACCUInt8;
-
 constructor TResourceNodeItem.Create;
 begin
  inherited Create;
@@ -4066,6 +4064,4 @@ begin
  end;
 end;
 
-initialization
- FillChar(NullBytes,SizeOf(NullBytes),#0);
 end.

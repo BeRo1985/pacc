@@ -320,7 +320,7 @@ const ET_NONE=0;
       SHT_PROGBITS=1; 
       SHT_SYMTAB=2;
       SHT_STRTAB=3; 
-      SHT_RELA=4; 
+      SHT_RELA=4;
       SHT_HASH=5; 
       SHT_DYNAMIC=6; 
       SHT_NOTE=7; 
@@ -335,7 +335,7 @@ const ET_NONE=0;
       SHT_SYMTAB_SHNDX=18; 
       SHT_LOOS=$60000000; 
       SHT_HIOS=$6fffffff;
-      SHT_LOPROC=$70000000; 
+      SHT_LOPROC=$70000000;
       SHT_HIPROC=$7fffffff;
       SHT_LOUSER=$80000000; 
       SHT_HIUSER=$ffffffff; 
@@ -1962,16 +1962,255 @@ begin
 end;
 
 procedure TPACCLinker_ELF_ELF.Link(const AOutputStream:TStream;const AOutputFileName:TPUCUUTF8String='');
+ procedure WriteNullPadding(const Stream:TStream;Value:TPACCInt64);
+ var PartCount:TPACCInt64;
+ begin
+  while Value>0 do begin
+   if Value<SizeOf(NullBytes) then begin
+    PartCount:=Value;
+   end else begin
+    PartCount:=SizeOf(NullBytes);
+   end;
+   Stream.WriteBuffer(NullBytes[0],PartCount);
+   dec(Value,PartCount);
+  end;
+ end;
+ procedure WriteNOPPadding(const Stream:TStream;Value:TPACCInt64);
+  procedure WriteByte(const b:TPACCUInt8);
+  begin
+   Stream.WriteBuffer(b,SizeOf(TPACCUInt8));
+  end;
+  procedure WriteByteCount(const b:TPACCUInt8;c:TPACCInt64);
+  begin
+   while c>0 do begin
+    Stream.WriteBuffer(b,SizeOf(TPACCUInt8));
+    dec(c);
+   end;
+  end;
+ var PartCount:TPACCInt64;
+ begin
+  case fMachine of
+   EM_386:begin
+    while Value>0 do begin
+     if Value<16 then begin
+      PartCount:=Value;
+     end else begin
+      PartCount:=15;
+     end;
+     case PartCount of
+      1:begin
+       // nop
+       WriteByte($90);
+       dec(Value);
+      end;
+      2:begin
+       // xchg ax, ax (o16 nop)
+       WriteByte($66);
+       WriteByte($90);
+       dec(Value,2);
+      end;
+      3:begin
+       // lea esi,[esi+byte 0]
+       WriteByte($8d);
+       WriteByte($76);
+       WriteByte($00);
+       dec(Value,3);
+      end;
+      4:begin
+       // lea esi,[esi*1+byte 0]
+       WriteByte($8d);
+       WriteByte($74);
+       WriteByte($26);
+       WriteByte($00);
+       dec(Value,4);
+      end;
+      5:begin
+       // nop
+       WriteByte($90);
+       // lea esi,[esi*1+byte 0]
+       WriteByte($8d);
+       WriteByte($74);
+       WriteByte($26);
+       WriteByte($00);
+       dec(Value,5);
+      end;
+      6:begin
+       // lea esi,[esi+dword 0]
+       WriteByte($8d);
+       WriteByte($b6);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,6);
+      end;
+      7:begin
+       // lea esi,[esi*1+dword 0]
+       WriteByte($8d);
+       WriteByte($b4);
+       WriteByte($26);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,7);
+      end;
+      8:begin
+       // nop
+       WriteByte($90);
+       // lea esi,[esi*1+dword 0]
+       WriteByte($8d);
+       WriteByte($b4);
+       WriteByte($26);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,8);
+      end;
+      9..15:begin
+       // jmp $+9; nop fill .. jmp $+15; nop fill ..
+       WriteByte($eb);
+       WriteByte(PartCount-2);
+       WriteByteCount($90,PartCount-2);
+       dec(Value,PartCount);
+      end;
+     end;
+    end;
+   end;
+   EM_X86_64:begin
+    while Value>0 do begin
+     if Value<16 then begin
+      PartCount:=Value;
+     end else begin
+      PartCount:=15;
+     end;
+     case PartCount of
+      1:begin
+       // nop
+       WriteByte($90);
+       dec(Value);
+      end;
+      2:begin
+       // xchg ax, ax (o16 nop)
+       WriteByte($66);
+       WriteByte($90);
+       dec(Value,2);
+      end;
+      3:begin
+       // nop(3)
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($00);
+       dec(Value,3);
+      end;
+      4:begin
+       // nop(4)
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($40);
+       WriteByte($00);
+       dec(Value,4);
+      end;
+      5:begin
+       // nop(5)
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($44);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,5);
+      end;
+      6:begin
+       // nop(6)
+       WriteByte($66);
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($44);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,6);
+      end;
+      7:begin
+       // nop(7)
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($80);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,7);
+      end;
+      8:begin
+       // nop(8)
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($84);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,8);
+      end;
+      9:begin
+       // nop(9)
+       WriteByte($66);
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($84);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,9);
+      end;
+      10..15:begin
+       // repeated-o16 cs: nop(10..15)
+       WriteByteCount($66,PartCount-9);
+       WriteByte($2e);
+       WriteByte($0f);
+       WriteByte($1f);
+       WriteByte($84);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       WriteByte($00);
+       dec(Value,PartCount);
+      end;
+     end;
+    end;
+   end;
+   else begin
+    while Value>0 do begin
+     if Value<SizeOf(NullBytes) then begin
+      PartCount:=Value;
+     end else begin
+      PartCount:=SizeOf(NullBytes);
+     end;
+     Stream.WriteBuffer(NullBytes[0],PartCount);
+     dec(Value,PartCount);
+    end;
+   end;
+  end;
+ end;
 var OutputImage:TPACCLinker_ELF_ELF_Image;
-    ImageIndex,ImageSectionIndex:TPACCInt32;
+    ImageIndex,ImageSectionIndex,OutputImageSectionIndex:TPACCInt32;
     Image:TPACCLinker_ELF_ELF_Image;
-    ImageSection:TPACCLinker_ELF_ELF_Section;
+    ImageSection,OutputImageSection,CurrentOutputImageSection:TPACCLinker_ELF_ELF_Section;
+    HasGNULinkOnce:boolean;
+    Offset:TPACCInt64;
 begin
 
  OutputImage:=TPACCLinker_ELF_ELF_Image.Create(self);
  try
 
   OutputImage.Name:=AOutputFileName;
+
+  HasGNULinkOnce:=false;
 
   for ImageIndex:=0 to Images.Count-1 do begin
 
@@ -1980,6 +2219,51 @@ begin
    for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
 
     ImageSection:=Image.Sections[ImageSectionIndex];
+
+    if (ImageSection.sh_type in [SHT_PROGBITS,
+                                 SHT_REL,
+                                 SHT_RELA,
+                                 SHT_NOBITS,
+                                 SHT_PREINIT_ARRAY,
+                                 SHT_INIT_ARRAY,
+                                 SHT_FINI_ARRAY]) and
+       (ImageSection.Name<>'.stabstr') and
+       ((not HasGNULinkOnce) or (HasGNULinkOnce and (ImageSection.Name<>'.gnu.linkonce'))) then begin
+
+     if (not HasGNULinkOnce) and (ImageSection.Name='.gnu.linkonce') then begin
+      HasGNULinkOnce:=true;
+     end;
+
+     OutputImageSection:=nil;
+     for OutputImageSectionIndex:=0 to OutputImage.Sections.Count-1 do begin
+      CurrentOutputImageSection:=OutputImage.Sections[OutputImageSectionIndex];
+      if CurrentOutputImageSection.Name=ImageSection.Name then begin
+       OutputImageSection:=CurrentOutputImageSection;
+       break;
+      end;
+     end;
+
+     if assigned(OutputImageSection) then begin
+      OutputImageSection.sh_addralign:=Max(OutputImageSection.sh_addralign,ImageSection.sh_addralign);
+     end else begin
+      OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+      OutputImage.Sections.Add(OutputImageSection);
+      OutputImageSection.Name:=ImageSection.Name;
+      OutputImageSection.sh_type:=ImageSection.sh_type;
+      OutputImageSection.sh_flags:=ImageSection.sh_flags;
+      OutputImageSection.sh_addralign:=Max(1,ImageSection.sh_addralign);
+      OutputImageSection.sh_entsize:=ImageSection.sh_entsize;
+     end;
+
+     ImageSection.Stream.Seek(0,soBeginning);
+     OutputImageSection.Stream.Seek(OutputImageSection.Stream.Size,soBeginning);
+     WriteNullPadding(OutputImageSection.Stream,Max(0,TPACCInt64((OutputImageSection.Stream.Size+TPACCInt64(ImageSection.sh_addralign-1)) and not TPACCInt64(ImageSection.sh_addralign-1))-OutputImageSection.Stream.Size));
+     Offset:=OutputImageSection.Stream.Size;
+     if Offset<>0 then begin
+     end;
+     OutputImageSection.Stream.CopyFrom(ImageSection.Stream,ImageSection.Stream.Size);
+
+    end;
 
    end;
 

@@ -149,6 +149,8 @@ const PACCDefaultOptions:TPACCOptions=
         CreateSharedLibrary:false;
        );
 
+var NullBytes:array[0..65535] of TPACCUInt8;
+       
 procedure DebuggerWaitEnterKey;
 
 function SARcint(Value,Shift:TPACCInt):TPACCInt;
@@ -225,6 +227,8 @@ begin
  end;
 end;
 
+initialization
+ FillChar(NullBytes,SizeOf(NullBytes),#0);
 end.
 
 
