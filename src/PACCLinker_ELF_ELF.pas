@@ -995,6 +995,8 @@ type PELFIdent=^TELFIdent;
 
        fLinker:TPACCLinker_ELF_ELF;
 
+       fIndex:TPACCInt32;
+
        fName:TPACCRawByteString;
 
        fSection:TPACCLinker_ELF_ELF_Section;
@@ -1018,6 +1020,8 @@ type PELFIdent=^TELFIdent;
       published
 
        property Linker:TPACCLinker_ELF_ELF read fLinker;
+
+       property Index_:TPACCInt32 read fIndex write fIndex;
 
        property Name:TPACCRawByteString read fName write fName;
 
@@ -1101,6 +1105,8 @@ type PELFIdent=^TELFIdent;
 
        fLinker:TPACCLinker_ELF_ELF;
 
+       fIndex:TPACCInt32;
+
        fName:TPACCRawByteString;
 
        fDataOffset:TPACCUInt64;
@@ -1145,6 +1151,8 @@ type PELFIdent=^TELFIdent;
       published
 
        property Linker:TPACCLinker_ELF_ELF read fLinker;
+
+       property Index_:TPACCInt32 read fIndex write fIndex;
 
        property Name:TPACCRawByteString read fName write fName;
 
@@ -1790,7 +1798,7 @@ begin
  for SectionIndex:=0 to ELF3264EHdr.ELF64EHdr.e_shnum-1 do begin
 
   Section:=TPACCLinker_ELF_ELF_Section.Create(self);
-  Image.Sections.Add(Section);
+  Section.Index_:=Image.Sections.Add(Section);
 
   if fIs64Bit then begin
 
@@ -1904,7 +1912,7 @@ begin
  Image.SymTabSection.Stream.Seek(0,soBeginning);
  while Image.SymTabSection.Stream.Position<Image.SymTabSection.Stream.Size do begin
   Symbol:=TPACCLinker_ELF_ELF_Symbol.Create(self);
-  Image.Symbols.Add(Symbol);
+  Symbol.Index_:=Image.Symbols.Add(Symbol);
   if fIs64Bit then begin
    Image.SymTabSection.Stream.ReadBuffer(ELF3264Sym.ELF64Sym,SizeOf(TELF64Sym));
    Symbol.st_name:=ELF3264Sym.ELF64Sym.st_name;
@@ -2267,6 +2275,93 @@ var OutputImage:TPACCLinker_ELF_ELF_Image;
  begin
   result:=OutputImageSymbolNameHashMap[SymbolName];
  end;
+ function PutSymbol(const DestSection:TPACCLinker_ELF_ELF_Section;
+                    const SymbolName:TPACCRawByteString;
+                    st_value:TELF32Addr;
+                    st_size:TELFWord;
+                    st_info:TPACCUInt8;
+                    st_other:TPACCUInt8;
+                    st_shndx:TELFHalf):TPACCLinker_ELF_ELF_Symbol;
+ begin
+  result:=TPACCLinker_ELF_ELF_Symbol.Create(self);
+  result.Index_:=OutputImage.Symbols.Add(result);
+  result.Name:=SymbolName;
+  result.st_info:=st_info;
+  result.st_other:=st_other;
+  result.st_shndx:=st_shndx;
+  result.st_value:=st_value;
+  result.st_size:=st_size;
+  OutputImageSymbolNameHashMap[SymbolName]:=result;
+  if result.st_shndx=SHN_UNDEF then begin
+   result.Section:=nil;
+  end else if result.st_shndx<OutputImage.Sections.Count then begin
+   result.Section:=OutputImage.Sections[result.st_shndx];
+   result.Section.Symbols.Add(result);
+  end else if result.st_shndx<SHN_LORESERVE then begin
+   TPACCInstance(Instance).AddError('Output symbol "'+SymbolName+'" section index out of range',nil,true);
+  end else begin
+   result.Section:=nil;
+  end;
+ end;
+ function AddSymbol(const DestSection:TPACCLinker_ELF_ELF_Section;
+                    const SymbolName:TPACCRawByteString;
+                    st_value:TELF32Addr;
+                    st_size:TELFWord;
+                    st_info:TPACCUInt8;
+                    st_other:TPACCUInt8;
+                    st_shndx:TELFHalf):TPACCLinker_ELF_ELF_Symbol;
+ var SymBind,SymType,SymVis,OtherSymBind,OtherSymType,OtherSymVis,NewVis:TPACCUInt32;
+     DoPatch:boolean;
+ begin
+  SymBind:=ELF_ST_BIND(st_info);
+  SymType:=ELF_ST_TYPE(st_info);
+  SymVis:=ELF_ST_VISIBILITY(st_other);
+  result:=FindSymbol(SymbolName);
+  if assigned(result) and (SymBind<>STB_LOCAL) then begin
+   if result.st_shndx<>SHN_UNDEF then begin
+    OtherSymBind:=ELF_ST_BIND(result.st_info);
+    OtherSymType:=ELF_ST_TYPE(result.st_info);
+    OtherSymVis:=ELF_ST_VISIBILITY(result.st_other);
+    if OtherSymVis=STV_DEFAULT then begin
+     NewVis:=SymVis;
+    end else if SymVis=STV_DEFAULT then begin
+     NewVis:=OtherSymVis;
+    end else begin
+     NewVis:=Min(SymVis,OtherSymVis);
+    end;
+    result.st_other:=(result.st_other and not ELF_ST_VISIBILITY($ffffffff)) or NewVis;
+    st_other:=result.st_other;
+    DoPatch:=false;
+    if st_shndx=SHN_UNDEF then begin
+     // Ignore
+    end else if (SymBind=STB_GLOBAL) and (OtherSymBind=STB_WEAK) then begin
+     // Global overrides weak
+     DoPatch:=true;
+    end else if (SymBind=STB_WEAK) and (OtherSymBind=STB_GLOBAL) then begin
+     // Weak is ignored if it is already global
+    end else if (SymBind=STB_WEAK) and (OtherSymBind=STB_WEAK) then begin
+     // Weak is ignored if it is weak
+    end else if (SymVis=STV_HIDDEN) and (OtherSymVis=STV_INTERNAL) then begin
+     // Internal > Hidden
+    end else if (result.st_shndx=SHN_COMMON) and ((st_shndx<SHN_LORESERVE) or (st_shndx=SHN_COMMON)) then begin
+     DoPatch:=true;
+    end else begin
+     TPACCInstance(Instance).AddError('Duplicate defined symbol name "'+SymbolName+'"',nil,false);
+    end;
+   end else begin
+    DoPatch:=true;
+   end;
+   if DoPatch then begin
+    result.st_info:=ELF_ST_INFO(SymBind,SymType);
+    result.st_other:=st_other;
+    result.st_shndx:=st_shndx;
+    result.st_value:=st_value;
+    result.st_size:=st_size;
+   end;
+  end else begin
+   result:=PutSymbol(DestSection,SymbolName,st_value,st_size,st_info,st_other,st_shndx);
+  end;
+ end;
 begin
 
  OutputImageSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
@@ -2276,6 +2371,18 @@ begin
   try
 
    OutputImage.Name:=AOutputFileName;
+
+   begin
+    OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
+    OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
+    OutputImageSection.Name:='';
+    OutputImageSection.sh_type:=0;
+    OutputImageSection.sh_flags:=0;
+    OutputImageSection.sh_addralign:=0;
+    OutputImageSection.sh_entsize:=0;
+    OutputImageSection.sh_link:=0;
+    OutputImageSection.sh_info:=0;
+   end;
 
    HasGNULinkOnce:=false;
 
@@ -2296,8 +2403,7 @@ begin
 
      ImageSection.LinkOnce:=HasGNULinkOnce and (ImageSection.Name='.gnu.linkonce');
 
-     if (ImageSection.sh_type in [SHT_NULL,
-                                  SHT_PROGBITS,
+     if (ImageSection.sh_type in [SHT_PROGBITS,
                                   SHT_REL,
                                   SHT_RELA,
                                   SHT_NOBITS,
@@ -2324,7 +2430,7 @@ begin
        OutputImageSection.sh_addralign:=Max(OutputImageSection.sh_addralign,ImageSection.sh_addralign);
       end else begin
        OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
-       OutputImage.Sections.Add(OutputImageSection);
+       OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
        OutputImageSection.Name:=ImageSection.Name;
        OutputImageSection.sh_type:=ImageSection.sh_type;
        OutputImageSection.sh_flags:=ImageSection.sh_flags;
@@ -2374,9 +2480,7 @@ begin
        OutputImageSection:=ImageSection.MergedToSection;
        OutputImageSection.LinkSection:=ImageSection.LinkSection.MergedToSection;
        if assigned(OutputImageSection.LinkSection) then begin
-        OutputImageSection.sh_link:=OutputImage.Sections.IndexOf(OutputImageSection.LinkSection);
-       end else begin
-        OutputImageSection.sh_link:=0;
+        OutputImageSection.sh_link:=OutputImageSection.LinkSection.Index_;
        end;
       end;
       case ImageSection.sh_type of
@@ -2384,9 +2488,7 @@ begin
         if assigned(ImageSection.InfoSection) and assigned(ImageSection.InfoSection.MergedToSection) then begin
          OutputImageSection:=ImageSection.MergedToSection;
          OutputImageSection.InfoSection:=ImageSection.InfoSection.MergedToSection;
-         OutputImageSection.sh_info:=Max(0,OutputImage.Sections.IndexOf(OutputImageSection.InfoSection));
-        end else begin
-         ImageSection.MergedToSection.sh_info:=0;
+         OutputImageSection.sh_info:=OutputImageSection.InfoSection.Index_;
         end;
        end;
       end;
@@ -2395,7 +2497,15 @@ begin
 
     for ImageSymbolIndex:=0 to Image.Symbols.Count-1 do begin
      ImageSymbol:=Image.Symbols[ImageSymbolIndex];
-     if (ImageSymbol.st_shndx<>SHN_UNDEF) and (ImageSymbol.st_shndx<SHN_LORESERVE) then begin
+     if (ImageSymbol.st_shndx=SHN_UNDEF) or (ImageSymbol.st_shndx>=SHN_LORESERVE) then begin
+      ImageSymbol.MergedSymbol:=AddSymbol(OutputImage.SymTabSection,
+                                          ImageSymbol.Name,
+                                          ImageSymbol.st_value,
+                                          ImageSymbol.st_size,
+                                          ImageSymbol.st_info,
+                                          ImageSymbol.st_other,
+                                          ImageSymbol.st_shndx);
+     end else begin
       ImageSection:=ImageSymbol.Section;
       if assigned(ImageSection) then begin
        if ImageSection.LinkOnce then begin
@@ -2403,6 +2513,16 @@ begin
          ImageSymbol.MergedSymbol:=FindSymbol(ImageSymbol.Name);
         end;
         continue;
+       end;
+       OutputImageSection:=ImageSection.MergedToSection;
+       if assigned(OutputImageSection) then begin
+        ImageSymbol.MergedSymbol:=AddSymbol(OutputImage.SymTabSection,
+                                            ImageSymbol.Name,
+                                            ImageSymbol.st_value+OutputImageSection.MergedOffset,
+                                            ImageSymbol.st_size,
+                                            ImageSymbol.st_info,
+                                            ImageSymbol.st_other,
+                                            OutputImageSection.Index_);
        end;
       end;
      end;
