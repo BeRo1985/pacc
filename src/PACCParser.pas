@@ -91,6 +91,7 @@ const TokenEOF:TPACCLexerToken=(TokenType:TOK_EOF;
                                 );
                                );
 var CurrentState:TState;
+    FunctionNameScope:TPACCRawByteStringHashMap;
     GlobalScope:TPACCRawByteStringHashMap;
     LocalScope:TPACCRawByteStringHashMap;
     TagScope:TPACCRawByteStringHashMap;
@@ -344,6 +345,30 @@ var CurrentState:TState;
    result:=TPACCAbstractSyntaxTreeNode(Node).Type_;
   end else begin
    result:=nil;
+  end;
+ end;
+ procedure AddFunctionNameVariable(const FunctionName:TPACCRawByteString;const FunctionBody,Variable:TPACCAbstractSyntaxTreeNode);
+ var FunctionNameList:TList;
+     Index:longint;
+ begin
+  if length(FunctionName)>0 then begin
+   FunctionNameList:=FunctionNameScope[FunctionName];
+   if not assigned(FunctionNameList) then begin
+    FunctionNameList:=TList.Create;
+    TPACCInstance(Instance).AllocatedObjects.Add(FunctionNameList);
+    FunctionNameScope[FunctionName]:=FunctionNameList;
+   end;
+   if (FunctionNameList.Count>0) and assigned(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionNameList[FunctionNameList.Count-1]).Variable) then begin
+    TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Variable:=TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionNameList[FunctionNameList.Count-1]).Variable;
+    FunctionNameList.Add(FunctionBody);
+   end else begin
+    FunctionNameList.Add(FunctionBody);
+    if assigned(Variable) then begin
+     for Index:=0 to FunctionNameList.Count-1 do begin
+      TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionNameList[Index]).Variable:=Variable;
+     end;
+    end;
+   end;
   end;
  end;
  function NewASTString(const SourceLocation:TPACCSourceLocation;const Encoding:TPACCEncoding;const Buf:TPACCRawByteString):TPACCAbstractSyntaxTreeNode;
@@ -684,11 +709,13 @@ var CurrentState:TState;
     if assigned(result) then begin
      if result.Type_^.Kind=tkFUNCTION Then begin
       result:=TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration.Create(TPACCInstance(Instance),astnkFUNCDESG,result.Type_,result.SourceLocation,Name,nil,nil,nil);
+      AddFunctionNameVariable(Name,result,nil);
      end;
     end else begin
      if CurrentState.Token^.TokenType=TOK_LPAR then begin
       AddWarning('assume returning int: '+Name+'()',@CurrentState.Token^.SourceLocation);
       result:=TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration.Create(TPACCInstance(Instance),astnkFUNCDESG,TPACCInstance(Instance).NewFunctionType(TPACCInstance(Instance).TypeINT,nil,true,false),CurrentState.Token^.SourceLocation,Name,nil,nil,nil);
+      AddFunctionNameVariable(Name,result,nil);
      end else begin
       result:=nil;
       AddError('Undeclared variable: '+Name,@RelevantSourceLocation,false);
@@ -801,11 +828,13 @@ var CurrentState:TState;
   if (Node.Kind=astnkADDR) and (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Kind=astnkFUNCDESG) then begin
    Desg:=TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand;
    result:=TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration.Create(TPACCInstance(Instance),astnkFUNCCALL,Desg.Type_^.ReturnType,Desg.SourceLocation,TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Desg).FunctionName,Desg.Type_,nil,nil);
+   AddFunctionNameVariable(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Desg).FunctionName,result,nil);
    TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(result).Parameters:=ParseFunctionArguments(Desg.Type_^.Parameters);
   end else begin
    if (Node.Type_^.Kind=tkPOINTER) and
       (Node.Type_^.ChildTYpe^.Kind=tkFUNCTION) then begin
     result:=TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration.Create(TPACCInstance(Instance),astnkFUNCPTR_CALL,Node.Type_^.ChildType^.ReturnType,Node.SourceLocation,TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node).FunctionName,nil,Node,nil);
+    AddFunctionNameVariable(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node).FunctionName,result,nil);
     TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(result).Parameters:=ParseFunctionArguments(Node.Type_^.ChildType^.Parameters);
    end else begin
     result:=nil;
@@ -3504,6 +3533,7 @@ var CurrentState:TState;
             end;
            end;
            FunctionBody:=TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration.Create(TPACCInstance(Instance),astnkFUNC,CurrentType,RelevantSourceLocation,Name,nil,nil,nil);
+           AddFunctionNameVariable(Name,FunctionBody,Variable);
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Parameters:=Parameters;
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).LocalVariables:=LocalVariables;
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Labels:=Labels;
@@ -3627,6 +3657,7 @@ var CurrentState:TState;
  end;
 begin
  if Lexer.CountTokens>0 then begin
+  FunctionNameScope:=TPACCRawByteStringHashMap.Create;
   GlobalScope:=TPACCRawByteStringHashMap.Create;
   LocalScope:=nil;
   TagScope:=TPACCRawByteStringHashMap.Create;
@@ -3665,6 +3696,7 @@ begin
    LocalVariables.Free;
    Labels.Free;
    UnresolvedLabelUsedNodes.Free;
+   FunctionNameScope.Free;
    Finalize(Cases);
   end;
  end;
