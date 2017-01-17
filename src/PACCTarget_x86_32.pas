@@ -135,8 +135,16 @@ var CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringL
  begin
   result:='__varlabel_'+IntToStr(TPACCPtrUInt(pointer(Variable)));
  end;
- procedure ProcessDECL(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
+ procedure ProcessInitializer(const Node:TPACCAbstractSyntaxTreeNodeInitializer);
+ begin
+  if Node.Kind=astnkINIT then begin
+  end else begin
+   TPACCInstance(Instance).AddError('Internal error 2017-01-17-09-24-0000',@Node.SourceLocation,true);
+  end;
+ end;
+ procedure ProcessDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
  var Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+     Index:TPACCInt32;
  begin
   if assigned(Node.DeclarationVariable) then begin
    if assigned(CurrentFunction) then begin
@@ -148,6 +156,9 @@ var CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringL
        DataSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
       end;
       DataSectionStringList.Add(GetVariableLabel(Variable)+':');
+      for Index:=0 to Node.DeclarationInitialization.Count-1 do begin
+       ProcessInitializer(TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[Index]));
+      end;
      end else begin
       if not (tfStatic in Variable.Type_^.Flags) then begin
        BSSSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
@@ -167,7 +178,7 @@ var CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringL
  begin
   case Node.Kind of
    astnkDECL:begin
-    ProcessDECL(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
+    ProcessDeclaration(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
    end;
    astnkFUNC:begin
    end;
