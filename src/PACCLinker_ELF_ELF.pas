@@ -1123,6 +1123,10 @@ type PELFIdent=^TELFIdent;
 
        fMergedToSection:TPACCLinker_ELF_ELF_Section;
 
+       fLinkSection:TPACCLinker_ELF_ELF_Section;
+
+       fInfoSection:TPACCLinker_ELF_ELF_Section;
+
        fMerged:boolean;
 
        fActive:boolean;
@@ -1161,6 +1165,10 @@ type PELFIdent=^TELFIdent;
        property MergedOffset:TPACCInt64 read fMergedOffset write fMergedOffset;
 
        property MergedToSection:TPACCLinker_ELF_ELF_Section read fMergedToSection write fMergedToSection;
+
+       property LinkSection:TPACCLinker_ELF_ELF_Section read fLinkSection write fLinkSection;
+
+       property InfoSection:TPACCLinker_ELF_ELF_Section read fInfoSection write fInfoSection;
 
        property Merged:boolean read fMerged write fMerged;
 
@@ -1857,6 +1865,20 @@ begin
   end;
  end;
 
+ for SectionIndex:=0 to Image.Sections.Count-1 do begin
+  Section:=Image.Sections[SectionIndex];
+  if Section.sh_link>0 then begin
+   Section.LinkSection:=Image.Sections[Section.sh_link];
+  end else begin
+   Section.LinkSection:=nil;
+  end;
+  if (Section.sh_type in [SHT_REL,SHT_RELA]) and (Section.sh_info>0) then begin
+   Section.InfoSection:=Image.Sections[Section.sh_Info];
+  end else begin
+   Section.InfoSection:=nil;
+  end;
+ end;
+
  if Image.SHStrTabSection.Name<>'.shstrtab' then begin
   TPACCInstance(Instance).AddError('".shstrtab" section have wrong name',nil,true);
  end;
@@ -2254,7 +2276,8 @@ begin
 
     ImageSection.Merged:=false;
 
-    if (ImageSection.sh_type in [SHT_PROGBITS,
+    if (ImageSection.sh_type in [SHT_NULL,
+                                 SHT_PROGBITS,
                                  SHT_REL,
                                  SHT_RELA,
                                  SHT_NOBITS,
@@ -2287,6 +2310,8 @@ begin
       OutputImageSection.sh_flags:=ImageSection.sh_flags;
       OutputImageSection.sh_addralign:=Max(1,ImageSection.sh_addralign);
       OutputImageSection.sh_entsize:=ImageSection.sh_entsize;
+      OutputImageSection.sh_link:=0;
+      OutputImageSection.sh_info:=0;
      end;
 
      ImageSection.Stream.Seek(0,soBeginning);
@@ -2322,11 +2347,37 @@ begin
     end;
    end;
 
+   for ImageSectionIndex:=0 to Image.Sections.Count-1 do begin
+    ImageSection:=Image.Sections[ImageSectionIndex];
+    if ImageSection.Merged and (ImageSection.MergedOffset=0) then begin
+     if assigned(ImageSection.LinkSection) then begin
+      OutputImageSection:=ImageSection.MergedToSection;
+      OutputImageSection.LinkSection:=ImageSection.LinkSection.MergedToSection;
+      if assigned(OutputImageSection.LinkSection) then begin
+       OutputImageSection.sh_link:=OutputImage.Sections.IndexOf(OutputImageSection.LinkSection);
+      end else begin
+       OutputImageSection.sh_link:=0;
+      end;
+     end;
+     case ImageSection.sh_type of
+      SHT_REL,SHT_RELA:begin
+       if assigned(ImageSection.InfoSection) and assigned(ImageSection.InfoSection.MergedToSection) then begin
+        OutputImageSection:=ImageSection.MergedToSection;
+        OutputImageSection.InfoSection:=ImageSection.InfoSection.MergedToSection;
+        OutputImageSection.sh_info:=Max(0,OutputImage.Sections.IndexOf(OutputImageSection.InfoSection));
+       end else begin
+        ImageSection.MergedToSection.sh_info:=0;
+       end;
+      end;
+     end;
+    end;
+   end;
+
    for ImageSymbolIndex:=0 to Image.Symbols.Count-1 do begin
 
     ImageSymbol:=Image.Symbols[ImageSymbolIndex];
 
-    
+
 
    end;
 
