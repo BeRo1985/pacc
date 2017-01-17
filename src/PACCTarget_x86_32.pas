@@ -357,27 +357,28 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
  var Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
  begin
   if assigned(Node.DeclarationVariable) then begin
-   if assigned(CurrentFunction) then begin
-   end else begin
-    if Node.DeclarationVariable.Kind=astnkGVAR then begin
-     Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable);
-     if assigned(Node.DeclarationInitialization) then begin
-      GetCodeLevel(Depth)^.DataSectionStringList.Add('');     
-      GetCodeLevel(Depth)^.DataSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
-      if not (tfStatic in Variable.Type_^.Flags) then begin
-       GetCodeLevel(Depth)^.DataSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
-      end;
-      GetCodeLevel(Depth)^.DataSectionStringList.Add(GetVariableLabel(Variable)+':');
-      ProcessInitializerList(Node.DeclarationInitialization,0,0,0);
-     end else begin
-      GetCodeLevel(Depth)^.BSSSectionStringList.Add('');     
-      GetCodeLevel(Depth)^.BSSSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
-      if not (tfStatic in Variable.Type_^.Flags) then begin
-       GetCodeLevel(Depth)^.BSSSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
-      end;
-      GetCodeLevel(Depth)^.BSSSectionStringList.Add(GetVariableLabel(Variable)+':');
-      GetCodeLevel(Depth)^.BSSSectionStringList.Add('resb '+IntToStr(Variable.Type_^.Size));
+   if Node.DeclarationVariable.Kind=astnkGVAR then begin
+    Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable);
+    if assigned(Node.DeclarationInitialization) then begin
+     GetCodeLevel(Depth)^.DataSectionStringList.Add('');
+     GetCodeLevel(Depth)^.DataSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
+     if not ((tfStatic in Variable.Type_^.Flags) or assigned(CurrentFunction)) then begin
+      GetCodeLevel(Depth)^.DataSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
      end;
+     GetCodeLevel(Depth)^.DataSectionStringList.Add(GetVariableLabel(Variable)+':');
+     ProcessInitializerList(Node.DeclarationInitialization,0,0,0);
+    end else begin
+     GetCodeLevel(Depth)^.BSSSectionStringList.Add('');
+     GetCodeLevel(Depth)^.BSSSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
+     if not ((tfStatic in Variable.Type_^.Flags) or assigned(CurrentFunction)) then begin
+      GetCodeLevel(Depth)^.BSSSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
+     end;
+     GetCodeLevel(Depth)^.BSSSectionStringList.Add(GetVariableLabel(Variable)+':');
+     GetCodeLevel(Depth)^.BSSSectionStringList.Add('resb '+IntToStr(Variable.Type_^.Size));
+    end;
+   end else begin
+    if assigned(CurrentFunction) and (Node.DeclarationVariable.Kind=astnkLVAR) then begin
+     
     end else begin
      TPACCInstance(Instance).AddError('Internal error 2017-01-17-09-08-0000',@Node.SourceLocation,true);
     end;
