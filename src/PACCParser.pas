@@ -3482,6 +3482,7 @@ var CurrentState:TState;
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Parameters:=Parameters;
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).LocalVariables:=LocalVariables;
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Labels:=Labels;
+           TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Variable:=Variable;
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Body:=ParseCompoundStatement;
            Parameters:=nil;
           finally

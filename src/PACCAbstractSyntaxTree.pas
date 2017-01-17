@@ -200,6 +200,7 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
      TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration=class(TPACCAbstractSyntaxTreeNode)
       public
        FunctionName:TPACCRawByteString;
+       Variable:TPACCAbstractSyntaxTreeNode;
        Arguments:TPACCAbstractSyntaxTreeNodeList;
        FunctionType:PPACCType;
        FunctionPointer:TPACCAbstractSyntaxTreeNode;
