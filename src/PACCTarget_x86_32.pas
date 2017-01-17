@@ -222,6 +222,8 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
                 (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Kind=astnkSTRING) and
                 (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.Kind=tkARRAY) and
                 (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.ChildType^.Kind=tkCHAR) then begin
+     GetCodeLevel(Depth+1)^.DataSectionStringList.Add('');
+     GetCodeLevel(Depth+1)^.DataSectionStringList.Add('.align('+IntToStr(Max(4,TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.ChildType^.Alignment))+')');
      GetCodeLevel(Depth+1)^.DataSectionStringList.Add('$_stringlabel_'+IntToStr(TPACCPtrUInt(pointer(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand)))+':');
      for i32:=1 to length(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Value) do begin
       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('db '+IntToStr(TPACCUInt8(AnsiChar(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Value[i32]))));
@@ -320,6 +322,8 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
    if Value.Kind=astnkADDR then begin
     case TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand.Kind of
      astnkLVAR:begin
+      GetCodeLevel(Depth+1)^.DataSectionStringList.Add('');
+      GetCodeLevel(Depth+1)^.DataSectionStringList.Add('.align('+IntToStr(Max(4,TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).Type_.Alignment))+')');
       GetCodeLevel(Depth+1)^.DataSectionStringList.Add(GetVariableLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand))+':');
       ProcessInitializerList(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).LocalVariableInitialization,
                              TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).Type_.Size,
@@ -358,6 +362,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
     if Node.DeclarationVariable.Kind=astnkGVAR then begin
      Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable);
      if assigned(Node.DeclarationInitialization) then begin
+      GetCodeLevel(Depth)^.DataSectionStringList.Add('');     
       GetCodeLevel(Depth)^.DataSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
       if not (tfStatic in Variable.Type_^.Flags) then begin
        GetCodeLevel(Depth)^.DataSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
@@ -365,6 +370,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
       GetCodeLevel(Depth)^.DataSectionStringList.Add(GetVariableLabel(Variable)+':');
       ProcessInitializerList(Node.DeclarationInitialization,0,0,0);
      end else begin
+      GetCodeLevel(Depth)^.BSSSectionStringList.Add('');     
       GetCodeLevel(Depth)^.BSSSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
       if not (tfStatic in Variable.Type_^.Flags) then begin
        GetCodeLevel(Depth)^.BSSSectionStringList.Add('.public('+GetVariableLabel(Variable)+' = "'+Variable.VariableName+'")');
@@ -393,7 +399,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
    end;
   end;
  end;
-var Index:TPACCInt32;
+var Index,LineIndex:TPACCInt32;
     TextSectionStringList,DataSectionStringList,BSSSectionStringList:TStringList;
     CodeLevel:PCodeLevel;
 begin
@@ -414,31 +420,46 @@ begin
       end;
       for Index:=0 to CountCodeLevels-1 do begin
        CodeLevel:=@CodeLevels[Index];
-       TextSectionStringList.AddStrings(CodeLevel^.TextSectionStringList);
-       DataSectionStringList.AddStrings(CodeLevel^.DataSectionStringList);
-       BSSSectionStringList.AddStrings(CodeLevel^.BSSSectionStringList);
+       for LineIndex:=0 to CodeLevel^.TextSectionStringList.Count-1 do begin
+        TextSectionStringList.Add('  '+CodeLevel^.TextSectionStringList[LineIndex]);
+       end;
+       for LineIndex:=0 to CodeLevel^.DataSectionStringList.Count-1 do begin
+        DataSectionStringList.Add('  '+CodeLevel^.DataSectionStringList[LineIndex]);
+       end;
+       for LineIndex:=0 to CodeLevel^.BSSSectionStringList.Count-1 do begin
+        BSSSectionStringList.Add('  '+CodeLevel^.BSSSectionStringList[LineIndex]);
+       end;
       end;
      finally
       FinalizeCodeLevels;
      end;
      if self is TPACCTarget_x86_32_COFF_PE then begin
       CodeStringList.Add('.cpu(all)');
+      CodeStringList.Add('');
       CodeStringList.Add('.target(coff32)');
+      CodeStringList.Add('');
       CodeStringList.Add('.section(".text",'+IntToStr(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
       if TextSectionStringList.Count=0 then begin
+       CodeStringList.Add('');
        CodeStringList.Add('  nop');
+       CodeStringList.Add('');
       end else begin
        CodeStringList.AddStrings(TextSectionStringList);
+       CodeStringList.Add('');
       end;
       CodeStringList.Add('}');
       if DataSectionStringList.Count>0 then begin
+       CodeStringList.Add('');
        CodeStringList.Add('.section(".data",'+IntToStr(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
        CodeStringList.AddStrings(DataSectionStringList);
+       CodeStringList.Add('');
        CodeStringList.Add('}');
       end;
       if BSSSectionStringList.Count>0 then begin
+       CodeStringList.Add('');
        CodeStringList.Add('.section(".bss",'+IntToStr(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
        CodeStringList.AddStrings(BSSSectionStringList);
+       CodeStringList.Add('');
        CodeStringList.Add('}');
       end;
      end;
