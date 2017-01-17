@@ -968,6 +968,7 @@ var CurrentState:TState;
     end;
    end;
    TOK_AND:begin
+    NextToken;
     result:=ParseCastExpression;
     if result.Kind=astnkFUNCDESG then begin
      result:=TPACCInstance(Instance).TypeConversion(result);
@@ -976,6 +977,7 @@ var CurrentState:TState;
     result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkADDR,TPACCInstance(Instance).NewPointerType(result.Type_),RelevantSourceLocation,result);
    end;
    TOK_MUL:begin
+    NextToken;
     result:=TPACCInstance(Instance).TypeConversion(ParseCastExpression);
     if result.Type_^.Kind<>tkPOINTER then begin
      AddError('Pointer type expected',nil,false);
@@ -984,9 +986,11 @@ var CurrentState:TState;
     end;
    end;
    TOK_ADD:begin
+    NextToken;
     result:=ParseCastExpression;
    end;
    TOK_SUB:begin
+    NextToken;
     result:=TPACCInstance(Instance).TypeConversion(ParseCastExpression);
     EnsureArithmeticType(result);
     if TPACCInstance(Instance).IsIntType(result.Type_) then begin
@@ -996,6 +1000,7 @@ var CurrentState:TState;
     end;
    end;
    TOK_NOT:begin
+    NextToken;
     result:=TPACCInstance(Instance).TypeConversion(ParseCastExpression);
     if TPACCInstance(Instance).IsIntType(result.Type_) then begin
      result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkOP_NOT,result.Type_,RelevantSourceLocation,result);
@@ -1004,6 +1009,7 @@ var CurrentState:TState;
     end;
    end;
    TOK_LNOT:begin
+    NextToken;
     result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkOP_LOG_NOT,TPACCInstance(Instance).TypeINT,RelevantSourceLocation,TPACCInstance(Instance).TypeConversion(ParseCastExpression));
    end;
    else begin
