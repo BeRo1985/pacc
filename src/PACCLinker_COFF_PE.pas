@@ -1674,6 +1674,19 @@ var SectionIndex,RelocationIndex,NumberOfRelocations,SymbolIndex,SectionStartInd
     c:ansichar;
     SymbolKind:TPACCLinker_COFF_PE_SymbolKind;
     SymbolRemap:array of TPACCUInt32;
+ procedure WriteNullPadding(const Stream:TStream;Value:TPACCInt64);
+ var PartCount:TPACCInt64;
+ begin
+  while Value>0 do begin
+   if Value<SizeOf(NullBytes) then begin
+    PartCount:=Value;
+   end else begin
+    PartCount:=SizeOf(NullBytes);
+   end;
+   Stream.WriteBuffer(NullBytes[0],PartCount);
+   dec(Value,PartCount);
+  end;
+ end;
 begin
 
  COFFSectionHeaders:=nil;
@@ -1741,12 +1754,14 @@ begin
      if (COFFSectionHeader^.Characteristics and IMAGE_SCN_ALIGN_MASK)<>0 then begin
       Section.Alignment:=1 shl (((COFFSectionHeader^.Characteristics and IMAGE_SCN_ALIGN_MASK) shr IMAGE_SCN_ALIGN_SHIFT)-1);
      end;
-     if (COFFSectionHeader^.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)=0 then begin
-      if COFFSectionHeader^.SizeOfRawData>0 then begin
-       if (COFFSectionHeader^.VirtualSize>0) and
-          (COFFSectionHeader^.SizeOfRawData>COFFSectionHeader^.VirtualSize) then begin
-        TPACCInstance(Instance).AddError('SizeOfRawData is larger than VirtualSize at section "'+Section.Name+'"',nil,true);
-       end;
+     if COFFSectionHeader^.SizeOfRawData>0 then begin
+      if (COFFSectionHeader^.VirtualSize>0) and
+         (COFFSectionHeader^.SizeOfRawData>COFFSectionHeader^.VirtualSize) then begin
+       TPACCInstance(Instance).AddError('SizeOfRawData is larger than VirtualSize at section "'+Section.Name+'"',nil,true);
+      end;
+      if (Section.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)<>0 then begin
+       WriteNullPadding(Section.Stream,COFFSectionHeader^.SizeOfRawData);
+      end else begin
        if AObjectStream.Seek(COFFSectionHeader^.PointerToRawData,soBeginning)<>COFFSectionHeader^.PointerToRawData then begin
         TPACCInstance(Instance).AddError('Stream seek error',nil,true);
        end;
@@ -3330,7 +3345,7 @@ var Relocations:TRelocations;
    SectionNameHashMap.Free;
   end;
 
- end;
+ end;                             
  procedure PositionAndSizeSections;
  var SectionIndex,RelocationIndex:TPACCInt32;
      Section:TPACCLinker_COFF_PE_Section;
