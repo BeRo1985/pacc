@@ -3623,9 +3623,9 @@ var Relocations:TRelocations;
    Section.VirtualSize:=(Section.Stream.Size+(PECOFFSectionAlignment-1)) and not TPACCInt64(PECOFFSectionAlignment-1);
 
    Section.RawSize:=Section.Stream.Size;
-   while (Section.RawSize>0) and (TPACCUInt8(PAnsiChar(Section.Stream.Memory)[Section.RawSize-1])=0) do begin
+{  while (Section.RawSize>0) and (TPACCUInt8(PAnsiChar(Section.Stream.Memory)[Section.RawSize-1])=0) do begin
     Section.RawSize:=Section.RawSize-1;
-   end;
+   end;}
 
    inc(LastVirtualAddress,Section.VirtualSize);
 
@@ -4099,9 +4099,9 @@ var Relocations:TRelocations;
    end;
    if (Section.Characteristics and IMAGE_SCN_CNT_UNINITIALIZED_DATA)=0 then begin
     TempSize:=FileSizeAlign(Section.RawSize);
-    while (Section.RawSize>TempSize) and (TPACCUInt8(PAnsiChar(Section.Stream.Memory)[Section.RawSize-1])=0) do begin
+{   while (Section.RawSize>TempSize) and (TPACCUInt8(PAnsiChar(Section.Stream.Memory)[Section.RawSize-1])=0) do begin
      Section.RawSize:=Section.RawSize-1;
-    end;
+    end;}
     inc(FileOffset,Section.RawSize);
     if (FileOffset and (PECOFFFileAlignment-1))<>0 then begin
      FileOffset:=(FileOffset+(PECOFFFileAlignment-1)) and not (PECOFFFileAlignment-1);
