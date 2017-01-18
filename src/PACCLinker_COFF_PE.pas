@@ -2238,9 +2238,13 @@ var Relocations:TRelocations;
                         '  pop ebx'#10+
                         '  pop edi'#10+
                         '  pop esi'#10+
-                        '  push dword offset WorkMemory'#10+
+                        // Main-calling-code for cdecl (quasi-cdecl without callee cleanup), stdcall and fastcall at the same time
+                        '  mov ebp, esp'#10+
+                        '  mov edx, dword offset WorkMemory'#10+
+                        '  push edx'#10+
                         '  push eax'#10+
                         '  call _main'#10+
+                        '  mov esp, ebp'#10+
                         '  push eax'#10+
                         '  call ExitProcess'#10+
                         '}'#10+
