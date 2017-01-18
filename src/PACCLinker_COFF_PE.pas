@@ -2062,16 +2062,23 @@ var Relocations:TRelocations;
     PECOFFDirectoryEntries:PPECOFFDirectoryEntries;
     Is64Bit,IsGUI:boolean;
     ExternalAvailableSymbolHashMap:TPACCRawByteStringHashMap;
+    EntryPointSymbolName:TPACCRawByteString;
  procedure AddStartupCode;
  begin
   if TPACCInstance(Instance).Options.CreateSharedLibrary then begin
+   EntryPointSymbolName:='_start';
   end else begin
    if assigned(PublicSymbolHashMap['WinMain']) then begin
     // GUI application
     IsGUI:=true;
+    EntryPointSymbolName:='_WinMainCRTStartup';
+    if not assigned(PublicSymbolHashMap[EntryPointSymbolName]) then begin
+    end;
    end else if assigned(PublicSymbolHashMap['main']) then begin
     // Console application
-    
+    EntryPointSymbolName:='_mainCRTStartup';
+    if not assigned(PublicSymbolHashMap[EntryPointSymbolName]) then begin
+    end;
    end else begin
     TPACCInstance(Instance).AddError('Neither "WinMain" nor "main" found',nil,true);
    end;
@@ -3755,11 +3762,14 @@ var Relocations:TRelocations;
 
   TotalImageSize:=LastVirtualAddress;
 
-  Symbol:=ExternalAvailableSymbolHashMap['_start'];
+  Symbol:=ExternalAvailableSymbolHashMap[EntryPointSymbolName];
   if assigned(Symbol) and assigned(Symbol.Section) then begin
    AddressOfEntryPoint:=Symbol.Section.VirtualAddress+Symbol.Value;
   end else begin
    AddressOfEntryPoint:=0;
+   if not TPACCInstance(Instance).Options.CreateSharedLibrary then begin
+    TPACCInstance(Instance).AddWarning('No valid entry point',nil);
+   end;
   end;
 
   CodeBase:=PECOFFSectionAlignment;
@@ -4041,6 +4051,8 @@ begin
 
  IsGUI:=false;
 
+ EntryPointSymbolName:='_start';
+ 
  AddStartupCode;
  
  RelocationsInit(Relocations);
