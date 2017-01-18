@@ -1309,7 +1309,7 @@ var CurrentState:TState;
  var Name:TPACCRawByteString;
  begin
   Name:='@TEMP@'+IntToStr(TPasMPInterlocked.Increment(TempVariableCounter));
-  result:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkLVAR,Type_,CurrentState.Token^.SourceLocation,Name,0,'');
+  result:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkLVAR,Type_,CurrentState.Token^.SourceLocation,Name,0);
   TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(result).LocalVariableInitialization:=ParseDeclarationInitializer(Type_);
   Assert(assigned(LocalScope));
   LocalScope[Name]:=result;
@@ -1685,7 +1685,7 @@ var CurrentState:TState;
        end;
        ParameterTypes[Index]:=CurrentType;
        if not TypeOnly then begin
-        Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkLVAR,CurrentType,RelevantSourceLocation,Name,0,'');
+        Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkLVAR,CurrentType,RelevantSourceLocation,Name,0);
         ParameterVariables.Add(Variable);
        end;
        case CurrentState.Token^.TokenType of
@@ -1710,7 +1710,7 @@ var CurrentState:TState;
      repeat
       if CurrentState.Token^.TokenType=TOK_IDENT then begin
        Name:=TPACCInstance(Instance).TokenSymbols[CurrentState.Token^.Index].Name;
-       ParameterVariables.Add(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkLVAR,TPACCInstance(Instance).TypeINT,CurrentState.Token^.SourceLocation,Name,0,''));
+       ParameterVariables.Add(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkLVAR,TPACCInstance(Instance).TypeINT,CurrentState.Token^.SourceLocation,Name,0));
        NextToken;
        case CurrentState.Token^.TokenType of
         TOK_RPAR:begin
@@ -3497,7 +3497,7 @@ var CurrentState:TState;
         Exclude(CurrentType^.Flags,tfStatic);
        end;
        CurrentType^.Attribute:=Attribute;
-       Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkGVAR,CurrentType,RelevantSourceLocation,Name,0,Name);
+       Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkGVAR,CurrentType,RelevantSourceLocation,Name,0);
        Assert(assigned(GlobalScope));
        GlobalScope[Name]:=Variable;
        OriginalLocalScope:=LocalScope;
@@ -3574,7 +3574,8 @@ var CurrentState:TState;
         GetScope[Name]:=TPACCAbstractSyntaxTreeNode.Create(TPACCInstance(Instance),astnkTYPEDEF,CurrentType,RelevantSourceLocation);
        end else if (tfStatic in CurrentType^.Flags) and not IsGlobal then begin
         EnsureNotVoid(CurrentType);
-        Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkGVAR,CurrentType,RelevantSourceLocation,Name,0,'@STATIC@'+IntToStr(TPasMPInterlocked.Increment(StaticCounter))+'@'+Name);
+        // Local static
+        Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkGVAR,CurrentType,RelevantSourceLocation,Name,0);
         Assert(assigned(LocalScope));
         LocalScope[Name]:=Variable;
         InitializationList:=nil;
@@ -3596,11 +3597,11 @@ var CurrentState:TState;
        end else begin
         EnsureNotVoid(CurrentType);
         if IsGlobal then begin
-         Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkGVAR,CurrentType,RelevantSourceLocation,Name,0,Name);
+         Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkGVAR,CurrentType,RelevantSourceLocation,Name,0);
          Assert(assigned(GlobalScope));
          GlobalScope[Name]:=Variable;
         end else begin
-         Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkLVAR,CurrentType,RelevantSourceLocation,Name,0,'');
+         Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkLVAR,CurrentType,RelevantSourceLocation,Name,0);
          Assert(assigned(LocalScope));
          LocalScope[Name]:=Variable;
          if assigned(LocalVariables) then begin
@@ -3641,26 +3642,6 @@ var CurrentState:TState;
    end;
   end;
  end;
- function ParseTranslationUnit:TPACCAbstractSyntaxTreeNodeTranslationUnit;
- begin
-  result:=TPACCAbstractSyntaxTreeNodeTranslationUnit.Create(TPACCInstance(Instance),astnkTRANSLATIONUNIT,nil,CurrentState.Token^.SourceLocation);
-  try
-   while CurrentState.Token^.TokenType<>TOK_EOF do begin
-    case CurrentState.Token^.TokenType of
-     TOK_ASM:begin
-      NextToken;
-      result.Children.Add(ParseAssemblerStatement(true));
-     end;
-     else begin
-      ParseDeclaration(result.Children,true,true);
-     end;
-    end;
-   end;
-  except
-   FreeAndNil(result);
-   raise;
-  end;
- end;
 begin
  if Lexer.CountTokens>0 then begin
   FunctionNameScope:=TPACCRawByteStringHashMap.Create;
@@ -3687,7 +3668,18 @@ begin
    NextToken;
    FreeAndNil(Root);
    try
-    Root:=ParseTranslationUnit;
+    Root:=TPACCAbstractSyntaxTreeNodeTranslationUnit.Create(TPACCInstance(Instance),astnkTRANSLATIONUNIT,nil,CurrentState.Token^.SourceLocation);
+    while CurrentState.Token^.TokenType<>TOK_EOF do begin
+     case CurrentState.Token^.TokenType of
+      TOK_ASM:begin
+       NextToken;
+       Root.Children.Add(ParseAssemblerStatement(true));
+      end;
+      else begin
+       ParseDeclaration(Root.Children,true,true);
+      end;
+     end;
+    end;                                                                                       
    except
     FreeAndNil(Root);
     Root:=TPACCAbstractSyntaxTreeNodeTranslationUnit.Create(TPACCInstance(Instance),astnkTRANSLATIONUNIT,nil,TPACCInstance(Instance).SourceLocation);

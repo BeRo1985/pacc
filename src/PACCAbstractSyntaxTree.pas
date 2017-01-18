@@ -120,13 +120,6 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
        destructor Destroy; override;
      end;
 
-     TPACCAbstractSyntaxTreeNodeLiteral=class(TPACCAbstractSyntaxTreeNode)
-      public
-       Value:TPACCRawByteString;
-       constructor Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation;const AValue:TPACCRawByteString); reintroduce;
-       destructor Destroy; override;
-     end;
-
      TPACCAbstractSyntaxTreeNodeAssemblerOperand=class(TPACCAbstractSyntaxTreeNode)
       public
        Identifier:TPACCRawByteString;
@@ -178,8 +171,7 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
        Index:TPACCInt;
        LocalOffset:TPACCInt;
        LocalVariableInitialization:TPACCAbstractSyntaxTreeNodeList;
-       GlobalLabelName:TPACCRawByteString;
-       constructor Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation;const AVariableName:TPACCRawByteString;const ALocalOffset:TPACCInt;const AGlobalLabelName:TPACCRawByteString); reintroduce;
+       constructor Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation;const AVariableName:TPACCRawByteString;const ALocalOffset:TPACCInt); reintroduce;
        destructor Destroy; override;
      end;
 
@@ -381,17 +373,6 @@ begin
  inherited Destroy;
 end;
 
-constructor TPACCAbstractSyntaxTreeNodeLiteral.Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation;const AValue:TPACCRawByteString);
-begin
- inherited Create(AInstance,AKind,AType,ASourceLocation);
- Value:=AValue;
-end;
-
-destructor TPACCAbstractSyntaxTreeNodeLiteral.Destroy;
-begin
- inherited Destroy;
-end;
-
 constructor TPACCAbstractSyntaxTreeNodeAssemblerOperand.Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation;const AIdentifier,AConstraint:TPACCRawByteString;const AExpression:TPACCAbstractSyntaxTreeNode);
 begin
  inherited Create(AInstance,AKind,AType,ASourceLocation);
@@ -459,18 +440,17 @@ begin
  inherited Destroy;
 end;
 
-constructor TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation;const AVariableName:TPACCRawByteString;const ALocalOffset:TPACCInt;const AGlobalLabelName:TPACCRawByteString);
+constructor TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation;const AVariableName:TPACCRawByteString;const ALocalOffset:TPACCInt);
 begin
  inherited Create(AInstance,AKind,AType,ASourceLocation);
  VariableName:=AVariableName;
+ LocalOffset:=ALocalOffset;
  LocalVariableInitialization:=nil;
- GlobalLabelName:=AGlobalLabelName;
 end;
 
 destructor TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Destroy;
 begin
  VariableName:='';
- GlobalLabelName:='';
  inherited Destroy;
 end;
 
