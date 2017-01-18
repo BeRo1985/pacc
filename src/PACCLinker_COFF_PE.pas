@@ -2064,6 +2064,9 @@ var Relocations:TRelocations;
     ExternalAvailableSymbolHashMap:TPACCRawByteStringHashMap;
     EntryPointSymbolName:TPACCRawByteString;
  procedure AddStartupCode;
+ var InputStream:TMemoryStream;
+     OutputStream:TMemoryStream;
+     CodeStringList:TStringList;
  begin
   if TPACCInstance(Instance).Options.CreateSharedLibrary then begin
    EntryPointSymbolName:='_start';
@@ -2078,6 +2081,102 @@ var Relocations:TRelocations;
     // Console application
     EntryPointSymbolName:='_mainCRTStartup';
     if not assigned(PublicSymbolHashMap[EntryPointSymbolName]) then begin
+     case fMachine of
+      IMAGE_FILE_MACHINE_I386:begin
+       InputStream:=TMemoryStream.Create;
+       try
+        CodeStringList:=TStringList.Create;
+        try
+         CodeStringList.Text:='.cpu(all)'#10+
+                              '.target(coff32)'#10+
+                              '.section(".text", 0x'+TPACCRawByteString(LowerCase(IntToHex(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_16BYTES,8)))+'){'#10+
+                              '  .external(GetCommandLineA = "GetCommandLineA")'#10+
+                              '  .external(ExitProcess = "ExitProcess")'#10+
+                              '  .external(_main = "main")'#10+
+                              '  .public(_mainCRTStartup = "_mainCRTStartup")'#10+
+                              '  _mainCRTStartup:'#10+
+                              '  push esi'#10+
+                              '  push edi'#10+
+                              '  push ebx'#10+
+                              '  mov esi, offset WorkMem'#10+
+                              '  lea edi, [esi+256]'#10+
+                              '  call GetCommandLineA'#10+
+                              '  lea edx, [eax-1]'#10+
+                              '  xor eax, eax'#10+
+                              '  mov ch, 32'#10+
+                              '  mov bl, 9'#10+
+                              '  @Scan:'#10+
+                              '  inc edx'#10+
+                              '  mov cl, byte ptr [edx]'#10+
+                              '  test cl, cl'#10+
+                              '  jz @Finish'#10+
+                              '  cmp cl, 32'#10+
+                              '  je @Scan'#10+
+                              '  cmp cl, 9'#10+
+                              '  je @Scan'#10+
+                              '  inc eax'#10+
+                              '  mov dword ptr [esi], edi'#10+
+                              '  add esi,4'#10+
+                              '  @Restart:'#10+
+                              '  mov cl, byte ptr [edx]'#10+
+                              '  test cl,cl'#10+
+                              '  jne @a'#10+
+                              '  mov byte ptr [edi], cl'#10+
+                              '  jmp @Finish'#10+
+                              '  @a:'#10+
+                              '  cmp cl, ch'#10+
+                              '  je @EndOfLine'#10+
+                              '  cmp cl, bl'#10+
+                              '  je @EndOfLine'#10+
+                              '  cmp cl, 34'#10+
+                              '  jne @b'#10+
+                              '  xor ch, 32'#10+
+                              '  xor bl, 9'#10+
+                              '  jmp @NextChar'#10+
+                              '  @b:'#10+
+                              '  mov byte ptr [edi], cl'#10+
+                              '  inc edi'#10+
+                              '  @NextChar:'#10+
+                              '  inc edx'#10+
+                              '  jmp @Restart'#10+
+                              '  @EndOfLine:'#10+
+                              '  mov byte ptr [edi], 0'#10+
+                              '  inc edi'#10+
+                              '  jmp @Scan'#10+
+                              '  @Finish:'#10+
+                              '  pop ebx'#10+
+                              '  pop edi'#10+
+                              '  pop esi'#10+
+                              '  push dword offset WorkMem'#10+
+                              '  push eax'#10+
+                              '  call _main'#10+
+                              '  push eax'#10+
+                              '  call ExitProcess'#10+
+                              '}'#10+
+                              '.section(".bss", 0x'+TPACCRawByteString(LowerCase(IntToHex(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_16BYTES,8)))+'){'#10+
+                              '  WorkMem: resb 4096'#10+
+                              '}'#10+
+                              '';
+         CodeStringList.SaveToStream(InputStream);
+        finally
+         CodeStringList.Free;
+        end;
+        OutputStream:=TMemoryStream.Create;
+        try
+         InputStream.Seek(0,soBeginning);
+         TPACCInstance(Instance).Target.AssembleCode(InputStream,OutputStream,'wcrt0@console.s');
+         if OutputStream.Size>0 then begin
+          OutputStream.Seek(0,soBeginning);
+          AddObject(OutputStream,'wcrt0@console.o');
+         end;
+        finally
+         OutputStream.Free;
+        end;
+       finally
+        InputStream.Free;
+       end;
+      end;
+     end;
     end;
    end else begin
     TPACCInstance(Instance).AddError('Neither "WinMain" nor "main" found',nil,true);

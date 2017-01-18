@@ -584,7 +584,7 @@ begin
     CodeStringList.Add('}');
    end;
    CodeStringList.Add('');
-   CodeStringList.Add('.section(".text", 0x'+TPACCRawByteString(LowerCase(IntToHex(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_4096BYTES,8)))+'){');
+   CodeStringList.Add('.section(".text", 0x'+TPACCRawByteString(LowerCase(IntToHex(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_16BYTES,8)))+'){');
    if TextSectionStringList.Count=0 then begin
     CodeStringList.Add('');
     CodeStringList.Add('  nop');
@@ -596,14 +596,14 @@ begin
    CodeStringList.Add('}');
    if DataSectionStringList.Count>0 then begin
     CodeStringList.Add('');
-    CodeStringList.Add('.section(".data", 0x'+TPACCRawByteString(LowerCase(IntToHex(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES,8)))+'){');
+    CodeStringList.Add('.section(".data", 0x'+TPACCRawByteString(LowerCase(IntToHex(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_16BYTES,8)))+'){');
     CodeStringList.AddStrings(DataSectionStringList);
     CodeStringList.Add('');
     CodeStringList.Add('}');
    end;
    if BSSSectionStringList.Count>0 then begin
     CodeStringList.Add('');
-    CodeStringList.Add('.section(".bss", 0x'+TPACCRawByteString(LowerCase(IntToHex(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES,8)))+'){');
+    CodeStringList.Add('.section(".bss", 0x'+TPACCRawByteString(LowerCase(IntToHex(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_16BYTES,8)))+'){');
     CodeStringList.AddStrings(BSSSectionStringList);
     CodeStringList.Add('');
     CodeStringList.Add('}');
