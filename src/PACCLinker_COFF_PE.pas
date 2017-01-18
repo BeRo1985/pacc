@@ -200,6 +200,8 @@ type TPACCLinker_COFF_PE=class;
 
        fSymbols:TPACCLinker_COFF_PE_SymbolList;
 
+       fPublicSymbolHashMap:TPACCRawByteStringHashMap;
+
        fImports:TPACCLinker_COFF_PE_ImportList;
        fImportSymbolNameHashMap:TPACCRawByteStringHashMap;
 
@@ -233,6 +235,8 @@ type TPACCLinker_COFF_PE=class;
 
        property Symbols:TPACCLinker_COFF_PE_SymbolList read fSymbols;
 
+       property PublicSymbolHashMap:TPACCRawByteStringHashMap read fPublicSymbolHashMap;
+
        property Imports_:TPACCLinker_COFF_PE_ImportList read fImports;
 
        property Exports_:TPACCLinker_COFF_PE_ExportList read fExports;
@@ -245,7 +249,7 @@ type TPACCLinker_COFF_PE=class;
 
 implementation
 
-uses PACCInstance,PACCLinker_COFF_PE_LCIDToCodePageLookUpTable,PACCTarget_x86_32{,PACCTarget_x86_64_Win64};
+uses SASMCore,PACCInstance,PACCLinker_COFF_PE_LCIDToCodePageLookUpTable,PACCTarget_x86_32{,PACCTarget_x86_64_Win64};
 
 const MZEXEHeaderSize=128;
       MZEXEHeaderBytes:array[0..MZEXEHeaderSize-1] of TPACCUInt8=
@@ -1580,6 +1584,8 @@ begin
 
  fResources:=TPACCLinker_COFF_PE_ResourceList.Create;
 
+ fPublicSymbolHashMap:=TPACCRawByteStringHashMap.Create;
+
  fImports:=TPACCLinker_COFF_PE_ImportList.Create;
  fImportSymbolNameHashMap:=TPACCRawByteStringHashMap.Create;
 
@@ -1606,6 +1612,8 @@ begin
   fSections.Delete(fSections.Count-1);
  end;
  fSections.Free;
+
+ fPublicSymbolHashMap.Free;
 
  fImports.Free;
  fImportSymbolNameHashMap.Free;
@@ -1894,6 +1902,9 @@ begin
         end;
        end;
       end;
+      if (Symbol.Class_=IMAGE_SYM_CLASS_EXTERNAL) and (Symbol.SymbolKind=plcpskNormal) and assigned(Symbol.Section) and not assigned(PublicSymbolHashMap[Symbol.Name]) then begin
+       PublicSymbolHashMap[Symbol.Name]:=Symbol;
+      end;
      end;
     finally
      COFFSymbols:=nil;
@@ -2049,8 +2060,23 @@ type PRelocationNode=^TRelocationNode;
 var Relocations:TRelocations;
     LastVirtualAddress:TPACCUInt64;
     PECOFFDirectoryEntries:PPECOFFDirectoryEntries;
-    Is64Bit:boolean;
+    Is64Bit,IsGUI:boolean;
     ExternalAvailableSymbolHashMap:TPACCRawByteStringHashMap;
+ procedure AddStartupCode;
+ begin
+  if TPACCInstance(Instance).Options.CreateSharedLibrary then begin
+  end else begin
+   if assigned(PublicSymbolHashMap['WinMain']) then begin
+    // GUI application
+    IsGUI:=true;
+   end else if assigned(PublicSymbolHashMap['main']) then begin
+    // Console application
+    
+   end else begin
+    TPACCInstance(Instance).AddError('Neither "WinMain" nor "main" found',nil,true);
+   end;
+  end;
+ end;
  procedure RelocationsInit(out Instance:TRelocations);
  begin
   FillChar(Instance,SizeOf(TRelocations),#0);
@@ -3738,8 +3764,7 @@ var Relocations:TRelocations;
 
   CodeBase:=PECOFFSectionAlignment;
 
-  Symbol:=ExternalAvailableSymbolHashMap['WinMain'];
-  if assigned(Symbol) and assigned(Symbol.Section) then begin
+  if IsGUI then begin
    SubSystem:=IMAGE_SUBSYSTEM_WINDOWS_GUI;
   end else begin
    SubSystem:=IMAGE_SUBSYSTEM_WINDOWS_CUI;
@@ -4013,10 +4038,17 @@ var Relocations:TRelocations;
 
  end;
 begin
+
+ IsGUI:=false;
+
+ AddStartupCode;
+ 
  RelocationsInit(Relocations);
  try
+
   GetMem(PECOFFDirectoryEntries,SizeOf(TPECOFFDirectoryEntries));
   try
+
    FillChar(PECOFFDirectoryEntries^,SizeOf(TPECOFFDirectoryEntries),#0);
    case fMachine of
     IMAGE_FILE_MACHINE_AMD64:begin
@@ -4059,9 +4091,11 @@ begin
   finally
    FreeMem(PECOFFDirectoryEntries);
   end;
+
  finally
   RelocationsDone(Relocations);
  end;
+
 end;
 
 end.

@@ -100,7 +100,7 @@ Conditionals=
 DebugSourceDirs=
 UsePackages=0
 [Parameters]
-RunParams=-S -t x86_32_coff_pe test4.c test4.imp 
+RunParams=-t x86_32_coff_pe test4.c test4.imp
 HostApplication=
 Launcher=
 UseLauncher=0
