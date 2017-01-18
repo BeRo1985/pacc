@@ -3,7 +3,8 @@ unit PACCTarget_x86_32;
 
 interface
 
-uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCAbstractSyntaxTree,PACCTarget;
+uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCAbstractSyntaxTree,PACCTarget,
+     PACCPointerHashMap;
 
 const ccCDECL=0;
       ccSTDCALL=1;
@@ -140,6 +141,8 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
     CodeStringList:TStringList;
     CurrentFunction:TPACCAbstractSyntaxTreeNode;
     CodeLevels:TCodeLevels;
+    NodeLabelHashMap:TPACCPointerHashMap;
+    NodeLabelCounter:TPACCPtrUInt;
  procedure InitializeCodeLevels;
  begin
   CodeLevels:=nil;
@@ -179,8 +182,23 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
   result:=@CodeLevels[Depth];
  end;
  function GetNodeLabelName(const Node:TPACCAbstractSyntaxTreeNode):TPACCRawByteString;
+ var Entity:PPACCPointerHashMapEntity;
+     Index:TPACCPtrUInt;
  begin
-  result:='_node@'+IntToStr(TPACCPtrUInt(pointer(Node)));
+  Entity:=NodeLabelHashMap.Get(Node,false);
+  if assigned(Entity) then begin
+   Index:=TPACCPtrUInt(Entity^.Value);
+  end else begin
+   Index:=NodeLabelCounter;
+   inc(NodeLabelCounter);
+   NodeLabelHashMap[Node]:=pointer(TPACCPtrUInt(Index));
+  end;
+  result:='__node_'+TPACCRawByteString(IntToStr(Index));
+//result:='__node_0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCPtrUInt(pointer(Node)),SizeOf(TPACCPtrUInt) shl 1)));
+  if (Node.Kind in [astnkLVAR,astnkGVAR]) and
+     (length(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).VariableName)>0) then begin
+   result:=result+'_'+TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).VariableName;
+  end;
  end;
  procedure EmitPrimitiveTypeData(const Type_:PPACCType;const Node:TPACCAbstractSyntaxTreeNode;const Depth:TPACCInt32);
  var f:TPACCFloat;
@@ -193,26 +211,26 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
   case Type_^.Kind of
    tkFLOAT:begin
     f:=TPACCInstance(Instance).EvaluateFloatExpression(Node,tkFLOAT);
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('dd 0x'+IntToHex(TPACCUInt32(pointer(@f)^),8));
+    GetCodeLevel(Depth)^.DataSectionStringList.Add('dd 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCUInt32(pointer(@f)^),8))));
    end;
    tkDOUBLE:begin
     d:=TPACCInstance(Instance).EvaluateFloatExpression(Node,tkDOUBLE);
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('dq 0x'+IntToHex(TPACCUInt64(pointer(@d)^),16));
+    GetCodeLevel(Depth)^.DataSectionStringList.Add('dq 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCUInt64(pointer(@d)^),16))));
    end;
    tkBOOL:begin
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('db '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
+    GetCodeLevel(Depth)^.DataSectionStringList.Add('db 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),2))));
    end;
    tkCHAR:begin
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('db '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
+    GetCodeLevel(Depth)^.DataSectionStringList.Add('db 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),2))));
    end;
    tkSHORT:begin
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('dw '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
+    GetCodeLevel(Depth)^.DataSectionStringList.Add('dw 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),4))));
    end;
    tkINT:begin
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('dd '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
+    GetCodeLevel(Depth)^.DataSectionStringList.Add('dd 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),8))));
    end;
    tkLONG,tkLLONG:begin
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('dq '+IntToStr(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil)));
+    GetCodeLevel(Depth)^.DataSectionStringList.Add('dq 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),16))));
    end;
    tkPOINTER:begin
     if Node.Kind=astnkOP_LABEL_ADDR then begin
@@ -225,20 +243,20 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
      GetCodeLevel(Depth+1)^.DataSectionStringList.Add('.align('+IntToStr(Max(4,TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.ChildType^.Alignment))+')');
      GetCodeLevel(Depth+1)^.DataSectionStringList.Add(GetNodeLabelName(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand)+':');
      for i32:=1 to length(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Value) do begin
-      GetCodeLevel(Depth+1)^.DataSectionStringList.Add('db '+IntToStr(TPACCUInt8(AnsiChar(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Value[i32]))));
+      GetCodeLevel(Depth+1)^.DataSectionStringList.Add('db 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCUInt8(AnsiChar(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Value[i32])),2))));
      end;
      case TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.ChildType^.Size of
       2:begin
-       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('dw 0');
+       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('dw 0x0000');
       end;
       4:begin
-       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('dd 0');
+       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('dd 0x00000000');
       end;
       8:begin
-       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('dq 0');
+       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('dq 0x0000000000000000');
       end;
       else begin
-       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('db 0');
+       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('db 0x00');
       end;
      end;
      GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand));
@@ -433,12 +451,12 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
   end;
   GetCodeLevel(0)^.TextSectionStringList.Add(GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Variable))+':');
   GetCodeLevel(0)^.TextSectionStringList.Add('push ebp');
-  GetCodeLevel(0)^.TextSectionStringList.Add('mov ebp,esp');
+  GetCodeLevel(0)^.TextSectionStringList.Add('mov ebp, esp');
   // ..
-  GetCodeLevel(0)^.TextSectionStringList.Add('mov esp,ebp');
+  GetCodeLevel(0)^.TextSectionStringList.Add('mov esp, ebp');
   GetCodeLevel(0)^.TextSectionStringList.Add('pop ebp');
   if (Node.FunctionName='main') and (Node.Type_^.ReturnType^.Kind=tkVOID) then begin
-   GetCodeLevel(0)^.TextSectionStringList.Add('xor eax,eax');
+   GetCodeLevel(0)^.TextSectionStringList.Add('xor eax, eax');
   end;
   case Node.Type_^.Attribute.CallingConvention of
    ccSTDCALL:begin
@@ -527,6 +545,8 @@ begin
  DataSectionStringList:=TStringList.Create;
  BSSSectionStringList:=TStringList.Create;
  ExternalStringList:=TStringList.Create;
+ NodeLabelHashMap:=TPACCPointerHashMap.Create;
+ NodeLabelCounter:=0;
  try
   CurrentFunction:=nil;
   SectionCounter:=1;
@@ -564,7 +584,7 @@ begin
     CodeStringList.Add('}');
    end;
    CodeStringList.Add('');
-   CodeStringList.Add('.section(".text",'+IntToStr(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+   CodeStringList.Add('.section(".text", 0x'+TPACCRawByteString(LowerCase(IntToHex(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_4096BYTES,8)))+'){');
    if TextSectionStringList.Count=0 then begin
     CodeStringList.Add('');
     CodeStringList.Add('  nop');
@@ -576,14 +596,14 @@ begin
    CodeStringList.Add('}');
    if DataSectionStringList.Count>0 then begin
     CodeStringList.Add('');
-    CodeStringList.Add('.section(".data",'+IntToStr(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+    CodeStringList.Add('.section(".data", 0x'+TPACCRawByteString(LowerCase(IntToHex(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES,8)))+'){');
     CodeStringList.AddStrings(DataSectionStringList);
     CodeStringList.Add('');
     CodeStringList.Add('}');
    end;
    if BSSSectionStringList.Count>0 then begin
     CodeStringList.Add('');
-    CodeStringList.Add('.section(".bss",'+IntToStr(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+    CodeStringList.Add('.section(".bss", 0x'+TPACCRawByteString(LowerCase(IntToHex(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES,8)))+'){');
     CodeStringList.AddStrings(BSSSectionStringList);
     CodeStringList.Add('');
     CodeStringList.Add('}');
@@ -591,6 +611,7 @@ begin
   end;
   CodeStringList.SaveToStream(AOutputStream);
  finally
+  NodeLabelHashMap.Free;
   ExternalStringList.Free;
   BSSSectionStringList.Free;
   DataSectionStringList.Free;
