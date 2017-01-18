@@ -133,6 +133,7 @@ type PCodeLevel=^TCodeLevel;
       TextSectionStringList:TStringList;
       DataSectionStringList:TStringList;
       BSSSectionStringList:TStringList;
+      ExternalStringList:TStringList;
      end;
      TCodeLevels=array of TCodeLevel;
 var CountCodeLevels,SectionCounter:TPACCInt32;
@@ -152,6 +153,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
    FreeAndNil(CodeLevel^.TextSectionStringList);
    FreeAndNil(CodeLevel^.DataSectionStringList);
    FreeAndNil(CodeLevel^.BSSSectionStringList);
+   FreeAndNil(CodeLevel^.ExternalStringList);
   end;
   SetLength(CodeLevels,0);
  end;
@@ -171,6 +173,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
     result^.TextSectionStringList:=TStringList.Create;
     result^.DataSectionStringList:=TStringList.Create;
     result^.BSSSectionStringList:=TStringList.Create;
+    result^.ExternalStringList:=TStringList.Create;
    end;
   end;
   result:=@CodeLevels[Depth];
@@ -364,6 +367,21 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
    GetCodeLevel(Depth)^.DataSectionStringList.Add('db '+IntToStr(Size)+' dup(0)');
   end;
  end;
+ procedure EmitExternalDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
+ const Depth=0;
+ var Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+ begin
+  if assigned(Node.DeclarationVariable) then begin
+   if Node.DeclarationVariable.Kind=astnkGVAR then begin
+    Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable);
+    GetCodeLevel(Depth)^.ExternalStringList.Add('.external('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
+   end else begin
+    TPACCInstance(Instance).AddError('Internal error 2017-01-18-04-39-0001',@Node.SourceLocation,true);
+   end;
+  end else begin
+   TPACCInstance(Instance).AddError('Internal error 2017-01-18-04-39-0000',@Node.SourceLocation,true);
+  end;
+ end;
  procedure EmitDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
  const Depth=0;
  var Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
@@ -486,6 +504,9 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
  procedure ProcessRootNode(const Node:TPACCAbstractSyntaxTreeNode);
  begin
   case Node.Kind of
+   astnkEXTERN_DECL:begin
+    EmitExternalDeclaration(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
+   end;
    astnkDECL:begin
     EmitDeclaration(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
    end;
@@ -498,80 +519,82 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
   end;
  end;
 var Index,LineIndex:TPACCInt32;
-    TextSectionStringList,DataSectionStringList,BSSSectionStringList:TStringList;
+    TextSectionStringList,DataSectionStringList,BSSSectionStringList,ExternalStringList:TStringList;
     CodeLevel:PCodeLevel;
 begin
  CodeStringList:=TStringList.Create;
+ TextSectionStringList:=TStringList.Create;
+ DataSectionStringList:=TStringList.Create;
+ BSSSectionStringList:=TStringList.Create;
+ ExternalStringList:=TStringList.Create;
  try
-  TextSectionStringList:=TStringList.Create;
+  CurrentFunction:=nil;
+  SectionCounter:=1;
+  InitializeCodeLevels;
   try
-   DataSectionStringList:=TStringList.Create;
-   try
-    BSSSectionStringList:=TStringList.Create;
-    try
-     CurrentFunction:=nil;
-     SectionCounter:=1;
-     InitializeCodeLevels;
-     try
-      for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(ARoot).Children.Count-1 do begin
-       ProcessRootNode(TPACCAbstractSyntaxTreeNodeStatements(ARoot).Children[Index]);
-      end;
-      for Index:=0 to CountCodeLevels-1 do begin
-       CodeLevel:=@CodeLevels[Index];
-       for LineIndex:=0 to CodeLevel^.TextSectionStringList.Count-1 do begin
-        TextSectionStringList.Add('  '+CodeLevel^.TextSectionStringList[LineIndex]);
-       end;
-       for LineIndex:=0 to CodeLevel^.DataSectionStringList.Count-1 do begin
-        DataSectionStringList.Add('  '+CodeLevel^.DataSectionStringList[LineIndex]);
-       end;
-       for LineIndex:=0 to CodeLevel^.BSSSectionStringList.Count-1 do begin
-        BSSSectionStringList.Add('  '+CodeLevel^.BSSSectionStringList[LineIndex]);
-       end;
-      end;
-     finally
-      FinalizeCodeLevels;
-     end;
-     if self is TPACCTarget_x86_32_COFF_PE then begin
-      CodeStringList.Add('.cpu(all)');
-      CodeStringList.Add('');
-      CodeStringList.Add('.target(coff32)');
-      CodeStringList.Add('');
-      CodeStringList.Add('.section(".text",'+IntToStr(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
-      if TextSectionStringList.Count=0 then begin
-       CodeStringList.Add('');
-       CodeStringList.Add('  nop');
-       CodeStringList.Add('');
-      end else begin
-       CodeStringList.AddStrings(TextSectionStringList);
-       CodeStringList.Add('');
-      end;
-      CodeStringList.Add('}');
-      if DataSectionStringList.Count>0 then begin
-       CodeStringList.Add('');
-       CodeStringList.Add('.section(".data",'+IntToStr(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
-       CodeStringList.AddStrings(DataSectionStringList);
-       CodeStringList.Add('');
-       CodeStringList.Add('}');
-      end;
-      if BSSSectionStringList.Count>0 then begin
-       CodeStringList.Add('');
-       CodeStringList.Add('.section(".bss",'+IntToStr(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
-       CodeStringList.AddStrings(BSSSectionStringList);
-       CodeStringList.Add('');
-       CodeStringList.Add('}');
-      end;
-     end;
-    finally
-     BSSSectionStringList.Free;
+   for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(ARoot).Children.Count-1 do begin
+    ProcessRootNode(TPACCAbstractSyntaxTreeNodeStatements(ARoot).Children[Index]);
+   end;
+   for Index:=0 to CountCodeLevels-1 do begin
+    CodeLevel:=@CodeLevels[Index];
+    for LineIndex:=0 to CodeLevel^.TextSectionStringList.Count-1 do begin
+     TextSectionStringList.Add('  '+CodeLevel^.TextSectionStringList[LineIndex]);
     end;
-   finally
-    DataSectionStringList.Free;
+    for LineIndex:=0 to CodeLevel^.DataSectionStringList.Count-1 do begin
+     DataSectionStringList.Add('  '+CodeLevel^.DataSectionStringList[LineIndex]);
+    end;
+    for LineIndex:=0 to CodeLevel^.BSSSectionStringList.Count-1 do begin
+     BSSSectionStringList.Add('  '+CodeLevel^.BSSSectionStringList[LineIndex]);
+    end;
+    for LineIndex:=0 to CodeLevel^.ExternalStringList.Count-1 do begin
+     ExternalStringList.Add('  '+CodeLevel^.ExternalStringList[LineIndex]);
+    end;
    end;
   finally
-   TextSectionStringList.Free;
+   FinalizeCodeLevels;
+  end;
+  if self is TPACCTarget_x86_32_COFF_PE then begin
+   CodeStringList.Add('.cpu(all)');
+   CodeStringList.Add('');
+   CodeStringList.Add('.target(coff32)');
+   if ExternalStringList.Count>0 then begin
+    CodeStringList.Add('');
+    CodeStringList.Add('{');
+    CodeStringList.AddStrings(ExternalStringList);
+    CodeStringList.Add('}');
+   end;
+   CodeStringList.Add('');
+   CodeStringList.Add('.section(".text",'+IntToStr(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+   if TextSectionStringList.Count=0 then begin
+    CodeStringList.Add('');
+    CodeStringList.Add('  nop');
+    CodeStringList.Add('');
+   end else begin
+    CodeStringList.AddStrings(TextSectionStringList);
+    CodeStringList.Add('');
+   end;
+   CodeStringList.Add('}');
+   if DataSectionStringList.Count>0 then begin
+    CodeStringList.Add('');
+    CodeStringList.Add('.section(".data",'+IntToStr(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+    CodeStringList.AddStrings(DataSectionStringList);
+    CodeStringList.Add('');
+    CodeStringList.Add('}');
+   end;
+   if BSSSectionStringList.Count>0 then begin
+    CodeStringList.Add('');
+    CodeStringList.Add('.section(".bss",'+IntToStr(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE or IMAGE_SCN_ALIGN_4096BYTES)+'){');
+    CodeStringList.AddStrings(BSSSectionStringList);
+    CodeStringList.Add('');
+    CodeStringList.Add('}');
+   end;
   end;
   CodeStringList.SaveToStream(AOutputStream);
  finally
+  ExternalStringList.Free;
+  BSSSectionStringList.Free;
+  DataSectionStringList.Free;
+  TextSectionStringList.Free;
   CodeStringList.Free;
  end;
 end;

@@ -21,6 +21,7 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
       astnkFUNCPTR_CALL,
       astnkFUNCDESG,
       astnkFUNC,
+      astnkEXTERN_DECL,
       astnkDECL,
       astnkINIT,
       astnkCONV,

@@ -672,7 +672,7 @@ var CurrentState:TState;
  end;
  function ParsePrimaryExpression:TPACCAbstractSyntaxTreeNode;
  var Type_:PPACCType;
-     Node:TPACCAbstractSyntaxTreeNode;
+     Node,Variable:TPACCAbstractSyntaxTreeNode;
      Name,StringValue:TPACCRawByteString;
      RelevantSourceLocation:TPACCSourceLocation;
      Encoding:TPACCEncoding;
@@ -708,8 +708,10 @@ var CurrentState:TState;
     NextToken;
     if assigned(result) then begin
      if result.Type_^.Kind=tkFUNCTION Then begin
+      Variable:=result;
       result:=TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration.Create(TPACCInstance(Instance),astnkFUNCDESG,result.Type_,result.SourceLocation,Name,nil,nil,nil);
-      AddFunctionNameVariable(Name,result,nil);
+      TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(result).Variable:=Variable;
+      AddFunctionNameVariable(Name,result,Variable);
      end;
     end else begin
      if CurrentState.Token^.TokenType=TOK_LPAR then begin
@@ -3612,6 +3614,10 @@ var CurrentState:TState;
          Block.Add(TPACCAbstractSyntaxTreeNodeDeclaration.Create(TPACCInstance(Instance),astnkDECL,nil,RelevantSourceLocation,Variable,ParseDeclarationInitializer(CurrentType)));
         end else if (StorageClass<>S_EXTERN) and (CurrentType^.Kind<>tkFUNCTION) then begin
          Block.Add(TPACCAbstractSyntaxTreeNodeDeclaration.Create(TPACCInstance(Instance),astnkDECL,nil,RelevantSourceLocation,Variable,nil));
+        end else if IsGlobal then begin
+         Block.Add(TPACCAbstractSyntaxTreeNodeDeclaration.Create(TPACCInstance(Instance),astnkEXTERN_DECL,nil,RelevantSourceLocation,Variable,nil));
+        end else begin
+         AddError('Internal error 2017-01-18-04-38-0000',nil,true);
         end;
        end;
        case CurrentState.Token^.TokenType of
