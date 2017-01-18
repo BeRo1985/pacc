@@ -28,13 +28,14 @@ uses
   PACCParser in 'PACCParser.pas',
   PACCAnalyzer in 'PACCAnalyzer.pas',
   PACCHighLevelOptimizer in 'PACCHighLevelOptimizer.pas',
+  PACCControlFlowGraph in 'PACCControlFlowGraph.pas',
   PACCLinker in 'PACCLinker.pas',
   PACCLinker_COFF_PE in 'PACCLinker_COFF_PE.pas',
   PACCLinker_COFF_PE_LCIDToCodePageLookUpTable in 'PACCLinker_COFF_PE_LCIDToCodePageLookUpTable.pas',
+  PACCLinker_ELF_ELF in 'PACCLinker_ELF_ELF.pas',
   PACCTarget_x86_32 in 'PACCTarget_x86_32.pas',
   PACCTarget_x86_64_SystemV in 'PACCTarget_x86_64_SystemV.pas',
-  PACCInstance in 'PACCInstance.pas',
-  PACCLinker_ELF_ELF in 'PACCLinker_ELF_ELF.pas';
+  PACCInstance in 'PACCInstance.pas';
 
 var ParameterIndex,CountParameters,Index:TPACCInt32;
     Parameter:TPUCUUTF8String;
