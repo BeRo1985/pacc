@@ -19,7 +19,7 @@ type TPACCParser=class
 
 implementation
 
-uses PACCSort,PACCInstance, PACCTarget;
+uses PACCSort,PACCInstance,PACCTarget,PACCControlFlowGraph;
 
 var StaticCounter:TPasMPInt32=0;
     TempVariableCounter:TPasMPInt32=0;
@@ -3541,6 +3541,7 @@ var CurrentState:TState;
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Labels:=Labels;
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Variable:=Variable;
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Body:=ParseCompoundStatement;
+           GenerateControlFlowGraphForFunctionDeclarationAbstractSyntaxTreeNode(Instance,FunctionBody);
            Parameters:=nil;
           finally
            CurrentFunctionType:=nil;
