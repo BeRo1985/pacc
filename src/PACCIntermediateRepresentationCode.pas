@@ -19,9 +19,13 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       picroJLT,
       picroJGE,
       picroJGT,
+      picroSET,
+      picroCONV,
       picroCOPY,
       picroLOAD,
       picroSTORE,
+      picroDEREF,
+      picroADDR,
       picroADD,
       picroSUB,
       picroDIV,
@@ -69,14 +73,20 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        fOpcode:TPACCIntermediateRepresentationCodeOpcode;
        fJumpToInstruction:TPACCIntermediateRepresentationCodeInstruction;
        fVariables:TPACCIntermediateRepresentationCodeInstructionVariableList;
+       fLabel:TPACCAbstractSyntaxTreeNodeLabel;
+       fValue:TPACCAbstractSyntaxTreeNode;
+       fType:PPACCType;
       public
        constructor Create(const AInstance:TObject); reintroduce;
        destructor Destroy; override;
+       property Type_:PPACCType read fType write fType;
       published
        property Instance:TObject read fInstance;
        property Opcode:TPACCIntermediateRepresentationCodeOpcode read fOpcode write fOpcode;
        property JumpToInstruction:TPACCIntermediateRepresentationCodeInstruction read fJumpToInstruction write fJumpToInstruction;
        property Variables:TPACCIntermediateRepresentationCodeInstructionVariableList read fVariables;
+       property Label_:TPACCAbstractSyntaxTreeNodeLabel read fLabel write fLabel;
+       property Value:TPACCAbstractSyntaxTreeNode read fValue write fValue;
      end;
 
      TPACCIntermediateRepresentationCodeInstructionList=class(TList)
@@ -100,6 +110,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Instance:TObject read fInstance;
        property Instructions:TPACCIntermediateRepresentationCodeInstructionList read fInstructions write fInstructions;
      end;
+
+procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
 
 implementation
 
@@ -171,5 +183,44 @@ begin
  inherited Destroy;
 end;
 
+function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObject;const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration):TPACCIntermediateRepresentationCodeBlock;
+ procedure ProcessNode(const ParentBlock:TPACCIntermediateRepresentationCodeBlock;const Node:TPACCAbstractSyntaxTreeNode);
+ var Index:TPACCInt32;
+ begin
+  if assigned(Node) then begin
+   case Node.Kind of
+    astnkSTATEMENTS:begin
+     for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(Node).Children.Count-1 do begin
+      ProcessNode(ParentBlock,TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index]);
+     end;
+    end;
+   end;
+
+  end;
+ end;
+begin
+ result:=TPACCIntermediateRepresentationCodeBlock.Create(AInstance);
+ ProcessNode(result,AFunctionNode.Body);
+end;
+
+procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
+var Index:TPACCInt32;
+    RootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNodeTranslationUnit;
+    Node:TPACCAbstractSyntaxTreeNode;
+begin
+ if assigned(ARootAbstractSyntaxTreeNode) and
+    (TPACCAbstractSyntaxTreeNode(ARootAbstractSyntaxTreeNode).Kind=astnkTRANSLATIONUNIT) and
+    (ARootAbstractSyntaxTreeNode is TPACCAbstractSyntaxTreeNodeTranslationUnit) then begin
+  RootAbstractSyntaxTreeNode:=TPACCAbstractSyntaxTreeNodeTranslationUnit(ARootAbstractSyntaxTreeNode);
+  for Index:=0 to RootAbstractSyntaxTreeNode.Children.Count-1 do begin
+   Node:=RootAbstractSyntaxTreeNode.Children[Index];
+   if assigned(Node) and (Node.Kind=astnkFUNC) then begin
+    GenerateIntermediateRepresentationCodeForFunction(AInstance,TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node));
+   end;
+  end;
+ end else begin
+  TPACCInstance(AInstance).AddError('Internal error 2017-01-19-11-48-0000',nil,true);
+ end;
+end;
 
 end.

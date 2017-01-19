@@ -198,6 +198,14 @@ begin
 
      OutputLock.Acquire;
      try
+      writeln('Generating intermediate representation code for ',ExtractFileName(InputFileName),' . . .');
+     finally
+      OutputLock.Release;
+     end;
+     GenerateIntermediateRepresentationCode(Instance,Instance.Parser.Root);
+
+     OutputLock.Acquire;
+     try
       writeln('Generating control flow graphs for ',ExtractFileName(InputFileName),' . . .');
      finally
       OutputLock.Release;
