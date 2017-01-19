@@ -6,116 +6,116 @@ interface
 uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCPointerHashMap,PACCAbstractSyntaxTree;
 
 type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationCodeOpcode;
-     TPACCIntermediateRepresentationCodeOpcode=(
-      pircoNOP,
-      picroCALL,
-      picroRET,
-      picroJMP,
-      picroJZ,
-      picroJNZ,
-      picroJEQ,
-      picroJNE,
-      picroJLE,
-      picroJLT,
-      picroJGE,
-      picroJGT,
-      picroSET,
-      picroCONV,
-      picroCOPY,
-      picroLOAD,
-      picroSTORE,
-      picroDEREF,
-      picroADDR,
-      picroADD,
-      picroSUB,
-      picroDIV,
-      picroMOD,
-      picroNEG,
-      picroBNOT,
-      picroBAND,
-      picroBOR,
-      picroBXOR,
-      picroLNOT,
-      picroLAND,
-      picroLOR,
-      picroLXOR,
-      picroEQ,
-      picroNEQ,
-      picroLE,
-      picroLT,
-      picroGE,
-      picroGT,
-      picroLAST
-     );
+     TPACCIntermediateRepresentationCodeOpcode=
+      (
+       pircoNOP,
+       picroCALL,
+       picroRET,
+       picroJMP,
+       picroJZ,
+       picroJNZ,
+       picroJEQ,
+       picroJNE,
+       picroJLE,
+       picroJLT,
+       picroJGE,
+       picroJGT,
+       picroSET,
+       picroCONV,
+       picroCOPY,
+       picroLOAD,
+       picroSTORE,
+       picroDEREF,
+       picroADDR,
+       picroINC,
+       picroDEC,
+       picroADD,
+       picroSUB,
+       picroDIV,
+       picroMOD,
+       picroNEG,
+       picroBNOT,
+       picroBAND,
+       picroBOR,
+       picroBXOR,
+       picroLNOT,
+       picroLAND,
+       picroLOR,
+       picroLXOR,
+       picroEQ,
+       picroNEQ,
+       picroLE,
+       picroLT,
+       picroGE,
+       picroGT,
+       picroLAST
+      );
 
-     PPACCIntermediateRepresentationCodeInstructionVariable=^TPACCIntermediateRepresentationCodeInstructionVariable;
-     TPACCIntermediateRepresentationCodeInstructionVariable=class
-      private
-       fInstance:TObject;
-       fVariable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
-       fStaticSingleAssignmentIndex:TPACCInt64;
-      public
-       constructor Create(const AInstance:TObject;const AVariable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable); reintroduce;
-       destructor Destroy; override;
-      published
-       property Instance:TObject read fInstance;
-       property Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable read fVariable write fVariable;
-       property StaticSingleAssignmentIndex:TPACCInt64 read fStaticSingleAssignmentIndex write fStaticSingleAssignmentIndex;
+     PPACCIntermediateRepresentationCodeReferenceType=^TPACCIntermediateRepresentationCodeReferenceType;
+     TPACCIntermediateRepresentationCodeReferenceType=
+      (
+       pircrtTEMPORARY,
+       pircrtCONSTANT,
+       pircrtSLOT,
+       pircrtTYPE,
+       pircrtCALL,
+       pircrtMEMORY,
+       pircrtVARIABLE,
+       pircrtLABEL
+      );
+
+     TPACCIntermediateRepresentationCodeReference=record
+      case Type_:TPACCIntermediateRepresentationCodeReferenceType of
+       pircrtTEMPORARY,
+       pircrtCONSTANT,
+       pircrtSLOT,
+       pircrtTYPE,
+       pircrtCALL,
+       pircrtMEMORY:(
+        Value:TPACCUInt32;
+       );
+       pircrtVARIABLE:(
+        Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+       );
+       pircrtLABEL:(
+        Label_:TPACCAbstractSyntaxTreeNodeLabel;
+       );
      end;
 
-     TPACCIntermediateRepresentationCodeInstructionVariableList=class(TList)
-      private
-       function GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeInstructionVariable;
-       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeInstructionVariable);
-      public
-       constructor Create;
-       destructor Destroy; override;
-       property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeInstructionVariable read GetItem write SetItem; default;
+     PPACCIntermediateRepresentationCodeClass=^TPACCIntermediateRepresentationCodeClass;
+     TPACCIntermediateRepresentationCodeClass=
+      (
+       pirccI8,
+       pirccI16,
+       pirccI32,
+       pirccI64,
+       pirccF32,
+       pirccF64
+      );
+
+     PPACCIntermediateRepresentationCodeInstruction=^TPACCIntermediateRepresentationCodeInstruction;
+     TPACCIntermediateRepresentationCodeInstruction=record
+      Opcode:TPACCIntermediateRepresentationCodeOpcode;
+      Class_:TPACCIntermediateRepresentationCodeClass;
+      To_:TPACCIntermediateRepresentationCodeReference;
+      Arguments:array[0..1] of TPACCIntermediateRepresentationCodeReference;
      end;
 
-     TPACCIntermediateRepresentationCodeInstruction=class
-      private
-       fInstance:TObject;
-       fOpcode:TPACCIntermediateRepresentationCodeOpcode;
-       fJumpToInstruction:TPACCIntermediateRepresentationCodeInstruction;
-       fVariables:TPACCIntermediateRepresentationCodeInstructionVariableList;
-       fLabel:TPACCAbstractSyntaxTreeNodeLabel;
-       fValue:TPACCAbstractSyntaxTreeNode;
-       fType:PPACCType;
-       fSourceLocation:TPACCSourceLocation;
-      public
-       constructor Create(const AInstance:TObject;const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const ASourceLocation:TPACCSourceLocation); reintroduce;
-       destructor Destroy; override;
-       property Type_:PPACCType read fType write fType;
-      published
-       property Instance:TObject read fInstance;
-       property Opcode:TPACCIntermediateRepresentationCodeOpcode read fOpcode write fOpcode;
-       property JumpToInstruction:TPACCIntermediateRepresentationCodeInstruction read fJumpToInstruction write fJumpToInstruction;
-       property Variables:TPACCIntermediateRepresentationCodeInstructionVariableList read fVariables;
-       property Label_:TPACCAbstractSyntaxTreeNodeLabel read fLabel write fLabel;
-       property Value:TPACCAbstractSyntaxTreeNode read fValue write fValue;
-     end;
-
-     TPACCIntermediateRepresentationCodeInstructionList=class(TList)
-      private
-       function GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeInstruction;
-       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeInstruction);
-      public
-       constructor Create;
-       destructor Destroy; override;
-       property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeInstruction read GetItem write SetItem; default;
-     end;
+     TPACCIntermediateRepresentationCodeInstructions=array of TPACCIntermediateRepresentationCodeInstruction;
 
      TPACCIntermediateRepresentationCodeBlock=class
       private
        fInstance:TObject;
-       fInstructions:TPACCIntermediateRepresentationCodeInstructionList;
       public
+
+       Instructions:TPACCIntermediateRepresentationCodeInstructions;
+       CountInstructions:TPACCINt32;
+
        constructor Create(const AInstance:TObject); reintroduce;
        destructor Destroy; override;
+
       published
        property Instance:TObject read fInstance;
-       property Instructions:TPACCIntermediateRepresentationCodeInstructionList read fInstructions write fInstructions;
      end;
 
 procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
@@ -124,121 +124,24 @@ implementation
 
 uses PACCInstance;
 
-constructor TPACCIntermediateRepresentationCodeInstructionVariable.Create(const AInstance:TObject;const AVariable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable);
-begin
- inherited Create;
- fInstance:=AInstance;
- TPACCInstance(fInstance).AllocatedObjects.Add(self);
- fVariable:=AVariable;
- fStaticSingleAssignmentIndex:=-1;
-end;
-
-destructor TPACCIntermediateRepresentationCodeInstructionVariable.Destroy;
-begin
- inherited Destroy;
-end;
-
-constructor TPACCIntermediateRepresentationCodeInstructionVariableList.Create;
-begin
- inherited Create;
-end;
-
-destructor TPACCIntermediateRepresentationCodeInstructionVariableList.Destroy;
-begin
- inherited Destroy;
-end;
-
-function TPACCIntermediateRepresentationCodeInstructionVariableList.GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeInstructionVariable;
-begin
- result:=pointer(inherited Items[AIndex]);
-end;
-
-procedure TPACCIntermediateRepresentationCodeInstructionVariableList.SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeInstructionVariable);
-begin
- inherited Items[AIndex]:=pointer(AItem);
-end;
-
-constructor TPACCIntermediateRepresentationCodeInstruction.Create(const AInstance:TObject;const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const ASourceLocation:TPACCSourceLocation);
-begin
- inherited Create;
- fInstance:=AInstance;
- TPACCInstance(fInstance).AllocatedObjects.Add(self);
- fOpcode:=AOpcode;
- fJumpToInstruction:=nil;
- fVariables:=TPACCIntermediateRepresentationCodeInstructionVariableList.Create;
- fLabel:=nil;
- fValue:=nil;
- fType:=nil;
-end;
-
-destructor TPACCIntermediateRepresentationCodeInstruction.Destroy;
-begin
- fVariables.Free;
- inherited Destroy;
-end;
-
-constructor TPACCIntermediateRepresentationCodeInstructionList.Create;
-begin
- inherited Create;
-end;
-
-destructor TPACCIntermediateRepresentationCodeInstructionList.Destroy;
-begin
- inherited Destroy;
-end;
-
-function TPACCIntermediateRepresentationCodeInstructionList.GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeInstruction;
-begin
- result:=pointer(inherited Items[AIndex]);
-end;
-
-procedure TPACCIntermediateRepresentationCodeInstructionList.SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeInstruction);
-begin
- inherited Items[AIndex]:=pointer(AItem);
-end;
 
 constructor TPACCIntermediateRepresentationCodeBlock.Create(const AInstance:TObject);
 begin
  inherited Create;
  fInstance:=AInstance;
  TPACCInstance(fInstance).AllocatedObjects.Add(self);
- fInstructions:=TPACCIntermediateRepresentationCodeInstructionList.Create;
+ Instructions:=nil;
 end;
 
 destructor TPACCIntermediateRepresentationCodeBlock.Destroy;
 begin
- fInstructions.Free;
+ Instructions:=nil;
  inherited Destroy;
 end;
 
 function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObject;const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration):TPACCIntermediateRepresentationCodeBlock;
- function CreateTemporaryVariableEx(const Type_:PPACCType;ASourceLocation:PPACCSourceLocation):TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
- begin
-  if not assigned(ASourceLocation) then begin
-   ASourceLocation:=@TPACCInstance(AInstance).SourceLocation;
-  end;
-  result:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(AInstance,astnkLVAR,Type_,ASourceLocation^,'',0);
-  AFunctionNode.LocalVariables.Add(result);
- end;
- function CreateTemporaryVariable(const Type_:PPACCType;ASourceLocation:PPACCSourceLocation):TPACCIntermediateRepresentationCodeInstructionVariable;
- var Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
- begin
-  if not assigned(ASourceLocation) then begin
-   ASourceLocation:=@TPACCInstance(AInstance).SourceLocation;
-  end;
-  Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(AInstance,astnkLVAR,Type_,ASourceLocation^,'',0);
-  AFunctionNode.LocalVariables.Add(Variable);
-  result:=TPACCIntermediateRepresentationCodeInstructionVariable.Create(AInstance,Variable);
- end;
- function CopyVariable(const Variable:TPACCIntermediateRepresentationCodeInstructionVariable):TPACCIntermediateRepresentationCodeInstructionVariable;
- begin
-  result:=TPACCIntermediateRepresentationCodeInstructionVariable.Create(AInstance,Variable.Variable);
- end;
- procedure ProcessNode(const ParentBlock:TPACCIntermediateRepresentationCodeBlock;const Node:TPACCAbstractSyntaxTreeNode;var ResultVariable:TPACCIntermediateRepresentationCodeInstructionVariable;const NeedResult:boolean);
+ procedure ProcessNode(const ParentBlock:TPACCIntermediateRepresentationCodeBlock;const Node:TPACCAbstractSyntaxTreeNode);
  var Index:TPACCInt32;
-     Instruction:TPACCIntermediateRepresentationCodeInstruction;
-     TemporaryVariables:array[0..1] of TPACCIntermediateRepresentationCodeInstructionVariable;
-     VariableNode:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
  begin
   if assigned(Node) then begin
 
@@ -254,11 +157,9 @@ function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObje
     end;
 
     astnkLVAR:begin
-     ResultVariable:=TPACCIntermediateRepresentationCodeInstructionVariable.Create(AInstance,TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node));
     end;
 
     astnkGVAR:begin
-     ResultVariable:=TPACCIntermediateRepresentationCodeInstructionVariable.Create(AInstance,TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node));
     end;
 
     astnkTYPEDEF:begin
@@ -292,17 +193,6 @@ function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObje
     end;
 
     astnkCONV:begin
-     ResultVariable:=CreateTemporaryVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_,@Node.SourceLocation);
-     TemporaryVariables[0]:=nil;
-     ProcessNode(ParentBlock,TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,TemporaryVariables[0],true);
-     if not assigned(TemporaryVariables[0]) then begin
-      TPACCInstance(AInstance).AddError('Internal error 2017-01-19-14-59-0000',@Node.SourceLocation,true);
-     end;
-     Instruction:=TPACCIntermediateRepresentationCodeInstruction.Create(AInstance,picroCONV,Node.SourceLocation);
-     ParentBlock.Instructions.Add(Instruction);
-     Instruction.Type_:=TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_;
-     Instruction.Variables.Add(ResultVariable);
-     Instruction.Variables.Add(TemporaryVariables[0]);
     end;
 
     astnkADDR:begin
@@ -330,24 +220,11 @@ function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObje
     end;
 
     astnkRETURN:begin
-     TemporaryVariables[0]:=nil;
-     if assigned(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node).ReturnValue) then begin
-      ProcessNode(ParentBlock,TPACCAbstractSyntaxTreeNodeRETURNStatement(Node).ReturnValue,TemporaryVariables[0],true);
-      if not assigned(TemporaryVariables[0]) then begin
-       TPACCInstance(AInstance).AddError('Internal error 2017-01-19-14-59-0001',@Node.SourceLocation,true);
-      end;
-     end;
-     Instruction:=TPACCIntermediateRepresentationCodeInstruction.Create(AInstance,picroRET,Node.SourceLocation);
-     ParentBlock.Instructions.Add(Instruction);
-     if assigned(ResultVariable) then begin
-      Instruction.Variables.Add(TemporaryVariables[0]);
-     end;
     end;
 
     astnkSTATEMENTS:begin
      for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(Node).Children.Count-1 do begin
-      TemporaryVariables[0]:=nil;
-      ProcessNode(ParentBlock,TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index],TemporaryVariables[0],false);
+      ProcessNode(ParentBlock,TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index]);
      end;
     end;
 
@@ -394,24 +271,6 @@ function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObje
     end;
 
     astnkOP_PRE_INC:begin
-
-     ResultVariable:=TPACCIntermediateRepresentationCodeInstructionVariable.Create(AInstance,TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node));
-
-     TemporaryVariables[0]:=CreateTemporaryVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Type_,@Node.SourceLocation);
-
-     Instruction:=TPACCIntermediateRepresentationCodeInstruction.Create(AInstance,picroSET,Node.SourceLocation);
-     ParentBlock.Instructions.Add(Instruction);
-     Instruction.Type_:=TPACCInstance(AInstance).TypeINT;
-     Instruction.fVariables.Add(TemporaryVariables[0]);
-     Instruction.fValue:=TPACCAbstractSyntaxTreeNodeIntegerValue.Create(AInstance,astnkINTEGER,Instruction.Type_,Node.SourceLocation,1);
-
-     Instruction:=TPACCIntermediateRepresentationCodeInstruction.Create(AInstance,picroADD,Node.SourceLocation);
-     ParentBlock.Instructions.Add(Instruction);
-     Instruction.Type_:=Node.Type_;
-     Instruction.fVariables.Add(ResultVariable);
-     Instruction.fVariables.Add(CopyVariable(ResultVariable));
-     Instruction.fVariables.Add(CopyVariable(TemporaryVariables[0]));
-
     end;
 
     astnkOP_PRE_DEC:begin
@@ -427,20 +286,6 @@ function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObje
     end;
 
     astnkOP_ADD:begin
-     ResultVariable:=CreateTemporaryVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Type_,@Node.SourceLocation);
-     TemporaryVariables[0]:=nil;
-     TemporaryVariables[1]:=nil;
-     ProcessNode(ParentBlock,TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryVariables[0],true);
-     ProcessNode(ParentBlock,TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryVariables[1],true);
-     if not (assigned(TemporaryVariables[0]) and assigned(TemporaryVariables[1])) then begin
-      TPACCInstance(AInstance).AddError('Internal error 2017-01-19-15-13-0000',@Node.SourceLocation,true);
-     end;
-     Instruction:=TPACCIntermediateRepresentationCodeInstruction.Create(AInstance,picroADD,Node.SourceLocation);
-     ParentBlock.Instructions.Add(Instruction);
-     Instruction.Type_:=TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Type_;
-     Instruction.Variables.Add(ResultVariable);
-     Instruction.Variables.Add(TemporaryVariables[0]);
-     Instruction.Variables.Add(TemporaryVariables[1]);
     end;
 
     astnkOP_SUB:begin
@@ -540,11 +385,9 @@ function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObje
 
   end;
  end;
-var TemporaryVariable:TPACCIntermediateRepresentationCodeInstructionVariable;
 begin
  result:=TPACCIntermediateRepresentationCodeBlock.Create(AInstance);
- TemporaryVariable:=nil;
- ProcessNode(result,AFunctionNode.Body,TemporaryVariable,false);
+ ProcessNode(result,AFunctionNode.Body);
 end;
 
 procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
