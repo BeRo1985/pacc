@@ -5,8 +5,6 @@ interface
 
 uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCPointerHashMap,PACCAbstractSyntaxTree;
 
-const CountPredecessors=64;
-
 type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationCodeOpcode;
      TPACCIntermediateRepresentationCodeOpcode=
       (
@@ -211,8 +209,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      PPACCIntermediateRepresentationCodePhi=^TPACCIntermediateRepresentationCodePhi;
      TPACCIntermediateRepresentationCodePhi=record
       To_:TPACCIntermediateRepresentationCodeReference;
-      Arguments:array[0..CountPredecessors-1] of TPACCIntermediateRepresentationCodeReference;
-      Blocks:array[0..CountPredecessors-1] of TPACCIntermediateRepresentationCodeBlock;
+      Arguments:array of TPACCIntermediateRepresentationCodeReference;
+      Blocks:array of TPACCIntermediateRepresentationCodeBlock;
       CountArguments:TPACCInt32;
       Class_:TPACCIntermediateRepresentationCodeClass;
       Link:PPACCIntermediateRepresentationCodePhi;
