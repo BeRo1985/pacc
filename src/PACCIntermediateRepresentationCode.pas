@@ -230,6 +230,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        Jump:TPACCIntermediateRepresentationCodeJump;
 
+       Successors:array[0..1] of TPACCIntermediateRepresentationCodeBlock;
+
        Link:TPACCIntermediateRepresentationCodeBlock;
 
        constructor Create(const AInstance:TObject); reintroduce;
@@ -308,6 +310,9 @@ begin
  CountInstructions:=0;
 
  Jump.Type_:=pircjtNONE;
+
+ Successors[0]:=nil;
+ Successors[1]:=nil;
 
  Link:=nil;
  
