@@ -94,8 +94,9 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircoALLOC,
        pircoALLOC1,
        pircoALLOC2,
-       pircoALLOC3,
        pircoALLOC4,
+       pircoALLOC8,
+       pircoALLOC16,
 
        pircoCOPY,
 
