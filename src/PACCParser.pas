@@ -3541,7 +3541,6 @@ var CurrentState:TState;
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Labels:=Labels;
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Variable:=Variable;
            TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(FunctionBody).Body:=ParseCompoundStatement;
-           GenerateControlFlowGraphForFunctionDeclarationAbstractSyntaxTreeNode(Instance,FunctionBody);
            Parameters:=nil;
           finally
            CurrentFunctionType:=nil;

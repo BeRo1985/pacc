@@ -197,6 +197,14 @@ begin
 
      OutputLock.Acquire;
      try
+      writeln('Generating control flow graphs for ',ExtractFileName(InputFileName),' . . .');
+     finally
+      OutputLock.Release;
+     end;
+     GenerateControlFlowGraphs(Instance,Instance.Parser.Root);
+
+     OutputLock.Acquire;
+     try
       writeln('Generating assembler code for ',ExtractFileName(InputFileName),' . . .');
      finally
       OutputLock.Release;

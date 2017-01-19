@@ -9,6 +9,8 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
      TPACCAbstractSyntaxTreeNodeKind=(
       astnkNONE,
       astnkTRANSLATIONUNIT,
+      astnkNOP,
+      astnkPHI,
       astnkINTEGER,
       astnkFLOAT,
       astnkSTRING,
@@ -109,6 +111,7 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
        Kind:TPACCAbstractSyntaxTreeNodeKind;
        Type_:PPACCType;
        SourceLocation:TPACCSourceLocation;
+       ControlFlowGraphNode:TObject;
        constructor Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation); reintroduce; virtual;
        destructor Destroy; override;
      end;
@@ -317,6 +320,18 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
        destructor Destroy; override;
      end;
 
+     TPACCAbstractSyntaxTreeNodeNOP=class(TPACCAbstractSyntaxTreeNode)
+      public
+       constructor Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation); reintroduce;
+       destructor Destroy; override;
+     end;
+
+     TPACCAbstractSyntaxTreeNodePHI=class(TPACCAbstractSyntaxTreeNode)
+      public
+       constructor Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation); reintroduce;
+       destructor Destroy; override;
+     end;
+
 implementation
 
 uses PACCInstance;
@@ -348,6 +363,7 @@ begin
  Kind:=AKind;
  Type_:=AType;
  SourceLocation:=ASourceLocation;
+ ControlFlowGraphNode:=nil;
  if assigned(Instance) then begin
   TPACCInstance(Instance).Nodes.Add(self);
  end;
@@ -645,6 +661,26 @@ begin
 end;
 
 destructor TPACCAbstractSyntaxTreeNodeStructReference.Destroy;
+begin
+ inherited Destroy;
+end;
+
+constructor TPACCAbstractSyntaxTreeNodeNOP.Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation);
+begin
+ inherited Create(AInstance,AKind,AType,ASourceLocation);
+end;
+
+destructor TPACCAbstractSyntaxTreeNodeNOP.Destroy;
+begin
+ inherited Destroy;
+end;
+
+constructor TPACCAbstractSyntaxTreeNodePHI.Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation);
+begin
+ inherited Create(AInstance,AKind,AType,ASourceLocation);
+end;
+
+destructor TPACCAbstractSyntaxTreeNodePHI.Destroy;
 begin
  inherited Destroy;
 end;
