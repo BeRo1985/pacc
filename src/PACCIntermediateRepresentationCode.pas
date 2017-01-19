@@ -8,6 +8,8 @@ uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCPointerHashMap,PACCAbs
 type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationCodeOpcode;
      TPACCIntermediateRepresentationCodeOpcode=
       (
+       pircoNONE,
+
        pircoADD,
        pircoSUB,
        pircoDIV,
@@ -120,6 +122,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      PPACCIntermediateRepresentationCodeReferenceType=^TPACCIntermediateRepresentationCodeReferenceType;
      TPACCIntermediateRepresentationCodeReferenceType=
       (
+       pircrtNONE,
        pircrtTEMPORARY,
        pircrtCONSTANT,
        pircrtSLOT,
@@ -130,8 +133,10 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircrtLABEL
       );
 
+     PPACCIntermediateRepresentationCodeReference=^TPACCIntermediateRepresentationCodeReference;
      TPACCIntermediateRepresentationCodeReference=record
       case Type_:TPACCIntermediateRepresentationCodeReferenceType of
+       pircrtNONE,
        pircrtTEMPORARY,
        pircrtCONSTANT,
        pircrtSLOT,
@@ -151,6 +156,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      PPACCIntermediateRepresentationCodeClass=^TPACCIntermediateRepresentationCodeClass;
      TPACCIntermediateRepresentationCodeClass=
       (
+       pirccNONE,
        pirccI8,
        pirccI16,
        pirccI32,
@@ -160,14 +166,43 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       );
 
      PPACCIntermediateRepresentationCodeInstruction=^TPACCIntermediateRepresentationCodeInstruction;
-     TPACCIntermediateRepresentationCodeInstruction=record
-      Opcode:TPACCIntermediateRepresentationCodeOpcode;
-      Class_:TPACCIntermediateRepresentationCodeClass;
-      To_:TPACCIntermediateRepresentationCodeReference;
-      Arguments:array[0..1] of TPACCIntermediateRepresentationCodeReference;
+     TPACCIntermediateRepresentationCodeInstruction={$ifdef HAS_ADVANCED_RECORDS}record{$else}object{$endif}
+      public
+       Opcode:TPACCIntermediateRepresentationCodeOpcode;
+       Class_:TPACCIntermediateRepresentationCodeClass;
+       To_:TPACCIntermediateRepresentationCodeReference;
+       Arguments:array[0..1] of TPACCIntermediateRepresentationCodeReference;
+       function Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode):TPACCIntermediateRepresentationCodeInstruction; overload;
+       function Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass):TPACCIntermediateRepresentationCodeInstruction; overload;
+       function Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction; overload;
+       function Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_,AArgument:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction; overload;
+       function Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_,AArgument,AOtherArgument:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction; overload;
      end;
 
      TPACCIntermediateRepresentationCodeInstructions=array of TPACCIntermediateRepresentationCodeInstruction;
+
+     PPACCIntermediateRepresentationCodeJumpType=^TPACCIntermediateRepresentationCodeJumpType;
+     TPACCIntermediateRepresentationCodeJumpType=
+      (
+       pircjtNONE,
+       pircjtRET0,
+       pircjtRETI8,
+       pircjtRETI16,
+       pircjtRETI32,
+       pircjtRETI64,
+       pircjtRETF32,
+       pircjtRETF64,
+       pircjtRETC,
+       pircjtJMP,
+       pircjtJNZ,
+       pircjtJZ
+      );
+
+     PPACCIntermediateRepresentationCodeJump=^TPACCIntermediateRepresentationCodeJump;
+     TPACCIntermediateRepresentationCodeJump=record
+      Type_:TPACCIntermediateRepresentationCodeJumpType;
+      Argument:TPACCIntermediateRepresentationCodeReference;
+     end;
 
      TPACCIntermediateRepresentationCodeBlock=class
       private
@@ -177,8 +212,12 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Instructions:TPACCIntermediateRepresentationCodeInstructions;
        CountInstructions:TPACCINt32;
 
+       Jump:TPACCIntermediateRepresentationCodeJump;
+
        constructor Create(const AInstance:TObject); reintroduce;
        destructor Destroy; override;
+
+       function AddInstruction(const AInstruction:TPACCIntermediateRepresentationCodeInstruction):TPACCInt32;
 
       published
        property Instance:TObject read fInstance;
@@ -190,19 +229,84 @@ implementation
 
 uses PACCInstance;
 
+function TPACCIntermediateRepresentationCodeInstruction.Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode):TPACCIntermediateRepresentationCodeInstruction;
+begin
+ Opcode:=AOpcode;
+ Class_:=pirccNONE;
+ To_.Type_:=pircrtNONE;
+ Arguments[0].Type_:=pircrtNONE;
+ Arguments[1].Type_:=pircrtNONE;
+ result:=self;
+end;
+
+function TPACCIntermediateRepresentationCodeInstruction.Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass):TPACCIntermediateRepresentationCodeInstruction;
+begin
+ Opcode:=AOpcode;
+ Class_:=AClass_;
+ To_.Type_:=pircrtNONE;
+ Arguments[0].Type_:=pircrtNONE;
+ Arguments[1].Type_:=pircrtNONE;
+ result:=self;
+end;
+
+function TPACCIntermediateRepresentationCodeInstruction.Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction;
+begin
+ Opcode:=AOpcode;
+ Class_:=AClass_;
+ To_:=ATo_;
+ Arguments[0].Type_:=pircrtNONE;
+ Arguments[1].Type_:=pircrtNONE;
+ result:=self;
+end;
+
+function TPACCIntermediateRepresentationCodeInstruction.Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_,AArgument:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction;
+begin
+ Opcode:=AOpcode;
+ Class_:=AClass_;
+ To_:=ATo_;
+ Arguments[0]:=AArgument;
+ Arguments[1].Type_:=pircrtNONE;
+ result:=self;
+end;
+
+function TPACCIntermediateRepresentationCodeInstruction.Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_,AArgument,AOtherArgument:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction;
+begin
+ Opcode:=AOpcode;
+ Class_:=AClass_;
+ To_:=ATo_;
+ Arguments[0]:=AArgument;
+ Arguments[1]:=AOtherArgument;
+ result:=self;
+end;
 
 constructor TPACCIntermediateRepresentationCodeBlock.Create(const AInstance:TObject);
 begin
  inherited Create;
+
  fInstance:=AInstance;
  TPACCInstance(fInstance).AllocatedObjects.Add(self);
+
  Instructions:=nil;
+ CountInstructions:=0;
+
+ Jump.Type_:=pircjtNONE;
+ 
 end;
 
 destructor TPACCIntermediateRepresentationCodeBlock.Destroy;
 begin
  Instructions:=nil;
  inherited Destroy;
+end;
+
+function TPACCIntermediateRepresentationCodeBlock.AddInstruction(const AInstruction:TPACCIntermediateRepresentationCodeInstruction):TPACCInt32;
+begin
+ result:=CountInstructions;
+ inc(CountInstructions);
+ if length(Instructions)<CountInstructions then begin
+  SetLength(Instructions,CountInstructions*2);
+ end;
+ Instructions[result]:=AInstruction;
 end;
 
 function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObject;const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration):TPACCIntermediateRepresentationCodeBlock;
