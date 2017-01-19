@@ -126,7 +126,6 @@ var BreakContinueHashMap:TPACCPointerHashMap;
  end;
  function ProcessStatement(const Node:TPACCAbstractSyntaxTreeNode;var LastControlFlowGraphNode:TPACCControlFlowGraphNode):TPACCControlFlowGraphNode;
  var ControlFlowGraphNode,a0,a1,b0,b1,c0,c1,d0,d1,e0,e1,f0,f1,g0,g1:TPACCControlFlowGraphNode;
-     AbstractSyntaxTreeNodePhi:TPACCAbstractSyntaxTreeNodePhi;
      Index:TPACCInt32;
  begin
   result:=nil;
@@ -144,9 +143,36 @@ var BreakContinueHashMap:TPACCPointerHashMap;
 
     astnkIF,astnkTERNARY:begin
 
-     result:=CreateNOP(LastControlFlowGraphNode);
+     ControlFlowGraphNode:=TPACCControlFlowGraphNode.Create(AInstance,Node);
+     if assigned(LastControlFlowGraphNode) then begin
+      ControlFlowGraphNode.Predecessors.Add(LastControlFlowGraphNode);
+      LastControlFlowGraphNode.Successors.Add(ControlFlowGraphNode);
+     end;
+     LastControlFlowGraphNode:=ControlFlowGraphNode;
+     result:=ControlFlowGraphNode;
 
      ProcessStatement(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Condition,LastControlFlowGraphNode);
+
+     a1:=LastControlFlowGraphNode;
+     b1:=LastControlFlowGraphNode;
+
+     a0:=ProcessStatement(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Then_,a1);
+     b0:=ProcessStatement(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Else_,b1);
+
+     if (a1<>LastControlFlowGraphNode) or
+        (b1<>LastControlFlowGraphNode) then begin
+      c1:=nil;
+      c0:=CreatePHI(c1);
+      c0.Predecessors.Add(a1);
+      c0.Predecessors.Add(b1);
+      a1.Successors.Add(c0);
+      b1.Successors.Add(c0);
+      LastControlFlowGraphNode:=c1;
+     end;
+
+    end;
+
+    astnkFOR:begin
 
      ControlFlowGraphNode:=TPACCControlFlowGraphNode.Create(AInstance,Node);
      if assigned(LastControlFlowGraphNode) then begin
@@ -154,32 +180,7 @@ var BreakContinueHashMap:TPACCPointerHashMap;
       LastControlFlowGraphNode.Successors.Add(ControlFlowGraphNode);
      end;
      LastControlFlowGraphNode:=ControlFlowGraphNode;
-
-     a0:=LastControlFlowGraphNode;
-     b0:=LastControlFlowGraphNode;
-
-     ProcessStatement(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Then_,a0);
-     ProcessStatement(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node).Else_,b0);
-
-     AbstractSyntaxTreeNodePhi:=TPACCAbstractSyntaxTreeNodePHI.Create(AInstance,astnkPHI,nil,Node.SourceLocation);
-
-     if (a0<>LastControlFlowGraphNode) or
-        (b0<>LastControlFlowGraphNode) then begin
-      ControlFlowGraphNode:=TPACCControlFlowGraphNode.Create(AInstance,Node);
-      if assigned(a0) then begin
-       ControlFlowGraphNode.Predecessors.Add(a0);
-       a0.Successors.Add(ControlFlowGraphNode);
-      end;
-      if assigned(b0) then begin
-       ControlFlowGraphNode.Predecessors.Add(b0);
-       b0.Successors.Add(ControlFlowGraphNode);
-      end;
-      LastControlFlowGraphNode:=ControlFlowGraphNode;
-     end;
-
-    end;
-
-    astnkFOR:begin
+     result:=ControlFlowGraphNode;
 
      a1:=LastControlFlowGraphNode;
      a0:=ProcessStatement(TPACCAbstractSyntaxTreeNodeFORStatement(Node).Initialization_,a1);
@@ -188,7 +189,6 @@ var BreakContinueHashMap:TPACCPointerHashMap;
       a0:=CreateNOP(a1);
      end;
      result:=a0;
-     LastControlFlowGraphNode:=a0;
 
      b1:=LastControlFlowGraphNode;
      b0:=ProcessStatement(TPACCAbstractSyntaxTreeNodeFORStatement(Node).ContinueLabel,b1);
@@ -245,6 +245,14 @@ var BreakContinueHashMap:TPACCPointerHashMap;
     end;
     astnkWHILE:begin
 
+     ControlFlowGraphNode:=TPACCControlFlowGraphNode.Create(AInstance,Node);
+     if assigned(LastControlFlowGraphNode) then begin
+      ControlFlowGraphNode.Predecessors.Add(LastControlFlowGraphNode);
+      LastControlFlowGraphNode.Successors.Add(ControlFlowGraphNode);
+     end;
+     LastControlFlowGraphNode:=ControlFlowGraphNode;
+     result:=ControlFlowGraphNode;
+
      a1:=LastControlFlowGraphNode;
      a0:=ProcessStatement(TPACCAbstractSyntaxTreeNodeWHILEOrDoStatement(Node).ContinueLabel,a1);
      if assigned(a0) then begin
@@ -254,7 +262,6 @@ var BreakContinueHashMap:TPACCPointerHashMap;
       a0:=CreateNOP(LastControlFlowGraphNode);
      end;
      LastControlFlowGraphNode:=a1;
-     result:=a1;
 
      b1:=LastControlFlowGraphNode;
      b0:=ProcessStatement(TPACCAbstractSyntaxTreeNodeWHILEOrDoStatement(Node).Condition,b1);
@@ -295,6 +302,14 @@ var BreakContinueHashMap:TPACCPointerHashMap;
 
     astnkDO:begin
 
+     ControlFlowGraphNode:=TPACCControlFlowGraphNode.Create(AInstance,Node);
+     if assigned(LastControlFlowGraphNode) then begin
+      ControlFlowGraphNode.Predecessors.Add(LastControlFlowGraphNode);
+      LastControlFlowGraphNode.Successors.Add(ControlFlowGraphNode);
+     end;
+     LastControlFlowGraphNode:=ControlFlowGraphNode;
+     result:=ControlFlowGraphNode;
+
      a1:=LastControlFlowGraphNode;
      a0:=ProcessStatement(TPACCAbstractSyntaxTreeNodeWHILEOrDoStatement(Node).ContinueLabel,a1);
      if assigned(a0) then begin
@@ -304,7 +319,6 @@ var BreakContinueHashMap:TPACCPointerHashMap;
       a0:=CreateNOP(LastControlFlowGraphNode);
      end;
      LastControlFlowGraphNode:=a1;
-     result:=a1;
 
      d1:=nil;
      d0:=ProcessStatement(TPACCAbstractSyntaxTreeNodeWHILEOrDoStatement(Node).BreakLabel,d1);
