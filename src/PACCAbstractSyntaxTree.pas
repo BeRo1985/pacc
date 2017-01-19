@@ -168,6 +168,7 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
        destructor Destroy; override;
      end;
 
+     PPACCAbstractSyntaxTreeNodeLocalGlobalVariable=^TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
      TPACCAbstractSyntaxTreeNodeLocalGlobalVariable=class(TPACCAbstractSyntaxTreeNode)
       public
        VariableName:TPACCRawByteString;
