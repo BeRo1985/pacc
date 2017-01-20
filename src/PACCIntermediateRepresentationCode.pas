@@ -558,10 +558,13 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
   CurrentBlock:=Block;
   PhiLink:=@CurrentBlock.Phi;
  end;
- procedure ProcessNode(const Node:TPACCAbstractSyntaxTreeNode);
+ procedure ProcessNode(const Node:TPACCAbstractSyntaxTreeNode;const OutputResultReference:PPACCIntermediateRepresentationCodeReference);
  var Index:TPACCInt32;
+     ResultReference:TPACCIntermediateRepresentationCodeReference;
  begin
   if assigned(Node) then begin
+
+   ResultReference.Type_:=pircrtNONE;
 
    case Node.Kind of
 
@@ -642,7 +645,7 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
 
     astnkSTATEMENTS:begin
      for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(Node).Children.Count-1 do begin
-      ProcessNode(TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index]);
+      ProcessNode(TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index],nil);
      end;
     end;
 
@@ -801,6 +804,10 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
 
    end;
 
+   if assigned(OutputResultReference) then begin
+    OutputResultReference^:=ResultReference;
+   end;
+
   end;
  end;
 begin
@@ -810,7 +817,7 @@ begin
  BlockLink:=@CodeInstance.StartBlock;
  PhiLink:=nil;
  EmitLabel(NewLabel);
- ProcessNode(AFunctionNode.Body);
+ ProcessNode(AFunctionNode.Body,nil);
  if CurrentBlock.Jump.Type_=pircjtNONE then begin
   CurrentBlock.Jump.Type_:=pircjtRET0;
  end;
