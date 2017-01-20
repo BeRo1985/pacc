@@ -10,6 +10,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       (
        pircoNONE,
 
+       pircoASM,
+
        pircoADD,
        pircoSUB,
        pircoDIV,
@@ -303,6 +305,10 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        StartBlock:TPACCIntermediateRepresentationCodeBlock;
 
+       TemporaryReferenceCounter:TPACCUInt32;
+
+       VariableTemporaryReferenceHashMap:TPACCPointerHashMap;
+
        constructor Create(const AInstance:TObject); reintroduce;
        destructor Destroy; override;
 
@@ -511,12 +517,17 @@ begin
 
  StartBlock:=nil;
 
+ TemporaryReferenceCounter:=0;
+
+ VariableTemporaryReferenceHashMap:=TPACCPointerHashMap.Create;
+
 end;
 
 destructor TPACCIntermediateRepresentationCode.Destroy;
 begin
  Blocks.Free;
  BlockLabelHashMap.Free;
+ VariableTemporaryReferenceHashMap.Free;
  inherited Destroy;
 end;
 
@@ -524,13 +535,40 @@ function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObje
 var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
     BlockLink,PhiLink:PPACCIntermediateRepresentationCodeBlock;
     CodeInstance:TPACCIntermediateRepresentationCode;
- function NewLabel:TPACCAbstractSyntaxTreeNodeLabel;
+    NeedNewBlock:boolean;
+ function GetVariableReference(Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeReference;
+ var Entity:PPACCPointerHashMapEntity;
  begin
-  result:=TPACCAbstractSyntaxTreeNodeLabel.Create(AInstance,astnkLABEL,nil,TPACCInstance(AInstance).SourceLocation,'');
+  case Variable.Kind of
+   astnkLVAR:begin
+    result.Type_:=pircrtTEMPORARY;
+    Entity:=CodeInstance.VariableTemporaryReferenceHashMap.Get(Variable,false);
+    if assigned(Entity) then begin
+     result.Value:=TPACCPtrUInt(pointer(Entity^.Value));
+    end else begin
+     result.Value:=CodeInstance.TemporaryReferenceCounter;
+     CodeInstance.VariableTemporaryReferenceHashMap[Variable]:=pointer(TPACCPtrUInt(CodeInstance.TemporaryReferenceCounter));
+     inc(CodeInstance.TemporaryReferenceCounter);
+    end;
+   end;
+   astnkGVAR:begin
+    result.Type_:=pircrtVARIABLE;
+    result.Variable:=Variable;
+   end;
+   else begin
+    result.Type_:=pircrtNONE;
+    TPACCInstance(AInstance).AddError('Internal error 2017-01-20-16-29-0000',nil,true);
+   end;
+  end;
+ end;
+ function NewHiddenLabel:TPACCAbstractSyntaxTreeNodeLabel;
+ begin
+  result:=TPACCAbstractSyntaxTreeNodeLabel.Create(AInstance,astnkHIDDEN_LABEL,nil,TPACCInstance(AInstance).SourceLocation,'');
  end;
  procedure CloseBlock;
  begin
   BlockLink:=@CurrentBlock.Link;
+  NeedNewBlock:=true;
  end;
  function FindBlock(const Label_:TPACCAbstractSyntaxTreeNodeLabel):TPACCIntermediateRepresentationCodeBlock;
  begin
@@ -557,6 +595,21 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
   BlockLink^:=Block;
   CurrentBlock:=Block;
   PhiLink:=@CurrentBlock.Phi;
+  NeedNewBlock:=false;
+ end;
+ procedure EmitJump(const Label_:TPACCAbstractSyntaxTreeNodeLabel);
+ var Block:TPACCIntermediateRepresentationCodeBlock;
+ begin
+  Block:=FindBlock(Label_);
+  CurrentBlock.Jump.Type_:=pircjtJMP;
+  CurrentBlock.Successors[0]:=Block;
+  CloseBlock;
+ end;
+ procedure CreateNewBlockIfNeeded;
+ begin
+  if NeedNewBlock then begin
+   EmitLabel(NewHiddenLabel);
+  end;
  end;
  procedure ProcessNode(const Node:TPACCAbstractSyntaxTreeNode;const OutputResultReference:PPACCIntermediateRepresentationCodeReference);
  var Index:TPACCInt32;
@@ -653,21 +706,26 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
     end;
 
     astnkGOTO:begin
+     EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_));
     end;
 
     astnkCOMPUTED_GOTO:begin
     end;
 
     astnkLABEL:begin
+     EmitLabel(TPACCAbstractSyntaxTreeNodeLabel(Node));
     end;
 
     astnkHIDDEN_LABEL:begin
+     EmitLabel(TPACCAbstractSyntaxTreeNodeLabel(Node));
     end;
 
     astnkBREAK:begin
+     EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeBREAKOrCONTINUEStatement(Node).Label_));
     end;
 
     astnkCONTINUE:begin
+     EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeBREAKOrCONTINUEStatement(Node).Label_));
     end;
 
     astnkOP_COMMA:begin
@@ -810,14 +868,41 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
 
   end;
  end;
+var Index,ParameterIndex:longint;
+    LocalVariable:TPACCAbstractSyntaxTreeNodeLocaLGlobalVariable;
+    Reference:TPACCIntermediateRepresentationCodeReference;
 begin
+
  result:=TPACCIntermediateRepresentationCode.Create(AInstance);
+
  CodeInstance:=result;
+
  CurrentBlock:=nil;
  BlockLink:=@CodeInstance.StartBlock;
  PhiLink:=nil;
- EmitLabel(NewLabel);
+
+ NeedNewBlock:=true;
+
+ EmitLabel(NewHiddenLabel);
+
+ for Index:=0 to AFunctionNode.LocalVariables.Count-1 do begin
+
+  LocalVariable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(AFunctionNode.LocalVariables[Index]);
+  if assigned(LocalVariable) then begin
+
+   Reference:=GetVariableReference(LocalVariable);
+
+   ParameterIndex:=AFunctionNode.Parameters.IndexOf(LocalVariable);
+   if ParameterIndex>=0 then begin
+
+   end;
+
+  end;
+
+ end;
+
  ProcessNode(AFunctionNode.Body,nil);
+
  if CurrentBlock.Jump.Type_=pircjtNONE then begin
   CurrentBlock.Jump.Type_:=pircjtRET0;
  end;
