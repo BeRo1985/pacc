@@ -206,6 +206,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
      TPACCIntermediateRepresentationCodeBlock=class;
 
+     TPACCIntermediateRepresentationCodeBlocks=array of TPACCIntermediateRepresentationCodeBlock;
+
      PPACCIntermediateRepresentationCodePhi=^TPACCIntermediateRepresentationCodePhi;
      TPACCIntermediateRepresentationCodePhi=record
       To_:TPACCIntermediateRepresentationCodeReference;
@@ -216,11 +218,25 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       Link:PPACCIntermediateRepresentationCodePhi;
      end;
 
+     TPACCIntermediateRepresentationCodeBitSet={$ifdef HAVE_ADVANCED_RECORDS}record{$else}object{$endif}
+      private
+       fBitmap:array of TPACCUInt32;
+       fBitmapSize:TPACCInt32;
+       function GetBit(const AIndex:TPACCInt32):boolean;
+       procedure SetBit(const AIndex:TPACCInt32;const ABit:boolean);
+      public
+       procedure Clear;
+       property BitmapSize:TPACCInt32 read fBitmapSize;
+       property Bits[const AIndex:TPACCInt32]:boolean read GetBit write SetBit; default;
+     end;
+
      TPACCIntermediateRepresentationCodeBlock=class
       private
        fInstance:TObject;
       public
 
+       Name:TPACCRawByteString;
+       
        Phi:PPACCIntermediateRepresentationCodePhi;
 
        Instructions:TPACCIntermediateRepresentationCodeInstructions;
@@ -231,6 +247,26 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Successors:array[0..1] of TPACCIntermediateRepresentationCodeBlock;
 
        Link:TPACCIntermediateRepresentationCodeBlock;
+
+       ID:TPACCInt32;
+       Visit:TPACCInt32;
+
+       InverseDominance:TPACCIntermediateRepresentationCodeBlock;
+       Dominance:TPACCIntermediateRepresentationCodeBlock;
+       DominanceLink:TPACCIntermediateRepresentationCodeBlock;
+
+       Fronts:TPACCIntermediateRepresentationCodeBlocks;
+       CountFronts:TPACCInt32;
+
+       Predecessors:TPACCIntermediateRepresentationCodeBlocks;
+       CountPredecessors:TPACCInt32;
+
+       In_:TPACCIntermediateRepresentationCodeBitSet;
+       Out_:TPACCIntermediateRepresentationCodeBitSet;
+       Gen_:TPACCIntermediateRepresentationCodeBitSet;
+
+       CountLive:array[0..1] of TPACCInt32;
+       Loop:TPACCInt32;
 
        constructor Create(const AInstance:TObject); reintroduce;
        destructor Destroy; override;
@@ -297,12 +333,48 @@ begin
  result:=self;
 end;
 
+function TPACCIntermediateRepresentationCodeBitSet.GetBit(const AIndex:TPACCInt32):boolean;
+begin
+ result:=((AIndex>=0) and (AIndex<(fBitmapSize shl 3))) and
+         ((fBitmap[AIndex shr 3] and (TPACCUInt32(1) shl (AIndex and 31)))<>0);
+end;
+
+procedure TPACCIntermediateRepresentationCodeBitSet.SetBit(const AIndex:TPACCInt32;const ABit:boolean);
+var OldSize,Index:TPACCInt32;
+begin
+ if AIndex>=0 then begin
+  if (fBitmapSize shl 3)<=AIndex then begin
+   fBitmapSize:=(AIndex+31) shr 3;
+   OldSize:=length(fBitmap);
+   if OldSize<fBitmapSize then begin
+    SetLength(fBitmap,fBitmapSize*2);
+    FillChar(fBitmap[OldSize],(length(fBitmap)-OldSize)*SizeOf(TPACCUInt32),#0);
+   end;
+  end;
+  if ABit then begin
+   fBitmap[AIndex shr 3]:=fBitmap[AIndex shr 3] or (TPACCUInt32(1) shl (AIndex and 31));
+  end else begin
+   fBitmap[AIndex shr 3]:=fBitmap[AIndex shr 3] and not (TPACCUInt32(1) shl (AIndex and 31));
+  end;
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeBitSet.Clear;
+begin
+ fBitmap:=nil;
+ fBitmapSize:=0;
+end;
+
 constructor TPACCIntermediateRepresentationCodeBlock.Create(const AInstance:TObject);
 begin
  inherited Create;
 
  fInstance:=AInstance;
  TPACCInstance(fInstance).AllocatedObjects.Add(self);
+
+ Name:='';
+
+ Phi:=nil;
 
  Instructions:=nil;
  CountInstructions:=0;
@@ -313,21 +385,52 @@ begin
  Successors[1]:=nil;
 
  Link:=nil;
- 
- Phi:=nil;
+
+ ID:=0;
+ Visit:=0;
+
+ InverseDominance:=nil;
+ Dominance:=nil;
+ DominanceLink:=nil;
+
+ Fronts:=nil;
+ CountFronts:=0;
+
+ Predecessors:=nil;
+ CountPredecessors:=0;
+
+ In_.Clear;
+ Out_.Clear;
+ Gen_.Clear;
+
+ CountLive[0]:=0;
+ CountLive[1]:=0;
+ Loop:=0;
 
 end;
 
 destructor TPACCIntermediateRepresentationCodeBlock.Destroy;
 begin
 
- Instructions:=nil;
+ Name:='';
 
  if assigned(Phi) then begin
   Finalize(Phi^);
   FreeMem(Phi);
   Phi:=nil;
  end;
+
+ Instructions:=nil;
+
+ Fronts:=nil;
+ CountFronts:=0;
+
+ Predecessors:=nil;
+ CountPredecessors:=0;
+
+ In_.Clear;
+ Out_.Clear;
+ Gen_.Clear;
 
  inherited Destroy;
 end;
