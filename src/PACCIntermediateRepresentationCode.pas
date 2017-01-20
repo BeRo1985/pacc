@@ -174,11 +174,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Class_:TPACCIntermediateRepresentationCodeClass;
        To_:TPACCIntermediateRepresentationCodeReference;
        Arguments:array[0..1] of TPACCIntermediateRepresentationCodeReference;
-       function Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode):TPACCIntermediateRepresentationCodeInstruction; overload;
-       function Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass):TPACCIntermediateRepresentationCodeInstruction; overload;
-       function Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction; overload;
-       function Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_,AArgument:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction; overload;
-       function Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_,AArgument,AOtherArgument:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction; overload;
      end;
 
      TPACCIntermediateRepresentationCodeInstructions=array of TPACCIntermediateRepresentationCodeInstruction;
@@ -316,60 +311,61 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Instance:TObject read fInstance;
      end;
 
+function CreateInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode):TPACCIntermediateRepresentationCodeInstruction; overload;
+function CreateInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass):TPACCIntermediateRepresentationCodeInstruction; overload;
+function CreateInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction; overload;
+function CreateInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_,AArgument:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction; overload;
+function CreateInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_,AArgument,AOtherArgument:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction; overload;
+
 procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
 
 implementation
 
 uses PACCInstance;
 
-function TPACCIntermediateRepresentationCodeInstruction.Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode):TPACCIntermediateRepresentationCodeInstruction;
+function CreateInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode):TPACCIntermediateRepresentationCodeInstruction;
 begin
- Opcode:=AOpcode;
- Class_:=pirccNONE;
- To_.Type_:=pircrtNONE;
- Arguments[0].Type_:=pircrtNONE;
- Arguments[1].Type_:=pircrtNONE;
- result:=self;
+ result.Opcode:=AOpcode;
+ result.Class_:=pirccNONE;
+ result.To_.Type_:=pircrtNONE;
+ result.Arguments[0].Type_:=pircrtNONE;
+ result.Arguments[1].Type_:=pircrtNONE;
 end;
 
-function TPACCIntermediateRepresentationCodeInstruction.Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass):TPACCIntermediateRepresentationCodeInstruction;
+function CreateInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass):TPACCIntermediateRepresentationCodeInstruction;
 begin
- Opcode:=AOpcode;
- Class_:=AClass_;
- To_.Type_:=pircrtNONE;
- Arguments[0].Type_:=pircrtNONE;
- Arguments[1].Type_:=pircrtNONE;
- result:=self;
+ result.Opcode:=AOpcode;
+ result.Class_:=AClass_;
+ result.To_.Type_:=pircrtNONE;
+ result.Arguments[0].Type_:=pircrtNONE;
+ result.Arguments[1].Type_:=pircrtNONE;
 end;
 
-function TPACCIntermediateRepresentationCodeInstruction.Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction;
+function CreateInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction;
 begin
- Opcode:=AOpcode;
- Class_:=AClass_;
- To_:=ATo_;
- Arguments[0].Type_:=pircrtNONE;
- Arguments[1].Type_:=pircrtNONE;
- result:=self;
+ result.Opcode:=AOpcode;
+ result.Class_:=AClass_;
+ result.To_:=ATo_;
+ result.Arguments[0].Type_:=pircrtNONE;
+ result.Arguments[1].Type_:=pircrtNONE;
 end;
 
-function TPACCIntermediateRepresentationCodeInstruction.Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_,AArgument:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction;
+function CreateInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_,AArgument:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction;
 begin
- Opcode:=AOpcode;
- Class_:=AClass_;
- To_:=ATo_;
- Arguments[0]:=AArgument;
- Arguments[1].Type_:=pircrtNONE;
- result:=self;
+ result.Opcode:=AOpcode;
+ result.Class_:=AClass_;
+ result.To_:=ATo_;
+ result.Arguments[0]:=AArgument;
+ result.Arguments[1].Type_:=pircrtNONE;
 end;
 
-function TPACCIntermediateRepresentationCodeInstruction.Create(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_,AArgument,AOtherArgument:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction;
+function CreateInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AClass_:TPACCIntermediateRepresentationCodeClass;const ATo_,AArgument,AOtherArgument:TPACCIntermediateRepresentationCodeReference):TPACCIntermediateRepresentationCodeInstruction;
 begin
- Opcode:=AOpcode;
- Class_:=AClass_;
- To_:=ATo_;
- Arguments[0]:=AArgument;
- Arguments[1]:=AOtherArgument;
- result:=self;
+ result.Opcode:=AOpcode;
+ result.Class_:=AClass_;
+ result.To_:=ATo_;
+ result.Arguments[0]:=AArgument;
+ result.Arguments[1]:=AOtherArgument;
 end;
 
 function TPACCIntermediateRepresentationCodeBitSet.GetBit(const AIndex:TPACCInt32):boolean;
@@ -610,6 +606,11 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
   if NeedNewBlock then begin
    EmitLabel(NewHiddenLabel);
   end;
+ end;
+ procedure EmitInstruction(const AInstruction:TPACCIntermediateRepresentationCodeInstruction);
+ begin
+  CreateNewBlockIfNeeded;
+  CurrentBlock.AddInstruction(AInstruction);
  end;
  procedure ProcessNode(const Node:TPACCAbstractSyntaxTreeNode;const OutputResultReference:PPACCIntermediateRepresentationCodeReference);
  var Index:TPACCInt32;
@@ -871,6 +872,7 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
 var Index,ParameterIndex:longint;
     LocalVariable:TPACCAbstractSyntaxTreeNodeLocaLGlobalVariable;
     Reference:TPACCIntermediateRepresentationCodeReference;
+    ReferenceValue:TPACCIntermediateRepresentationCodeReference;
 begin
 
  result:=TPACCIntermediateRepresentationCode.Create(AInstance);
@@ -891,6 +893,61 @@ begin
   if assigned(LocalVariable) then begin
 
    Reference:=GetVariableReference(LocalVariable);
+
+   if TPACCInstance(AInstance).IsIntType(LocalVariable.Type_) or (LocalVariable.Type_^.Kind=tkPOINTER) then begin
+    case LocalVariable.Type_^.Size of
+     1,2,4:begin
+      ReferenceValue.Type_:=pircrtCONSTANT;
+      ReferenceValue.Value:=1;
+      EmitInstruction(CreateInstruction(pircoALLOC4,pirccI32,ReferenceValue));
+     end;
+     8:begin
+      ReferenceValue.Type_:=pircrtCONSTANT;
+      ReferenceValue.Value:=1;
+      EmitInstruction(CreateInstruction(pircoALLOC8,pirccI64,ReferenceValue));
+     end;
+     else begin
+      TPACCInstance(AInstance).AddError('Internal error 2017-01-20-16-40-0000',nil,true);
+     end;
+    end;
+   end else if TPACCInstance(AInstance).IsFloatType(LocalVariable.Type_) then begin
+    case LocalVariable.Type_^.Size of
+     4:begin
+      ReferenceValue.Type_:=pircrtCONSTANT;
+      ReferenceValue.Value:=1;
+      EmitInstruction(CreateInstruction(pircoALLOC4,pirccF32,ReferenceValue));
+     end;
+     8:begin
+      ReferenceValue.Type_:=pircrtCONSTANT;
+      ReferenceValue.Value:=1;
+      EmitInstruction(CreateInstruction(pircoALLOC8,pirccF64,ReferenceValue));
+     end;
+     else begin
+      TPACCInstance(AInstance).AddError('Internal error 2017-01-20-16-41-0000',nil,true);
+     end;
+    end;
+   end else if LocalVariable.Type_^.Kind=tkARRAY then begin
+   end else begin
+    ReferenceValue.Type_:=pircrtCONSTANT;
+    ReferenceValue.Value:=(LocalVariable.Type_^.Size+Max(3,LocalVariable.Type_^.Alignment-1)) and not TPACCUInt32(Max(3,LocalVariable.Type_^.Alignment-1));
+    case LocalVariable.Type_^.Alignment of
+     1:begin
+      EmitInstruction(CreateInstruction(pircoALLOC1,pirccI8,ReferenceValue));
+     end;
+     2:begin
+      EmitInstruction(CreateInstruction(pircoALLOC2,pirccI8,ReferenceValue));
+     end;
+     3,4:begin
+      EmitInstruction(CreateInstruction(pircoALLOC4,pirccI8,ReferenceValue));
+     end;
+     5..8:begin
+      EmitInstruction(CreateInstruction(pircoALLOC8,pirccI8,ReferenceValue));
+     end;
+     else begin
+      EmitInstruction(CreateInstruction(pircoALLOC16,pirccI8,ReferenceValue));
+     end;
+    end;
+   end;
 
    ParameterIndex:=AFunctionNode.Parameters.IndexOf(LocalVariable);
    if ParameterIndex>=0 then begin
