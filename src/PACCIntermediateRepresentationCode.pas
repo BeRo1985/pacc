@@ -524,6 +524,10 @@ function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObje
 var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
     BlockLink,PhiLink:PPACCIntermediateRepresentationCodeBlock;
     CodeInstance:TPACCIntermediateRepresentationCode;
+ function NewLabel:TPACCAbstractSyntaxTreeNodeLabel;
+ begin
+  result:=TPACCAbstractSyntaxTreeNodeLabel.Create(AInstance,astnkLABEL,nil,TPACCInstance(AInstance).SourceLocation,'');
+ end;
  procedure CloseBlock;
  begin
   BlockLink:=@CurrentBlock.Link;
@@ -805,7 +809,11 @@ begin
  CurrentBlock:=nil;
  BlockLink:=@CodeInstance.StartBlock;
  PhiLink:=nil;
+ EmitLabel(NewLabel);
  ProcessNode(AFunctionNode.Body);
+ if CurrentBlock.Jump.Type_=pircjtNONE then begin
+  CurrentBlock.Jump.Type_:=pircjtRET0;
+ end;
 end;
 
 procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
