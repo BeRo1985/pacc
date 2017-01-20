@@ -204,6 +204,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       Argument:TPACCIntermediateRepresentationCodeReference;
      end;
 
+     PPACCIntermediateRepresentationCodeBlock=^TPACCIntermediateRepresentationCodeBlock;
      TPACCIntermediateRepresentationCodeBlock=class;
 
      TPACCIntermediateRepresentationCodeBlocks=array of TPACCIntermediateRepresentationCodeBlock;
@@ -235,8 +236,10 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        fInstance:TObject;
       public
 
-       Name:TPACCRawByteString;
-       
+       Index:TPACCInt32;
+
+       Label_:TPACCAbstractSyntaxTreeNodeLabel;
+
        Phi:PPACCIntermediateRepresentationCodePhi;
 
        Instructions:TPACCIntermediateRepresentationCodeInstructions;
@@ -272,6 +275,36 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        destructor Destroy; override;
 
        function AddInstruction(const AInstruction:TPACCIntermediateRepresentationCodeInstruction):TPACCInt32;
+
+      published
+       property Instance:TObject read fInstance;
+     end;
+
+     TPACCIntermediateRepresentationCodeBlockList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeBlock;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeBlock);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeBlock read GetItem write SetItem; default;
+     end;
+
+     TPACCIntermediateRepresentationCode=class
+      private
+
+       fInstance:TObject;
+
+      public
+
+       Blocks:TPACCIntermediateRepresentationCodeBlockList;
+
+       BlockLabelHashMap:TPACCPointerHashMap;
+
+       StartBlock:TPACCIntermediateRepresentationCodeBlock;
+
+       constructor Create(const AInstance:TObject); reintroduce;
+       destructor Destroy; override;
 
       published
        property Instance:TObject read fInstance;
@@ -372,7 +405,9 @@ begin
  fInstance:=AInstance;
  TPACCInstance(fInstance).AllocatedObjects.Add(self);
 
- Name:='';
+ Index:=0;
+
+ Label_:=nil;
 
  Phi:=nil;
 
@@ -412,8 +447,6 @@ end;
 destructor TPACCIntermediateRepresentationCodeBlock.Destroy;
 begin
 
- Name:='';
-
  if assigned(Phi) then begin
   Finalize(Phi^);
   FreeMem(Phi);
@@ -445,8 +478,79 @@ begin
  Instructions[result]:=AInstruction;
 end;
 
-function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObject;const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration):TPACCIntermediateRepresentationCodeBlock;
- procedure ProcessNode(const ParentBlock:TPACCIntermediateRepresentationCodeBlock;const Node:TPACCAbstractSyntaxTreeNode);
+constructor TPACCIntermediateRepresentationCodeBlockList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCIntermediateRepresentationCodeBlockList.Destroy;
+begin
+ inherited Destroy;
+end;
+
+function TPACCIntermediateRepresentationCodeBlockList.GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeBlock;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCIntermediateRepresentationCodeBlockList.SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeBlock);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
+constructor TPACCIntermediateRepresentationCode.Create(const AInstance:TObject);
+begin
+ inherited Create;
+
+ fInstance:=AInstance;
+ TPACCInstance(fInstance).AllocatedObjects.Add(self);
+
+ Blocks:=TPACCIntermediateRepresentationCodeBlockList.Create;
+
+ BlockLabelHashMap:=TPACCPointerHashMap.Create;
+
+ StartBlock:=nil;
+
+end;
+
+destructor TPACCIntermediateRepresentationCode.Destroy;
+begin
+ Blocks.Free;
+ BlockLabelHashMap.Free;
+ inherited Destroy;
+end;
+
+function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObject;const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration):TPACCIntermediateRepresentationCode;
+var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
+    BlockLink,PhiLink:PPACCIntermediateRepresentationCodeBlock;
+    CodeInstance:TPACCIntermediateRepresentationCode;
+ procedure CloseBlock;
+ begin
+  BlockLink:=@CurrentBlock.Link;
+ end;
+ procedure EmitLabel(const Label_:TPACCAbstractSyntaxTreeNodeLabel);
+ var Block:TPACCIntermediateRepresentationCodeBlock;
+ begin
+  Block:=CodeInstance.BlockLabelHashMap[Label_];
+  if not assigned(Block) then begin
+   Block:=TPACCIntermediateRepresentationCodeBlock.Create(AInstance);
+   Block.Index:=CodeInstance.Blocks.Add(Block);
+   Block.Label_:=Label_;
+   CodeInstance.BlockLabelHashMap[Label_]:=Block;
+  end;
+  if assigned(CurrentBlock) and (CurrentBlock.Jump.Type_=pircjtNONE) then begin
+   CloseBlock;
+   CurrentBlock.Jump.Type_:=pircjtJMP;
+   CurrentBlock.Successors[0]:=Block;
+  end;
+  if Block.Jump.Type_<>pircjtNONE then begin
+   TPACCInstance(AInstance).AddError('Internal error 2017-01-20-14-42-0000',nil,true);
+  end;
+  BlockLink^:=Block;
+  CurrentBlock:=Block;
+  PhiLink:=@CurrentBlock.Phi;
+ end;
+ procedure ProcessNode(const Node:TPACCAbstractSyntaxTreeNode);
  var Index:TPACCInt32;
  begin
   if assigned(Node) then begin
@@ -530,7 +634,7 @@ function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObje
 
     astnkSTATEMENTS:begin
      for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(Node).Children.Count-1 do begin
-      ProcessNode(ParentBlock,TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index]);
+      ProcessNode(TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index]);
      end;
     end;
 
@@ -692,8 +796,12 @@ function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObje
   end;
  end;
 begin
- result:=TPACCIntermediateRepresentationCodeBlock.Create(AInstance);
- ProcessNode(result,AFunctionNode.Body);
+ result:=TPACCIntermediateRepresentationCode.Create(AInstance);
+ CodeInstance:=result;
+ CurrentBlock:=nil;
+ BlockLink:=@CodeInstance.StartBlock;
+ PhiLink:=nil;
+ ProcessNode(AFunctionNode.Body);
 end;
 
 procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
