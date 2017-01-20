@@ -528,16 +528,20 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
  begin
   BlockLink:=@CurrentBlock.Link;
  end;
+ function FindBlock(const Label_:TPACCAbstractSyntaxTreeNodeLabel):TPACCIntermediateRepresentationCodeBlock;
+ begin
+  result:=CodeInstance.BlockLabelHashMap[Label_];
+  if not assigned(result) then begin
+   result:=TPACCIntermediateRepresentationCodeBlock.Create(AInstance);
+   result.Index:=CodeInstance.Blocks.Add(result);
+   result.Label_:=Label_;
+   CodeInstance.BlockLabelHashMap[Label_]:=result;
+  end;
+ end;
  procedure EmitLabel(const Label_:TPACCAbstractSyntaxTreeNodeLabel);
  var Block:TPACCIntermediateRepresentationCodeBlock;
  begin
-  Block:=CodeInstance.BlockLabelHashMap[Label_];
-  if not assigned(Block) then begin
-   Block:=TPACCIntermediateRepresentationCodeBlock.Create(AInstance);
-   Block.Index:=CodeInstance.Blocks.Add(Block);
-   Block.Label_:=Label_;
-   CodeInstance.BlockLabelHashMap[Label_]:=Block;
-  end;
+  Block:=FindBlock(Label_);
   if assigned(CurrentBlock) and (CurrentBlock.Jump.Type_=pircjtNONE) then begin
    CloseBlock;
    CurrentBlock.Jump.Type_:=pircjtJMP;
