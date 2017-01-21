@@ -569,9 +569,19 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
     end;
 
     astnkLVAR:begin
+     if assigned(OutputResultReference) and (OutputResultReference^.Kind=pircrkNONE) then begin
+      OutputResultReference^:=GetVariableReference(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node));
+     end else begin
+      TPACCInstance(AInstance).AddError('Internal error 2017-01-21-14-03-0000',nil,true);
+     end;
     end;
 
     astnkGVAR:begin
+     if assigned(OutputResultReference) and (OutputResultReference^.Kind=pircrkNONE) then begin
+      OutputResultReference^:=GetVariableReference(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node));
+     end else begin
+      TPACCInstance(AInstance).AddError('Internal error 2017-01-21-14-04-0000',nil,true);
+     end;
     end;
 
     astnkTYPEDEF:begin
@@ -605,17 +615,22 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
     end;
 
     astnkCONV:begin
-     AllocateReference(ReferenceA);
-     try
-      if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) and
-         assigned(OutputResultReference) then begin
+     if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) and
+        assigned(OutputResultReference) then begin
+      AllocateReference(ReferenceA);
+      try
+       ReferenceA^.Kind:=pircrkNONE;
        ProcessNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,ReferenceA);
-       EmitInstruction(pircoCONV,OutputResultReference^,ReferenceA^);
-      end else begin
-       TPACCInstance(AInstance).AddError('Internal error 2017-01-21-12-45-0000',nil,true);
+       if ReferenceA^.Kind=pircrkNONE then begin
+        TPACCInstance(AInstance).AddError('Internal error 2017-01-21-13-58-0000',nil,true);
+       end else begin
+        EmitInstruction(pircoCONV,OutputResultReference^,ReferenceA^);
+       end;
+      finally
+       FreeReference(ReferenceA);
       end;
-     finally
-      FreeReference(ReferenceA);
+     end else begin
+      TPACCInstance(AInstance).AddError('Internal error 2017-01-21-12-45-0000',nil,true);
      end;
     end;
 
@@ -733,6 +748,28 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
     end;
 
     astnkOP_ADD:begin
+     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
+        assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) and
+        assigned(OutputResultReference) then begin
+      AllocateReference(ReferenceA);
+      AllocateReference(ReferenceB);
+      try
+       ReferenceA^.Kind:=pircrkNONE;
+       ReferenceB^.Kind:=pircrkNONE;
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,ReferenceA);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,ReferenceB);
+       if ReferenceA^.Kind=pircrkNONE then begin
+        TPACCInstance(AInstance).AddError('Internal error 2017-01-21-14-01-0000',nil,true);
+       end else begin
+        EmitInstruction(pircoADD,OutputResultReference^,ReferenceA^,ReferenceB^);
+       end;
+      finally
+       FreeReference(ReferenceA);
+       FreeReference(ReferenceB);
+      end;
+     end else begin
+      TPACCInstance(AInstance).AddError('Internal error 2017-01-21-14-01-0001',nil,true);
+     end;
     end;
 
     astnkOP_SUB:begin
