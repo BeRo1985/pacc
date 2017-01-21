@@ -58,6 +58,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        pircoCONV,
        pircoADDR,
+       pircoDEREF,
 
        pircoSWAP,
        pircoSIGN,
@@ -70,10 +71,10 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      TPACCIntermediateRepresentationCodeReferenceKind=
       (
        pircrkNONE,
+       pircrkCONSTANT,
+       pircrkTEMPORARY,
        pircrkVARIABLE,
        pircrkLABEL,
-       pircrkMEMORY,
-       pircrkCONSTANT,
        pircrkREGISTER,
        pircrkSTACKSLOT,
        pircrkCOUNT
@@ -85,12 +86,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       case Kind:TPACCIntermediateRepresentationCodeReferenceKind of
        pircrkNONE:(
        );
-       pircrkVARIABLE:(
-        Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
-       );
-       pircrkLABEL:(
-        Label_:TPACCAbstractSyntaxTreeNodeLabel;
-       );
        pircrkCONSTANT:(
         case boolean of
          false:(
@@ -100,6 +95,15 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
           ValueFloat:TPACCDouble;
          );
        );
+       pircrkTEMPORARY:(
+        TemporaryIndex:TPACCInt32;
+       );
+       pircrkVARIABLE:(
+        Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+       );
+       pircrkLABEL:(
+        Label_:TPACCAbstractSyntaxTreeNodeLabel;
+       );
        pircrkREGISTER:(
         RegisterIndex:TPACCInt32;
        );
@@ -108,17 +112,12 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        );
      end;
 
-     PPACCIntermediateRepresentationCodeClass=^TPACCIntermediateRepresentationCodeClass;
-     TPACCIntermediateRepresentationCodeClass=
-      (
-       pirccNONE,
-       pirccI8,
-       pirccI16,
-       pirccI32,
-       pirccI64,
-       pirccF32,
-       pirccF64
-      );
+     PPACCIntermediateRepresentationCodeTemporary=^TPACCIntermediateRepresentationCodeTemporary;
+     TPACCIntermediateRepresentationCodeTemporary=record
+      Type_:PPACCType;
+     end;
+
+     TPACCIntermediateRepresentationCodeTemporaries=array of TPACCIntermediateRepresentationCodeTemporary;
 
      PPACCIntermediateRepresentationCodeInstruction=^TPACCIntermediateRepresentationCodeInstruction;
      TPACCIntermediateRepresentationCodeInstruction={$ifdef HAS_ADVANCED_RECORDS}record{$else}object{$endif}
@@ -185,7 +184,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Phi:PPACCIntermediateRepresentationCodePhi;
 
        Instructions:TPACCIntermediateRepresentationCodeInstructions;
-       CountInstructions:TPACCINt32;
+       CountInstructions:TPACCInt32;
 
        Jump:TPACCIntermediateRepresentationCodeJump;
 
@@ -245,12 +244,18 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        StartBlock:TPACCIntermediateRepresentationCodeBlock;
 
+       Temporaries:TPACCIntermediateRepresentationCodeTemporaries;
+       CountTemporaries:TPACCInt32;
+
        TemporaryReferenceCounter:TPACCUInt32;
 
        VariableTemporaryReferenceHashMap:TPACCPointerHashMap;
 
        constructor Create(const AInstance:TObject); reintroduce;
        destructor Destroy; override;
+
+       function RequestTemporary(const Type_:PPACCType):TPACCInt32;
+       function RequestTemporaryReference(const Type_:PPACCType):TPACCIntermediateRepresentationCodeReference;
 
       published
        property Instance:TObject read fInstance;
@@ -407,6 +412,9 @@ begin
 
  StartBlock:=nil;
 
+ Temporaries:=nil;
+ CountTemporaries:=0;
+
  TemporaryReferenceCounter:=0;
 
  VariableTemporaryReferenceHashMap:=TPACCPointerHashMap.Create;
@@ -418,7 +426,27 @@ begin
  Blocks.Free;
  BlockLabelHashMap.Free;
  VariableTemporaryReferenceHashMap.Free;
+ Temporaries:=nil;
  inherited Destroy;
+end;
+
+function TPACCIntermediateRepresentationCode.RequestTemporary(const Type_:PPACCType):TPACCInt32;
+var Temporary:PPACCIntermediateRepresentationCodeTemporary;
+begin
+ result:=CountTemporaries;
+ inc(CountTemporaries);
+ if length(Temporaries)<CountTemporaries then begin
+  SetLength(Temporaries,CountTemporaries*2);
+ end;
+ Temporary:=@Temporaries[result];
+ Temporary^.Type_:=Type_;
+end;
+
+function TPACCIntermediateRepresentationCode.RequestTemporaryReference(const Type_:PPACCType):TPACCIntermediateRepresentationCodeReference;
+begin
+ result.Kind:=pircrkTEMPORARY;
+ result.Type_:=Type_;
+ result.TemporaryIndex:=RequestTemporary(Type_);
 end;
 
 function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObject;const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration):TPACCIntermediateRepresentationCode;
@@ -557,7 +585,17 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
   begin
    if assigned(OutputResultReference) then begin
     if OutputResultReference^.Kind=pircrkNONE then begin
-     OutputResultReference^:=CreateTemporaryVariableReference(Type_);
+     OutputResultReference^:=CodeInstance.RequestTemporaryReference(Type_);
+    end;
+   end else begin
+    TPACCInstance(AInstance).AddError('Internal error 2017-01-21-14-36-0000',nil,true);
+   end;
+  end;
+  procedure PrepareResultDereference(const Type_:PPACCType);
+  begin
+   if assigned(OutputResultReference) then begin
+    if OutputResultReference^.Kind=pircrkNONE then begin
+//     OutputResultReference^.Kind:=
     end;
    end else begin
     TPACCInstance(AInstance).AddError('Internal error 2017-01-21-14-36-0000',nil,true);
@@ -569,6 +607,26 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
            (OutputResultReference^.Kind<>pircrkNONE) and
            TPACCInstance(AInstance).AreTypesEqual(OutputResultReference^.Type_,Type_)) then begin
     TPACCInstance(AInstance).AddError('Internal error 2017-01-21-14-40-0000',nil,true);
+   end;
+  end;
+  procedure ProcessLValueNode(const Node:TPACCAbstractSyntaxTreeNode;const OutputResultReference:PPACCIntermediateRepresentationCodeReference);
+  begin
+   case Node.KInd of
+    astnkLVAR,
+    astnkGVAR:begin
+     if assigned(OutputResultReference) and (OutputResultReference^.Kind=pircrkNONE) then begin
+      OutputResultReference^:=GetVariableReference(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node));
+     end else begin
+      TPACCInstance(AInstance).AddError('Internal error 2017-01-21-14-04-0000',nil,true);
+     end;
+    end;
+    astnkDEREF:begin
+    end;
+    astnkSTRUCT_REF:begin
+    end;
+    else begin
+     TPACCInstance(AInstance).AddError('Internal error 2017-01-21-18-39-0000',nil,true);
+    end;
    end;
   end;
  begin
@@ -706,9 +764,13 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
        if ReferenceA^.Kind=pircrkNONE then begin
         TPACCInstance(AInstance).AddError('Internal error 2017-01-21-15-11-0000',nil,true);
        end else begin
-        PrepareResultReference(Node.Type_);
-        EmitInstruction(pircoASSIGN,OutputResultReference^,ReferenceA^);
-        CheckResultReference(Node.Type_);
+        if Node.Type_.Kind=tkPOINTER then begin
+         PrepareResultDereference(Node.Type_^.ChildType);
+         EmitInstruction(pircoDEREF,OutputResultReference^,ReferenceA^);
+         CheckResultReference(Node.Type_^.ChildType);
+        end else begin
+         TPACCInstance(AInstance).AddError('Internal error 2017-01-21-18-06-0000',nil,true);
+        end;
        end;
       finally
        FreeReference(ReferenceA);
