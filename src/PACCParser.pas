@@ -917,7 +917,7 @@ var CurrentState:TState;
      TOK_ARROW:begin
       if result.Type_^.Kind<>tKPOINTER then begin
        AddError('Pointer type expected',nil,false);
-      end;
+      end;                                                                                                       
       result:=ParseStructField(TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkDEREF,result.Type_^.ChildType,CurrentState.Token^.SourceLocation,result));
       NextToken;
       continue;

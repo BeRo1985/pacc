@@ -489,8 +489,6 @@ var FunctionUsedVariablesHashMap:TPACCPointerHashMap;
      end;
      Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
     end;
-    astnkOP_SIZEOF:begin
-    end;
     astnkOP_CAST:begin
      Scan(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand);
     end;

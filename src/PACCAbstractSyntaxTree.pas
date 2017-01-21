@@ -47,7 +47,6 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
       astnkOP_COMMA,
       astnkOP_ARROW,
       astnkOP_ASSIGN,
-      astnkOP_SIZEOF,
       astnkOP_CAST,
       astnkOP_NOT,
       astnkOP_NEG,

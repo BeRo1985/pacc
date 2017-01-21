@@ -375,8 +375,6 @@ begin
      result:=false;
     end;
    end;
-   astnkOP_SIZEOF:begin
-   end;
    astnkOP_CAST:begin
     if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) then begin
      result:=false;
@@ -1301,8 +1299,6 @@ begin
     if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
      result:=true;
     end;
-   end;
-   astnkOP_SIZEOF:begin
    end;
    astnkOP_CAST:begin
     if OptimizeNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) then begin
