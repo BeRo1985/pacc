@@ -66,8 +66,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircoCASTDL, // Bitwise cast from double to long
        pircoCASTLD, // Bitwise cast from long to double
 
-       pircoADDRI, // Address-from to int (on 32-bit targets)
-       pircoADDRL, // Address-from to long (on 64-bit targets)
+       pircoADDROFI, // Address-of to int (on 32-bit targets)
+       pircoADDROFL, // Address-of to long (on 64-bit targets)
 
        pircoZECI, // Zero extend from char to int
        pircoZESI, // Zero extend from short to int
@@ -288,12 +288,59 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
      TPACCIntermediateRepresentationCodeTemporaries=array of TPACCIntermediateRepresentationCodeTemporary;
 
+     PPACCIntermediateRepresentationCodeOperandFlag=^TPACCIntermediateRepresentationCodeOperandFlag;
+     TPACCIntermediateRepresentationCodeOperandFlag=
+      (
+       pircofMEMORY
+     );
+
+     PPACCIntermediateRepresentationCodeOperandFlags=^TPACCIntermediateRepresentationCodeOperandFlags;
+     TPACCIntermediateRepresentationCodeOperandFlags=set of TPACCIntermediateRepresentationCodeOperandFlag;
+
+     PPACCIntermediateRepresentationCodeOperandKind=^TPACCIntermediateRepresentationCodeOperandKind;
+     TPACCIntermediateRepresentationCodeOperandKind=
+      (
+       pircokNONE,
+       pircokTEMPORARY,
+       pircokINTEGER,
+       pircokFLOAT,
+       pircokVARIABLE,
+       pircokLABEL,
+       pircokCOUNT
+     );
+
+     PPACCIntermediateRepresentationCodeOperand=^TPACCIntermediateRepresentationCodeOperand;
+     TPACCIntermediateRepresentationCodeOperand=record
+      Flags:TPACCIntermediateRepresentationCodeOperandFlags;
+      case Kind:TPACCIntermediateRepresentationCodeOperandKind of
+       pircokNONE:(
+       );
+       pircokTEMPORARY:(
+        Temporary:TPACCInt32;
+       );
+       pircokINTEGER:(
+        IntegerValue:TPACCInt64;
+       );
+       pircokFLOAT:(
+        FloatValue:TPACCDouble;
+       );
+       pircokVARIABLE:(
+        Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+       );
+       pircokLABEL:(
+        Label_:TPACCAbstractSyntaxTreeNodeLabel;
+       );
+       pircokCOUNT:(
+       );
+     end;
+
+     TPACCIntermediateRepresentationCodeOperands=array of TPACCIntermediateRepresentationCodeOperand;
+
      PPACCIntermediateRepresentationCodeInstruction=^TPACCIntermediateRepresentationCodeInstruction;
      TPACCIntermediateRepresentationCodeInstruction={$ifdef HAS_ADVANCED_RECORDS}record{$else}object{$endif}
       public
        Opcode:TPACCIntermediateRepresentationCodeOpcode;
-       To_:TPACCIntermediateRepresentationCodeReference;
-       Arguments:array[0..1] of TPACCIntermediateRepresentationCodeReference;
+       Operands:TPACCIntermediateRepresentationCodeOperands;
      end;
 
      TPACCIntermediateRepresentationCodeInstructions=array of TPACCIntermediateRepresentationCodeInstruction;
@@ -301,7 +348,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      PPACCIntermediateRepresentationCodeJump=^TPACCIntermediateRepresentationCodeJump;
      TPACCIntermediateRepresentationCodeJump=record
       Kind:TPACCIntermediateRepresentationCodeJumpKind;
-      Argument:TPACCIntermediateRepresentationCodeReference;
+      Operand:TPACCIntermediateRepresentationCodeOperand;
      end;
 
      PPACCIntermediateRepresentationCodeBlock=^TPACCIntermediateRepresentationCodeBlock;
@@ -720,76 +767,24 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
     EmitLabel(NewHiddenLabel);
    end;
   end;
-  procedure EmitInstruction(const AInstruction:TPACCIntermediateRepresentationCodeInstruction); overload;
-  begin
-   CreateNewBlockIfNeeded;
-   CurrentBlock.AddInstruction(AInstruction);
-  end;
-  procedure EmitInstruction0(const AOpcode:TPACCIntermediateRepresentationCodeOpcode); overload;
-  var Instruction:TPACCIntermediateRepresentationCodeInstruction;
-  begin
-   Instruction.Opcode:=AOpcode;
-   Instruction.To_.Kind:=pircrkNONE;
-   Instruction.Arguments[0].Kind:=pircrkNONE;
-   Instruction.Arguments[1].Kind:=pircrkNONE;
-   EmitInstruction(Instruction);
-  end;
-  procedure EmitInstruction1(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const ATo_:TPACCIntermediateRepresentationCodeReference); overload;
-  var Instruction:TPACCIntermediateRepresentationCodeInstruction;
-  begin
-   Instruction.Opcode:=AOpcode;
-   Instruction.To_:=ATo_;
-   Instruction.Arguments[0].Kind:=pircrkNONE;
-   Instruction.Arguments[1].Kind:=pircrkNONE;
-   EmitInstruction(Instruction);
-  end;
-  procedure EmitInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const ATo_,AArgument:TPACCIntermediateRepresentationCodeReference); overload;
-  var Instruction:TPACCIntermediateRepresentationCodeInstruction;
-  begin
-   Instruction.Opcode:=AOpcode;
-   Instruction.To_:=ATo_;
-   Instruction.Arguments[0]:=AArgument;
-   Instruction.Arguments[1].Kind:=pircrkNONE;
-   EmitInstruction(Instruction);
-  end;
-  procedure EmitInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const ATo_,AArgument,AOtherArgument:TPACCIntermediateRepresentationCodeReference); overload;
-  var Instruction:TPACCIntermediateRepresentationCodeInstruction;
-  begin
-   Instruction.Opcode:=AOpcode;
-   Instruction.To_:=ATo_;
-   Instruction.Arguments[0]:=AArgument;
-   Instruction.Arguments[1]:=AOtherArgument;
-   EmitInstruction(Instruction);
-  end;
-  procedure ProcessNode(const Node:TPACCAbstractSyntaxTreeNode;const OutputResultReference:PPACCIntermediateRepresentationCodeReference;const ValueKind:TValueKind);
+  procedure EmitInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AOperands:array of TPACCIntermediateRepresentationCodeOperand); overload;
   var Index:TPACCInt32;
+      Instruction:TPACCIntermediateRepresentationCodeInstruction;
+  begin
+   Instruction.Opcode:=AOpcode;
+   Instruction.Operands:=nil;
+   if length(AOperands)>0 then begin
+    SetLength(Instruction.Operands,length(AOperands));
+    for Index:=0 to length(AOperands)-1 do begin
+     Instruction.Operands[Index]:=AOperands[Index];
+    end;
+   end;
+   CreateNewBlockIfNeeded;
+   CurrentBlock.AddInstruction(Instruction);
+  end;
+  procedure ProcessNode(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const ValueKind:TValueKind);
+  var Index,TemporaryA,TemporaryB,TemporaryC:TPACCInt32;
       Opcode:TPACCIntermediateRepresentationCodeOpcode;
-      ReferenceA,ReferenceB,ReferenceC:PPACCIntermediateRepresentationCodeReference;
-   function AllocateReference(var Reference:PPACCIntermediateRepresentationCodeReference):PPACCIntermediateRepresentationCodeReference;
-   begin
-    if not assigned(Reference) then begin
-     GetMem(Reference,SizeOf(TPACCIntermediateRepresentationCodeReference));
-     FillChar(Reference^,SizeOf(TPACCIntermediateRepresentationCodeReference),#0);
-    end;
-    result:=Reference;
-    result^.Kind:=pircrkNONE;
-   end;
-   procedure FreeReference(var Reference:PPACCIntermediateRepresentationCodeReference);
-   begin
-    if assigned(Reference) then begin
-     Finalize(Reference^);
-     FreeMem(Reference,SizeOf(TPACCIntermediateRepresentationCodeReference));
-     Reference:=nil;
-    end;
-   end;
-   procedure CheckResultReference(const Type_:PPACCType);
-   begin
-    if not (assigned(OutputResultReference) and
-            (OutputResultReference^.Kind<>pircrkNONE) and
-            TPACCInstance(AInstance).AreTypesEqual(OutputResultReference^.Type_,Type_)) then begin
-     TPACCInstance(AInstance).AddError('Internal error 2017-01-21-14-40-0000',nil,true);
-    end;
-   end;
    procedure ProcessLValueNode(const Node:TPACCAbstractSyntaxTreeNode;const OutputResultReference:PPACCIntermediateRepresentationCodeReference);
    begin
     case Node.KInd of
@@ -812,10 +807,6 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
    end;
   begin
    if assigned(Node) then begin
-
-    ReferenceA:=nil;
-    ReferenceB:=nil;
-    ReferenceC:=nil;
 
  // writeln(TypInfo.GetEnumName(TypeInfo(TPACCAbstractSyntaxTreeNodeKind),TPACCInt32(Node.Kind)));
 
@@ -1034,27 +1025,78 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
      end;
 
      astnkRETURN:begin
-      AllocateReference(ReferenceA);
-      try
-       ReferenceA^.Kind:=pircrkNONE;
+      if assigned(AFunctionNode.Type_) and
+         assigned(AFunctionNode.Type_^.ReturnType) then begin
+       TemporaryA:=-1;
        if assigned(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node).ReturnValue) then begin
-        ProcessNode(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node).ReturnValue,ReferenceA,vkRVALUE);
+        ProcessNode(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node).ReturnValue,TemporaryA,vkRVALUE);
+        if TemporaryA<0 then begin
+         TPACCInstance(AInstance).AddError('Internal error 2017-01-22-14-51-0000',@Node.SourceLocation,true);
+        end;
+       end else begin
+        TPACCInstance(AInstance).AddError('Internal error 2017-01-22-14-48-0000',@Node.SourceLocation,true);
        end;
        if CurrentBlock.Jump.Kind=pircjkNONE then begin
-        CurrentBlock.Jump.Kind:=pircjkRET;
-        CurrentBlock.Jump.Argument:=ReferenceA^;
+        case AFunctionNode.Type_^.ReturnType^.Kind of
+         tkBOOL,tkCHAR,tkSHORT,tkINT:begin
+          CurrentBlock.Jump.Kind:=pircjkRETI;
+         end;
+         tkLONG,tkLLONG:begin
+          CurrentBlock.Jump.Kind:=pircjkRETL;
+         end;
+         tkFLOAT:begin
+          CurrentBlock.Jump.Kind:=pircjkRETF;
+         end;
+         tkDOUBLE,tkLDOUBLE:begin
+          CurrentBlock.Jump.Kind:=pircjkRETD;
+         end;
+         tkPOINTER:begin
+          if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong then begin
+           CurrentBlock.Jump.Kind:=pircjkRETL;
+          end else begin
+           CurrentBlock.Jump.Kind:=pircjkRETI;
+          end;
+         end;
+         else begin
+          TPACCInstance(AInstance).AddError('Internal error 2017-01-22-14-44-0000',@Node.SourceLocation,true);
+         end;
+        end;
+        if TemporaryA>=0 then begin
+         CurrentBlock.Jump.Operand.Kind:=pircokTEMPORARY;
+         CurrentBlock.Jump.Operand.Temporary:=TemporaryA;
+        end else begin
+         case AFunctionNode.Type_^.ReturnType^.Kind of
+          tkBOOL,tkCHAR,tkSHORT,tkINT,tkLONG,tkLLONG,tkPOINTER:begin
+           CurrentBlock.Jump.Operand.Kind:=pircokINTEGER;
+           CurrentBlock.Jump.Operand.IntegerValue:=0;
+          end;
+          tkFLOAT,tkDOUBLE,tkLDOUBLE:begin
+           CurrentBlock.Jump.Operand.Kind:=pircokFLOAT;
+           CurrentBlock.Jump.Operand.FloatValue:=0;
+          end;
+          else begin
+           TPACCInstance(AInstance).AddError('Internal error 2017-01-22-14-50-0000',@Node.SourceLocation,true);
+          end;
+         end;
+        end;
         CloseBlock;
        end else begin
-        TPACCInstance(AInstance).AddError('Internal error 2017-01-21-13-54-0000',nil,true);
+        TPACCInstance(AInstance).AddError('Internal error 2017-01-21-13-54-0000',@Node.SourceLocation,true);
        end;
-      finally
-       FreeReference(ReferenceA);
+      end else begin
+       if CurrentBlock.Jump.Kind=pircjkNONE then begin
+        CurrentBlock.Jump.Kind:=pircjkRET;
+        CloseBlock;
+       end else begin
+        TPACCInstance(AInstance).AddError('Internal error 2017-01-21-13-54-0000',@Node.SourceLocation,true);
+       end;
       end;
      end;
 
      astnkSTATEMENTS:begin
       for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(Node).Children.Count-1 do begin
-       ProcessNode(TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index],nil,vkNONE);
+       TemporaryA:=-1;
+       ProcessNode(TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index],TemporaryA,vkNONE);
       end;
      end;
 
@@ -1087,14 +1129,9 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
      astnkOP_COMMA:begin
       if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
          assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-       AllocateReference(ReferenceA);
-       try
-        ReferenceA^.Kind:=pircrkNONE;
-        ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,ReferenceA,ValueKind);
-        ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,OutputResultReference,ValueKind);
-       finally
-        FreeReference(ReferenceA);
-       end;
+       TemporaryA:=-1;
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,ValueKind);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,OutputTemporary,ValueKind);
       end else begin
        TPACCInstance(AInstance).AddError('Internal error 2017-01-21-15-08-0000',nil,true);
       end;
@@ -1316,6 +1353,7 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
      LocalVariable:TPACCAbstractSyntaxTreeNodeLocaLGlobalVariable;
      Reference:TPACCIntermediateRepresentationCodeReference;
      ReferenceValue:TPACCIntermediateRepresentationCodeReference;}
+ var IgnoredTemporary:TPACCInt32;
  begin
 
   result:=TPACCIntermediateRepresentationCodeFunction.Create(AInstance);
@@ -1352,7 +1390,7 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
 
   end;}
 
-  ProcessNode(AFunctionNode.Body,nil,vkNONE);
+  ProcessNode(AFunctionNode.Body,IgnoredTemporary,vkNONE);
 
   if CurrentBlock.Jump.Kind=pircjkNONE then begin
    CurrentBlock.Jump.Kind:=pircjkRET;
