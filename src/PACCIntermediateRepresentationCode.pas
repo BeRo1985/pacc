@@ -3,8 +3,7 @@ unit PACCIntermediateRepresentationCode;
 
 interface
 
-uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCPointerHashMap,PACCAbstractSyntaxTree,
-     TypInfo;
+uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCPointerHashMap,PACCAbstractSyntaxTree;
 
 type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationCodeOpcode;
      TPACCIntermediateRepresentationCodeOpcode=
@@ -67,6 +66,16 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        picroCOUNT
       );
 
+     PPACCIntermediateRepresentationCodeClass=^TPACCIntermediateRepresentationCodeClass;
+     TPACCIntermediateRepresentationCodeClass=
+      (
+       pirccTOP,
+       pirccINT,
+       pirccLONG,
+       pirccFLOAT,
+       pirccDOUBLE
+      );
+
      PPACCIntermediateRepresentationCodeReferenceKind=^TPACCIntermediateRepresentationCodeReferenceKind;
      TPACCIntermediateRepresentationCodeReferenceKind=
       (
@@ -123,6 +132,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      TPACCIntermediateRepresentationCodeInstruction={$ifdef HAS_ADVANCED_RECORDS}record{$else}object{$endif}
       public
        Opcode:TPACCIntermediateRepresentationCodeOpcode;
+       Class_:TPACCIntermediateRepresentationCodeClass;
        To_:TPACCIntermediateRepresentationCodeReference;
        Arguments:array[0..1] of TPACCIntermediateRepresentationCodeReference;
      end;
@@ -156,6 +166,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       Arguments:array of TPACCIntermediateRepresentationCodeReference;
       Blocks:array of TPACCIntermediateRepresentationCodeBlock;
       CountArguments:TPACCInt32;
+      Class_:TPACCIntermediateRepresentationCodeClass;
       Type_:PPACCType;
       Link:PPACCIntermediateRepresentationCodePhi;
      end;
@@ -263,9 +274,20 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
 procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
 
+function TypeToClass(const Type_:PPACCType):TPACCIntermediateRepresentationCodeClass;
+
 implementation
 
 uses PACCInstance;
+
+function TypeToClass(const Type_:PPACCType):TPACCIntermediateRepresentationCodeClass;
+begin
+ case Type_^.Kind of
+  tkCHAR,
+  tkSHORT:begin
+  end;
+ end;
+end;
 
 function TPACCIntermediateRepresentationCodeBitSet.GetBit(const AIndex:TPACCInt32):boolean;
 begin
@@ -450,6 +472,13 @@ begin
 end;
 
 function GenerateIntermediateRepresentationCodeForFunction(const AInstance:TObject;const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration):TPACCIntermediateRepresentationCode;
+type PValueKind=^TValueKind;
+     TValueKind=
+      (
+       vkNONE,
+       vkLVALUE,
+       vkRVALUE
+      );
 var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
     BlockLink,PhiLink:PPACCIntermediateRepresentationCodeBlock;
     CodeInstance:TPACCIntermediateRepresentationCode;
@@ -560,7 +589,7 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
   Instruction.Arguments[1]:=AOtherArgument;
   EmitInstruction(Instruction);
  end;
- procedure ProcessNode(const Node:TPACCAbstractSyntaxTreeNode;const OutputResultReference:PPACCIntermediateRepresentationCodeReference);
+ procedure ProcessNode(const Node:TPACCAbstractSyntaxTreeNode;const OutputResultReference:PPACCIntermediateRepresentationCodeReference;const ValueKind:TValueKind);
  var Index:TPACCInt32;
      Opcode:TPACCIntermediateRepresentationCodeOpcode;
      ReferenceA,ReferenceB,ReferenceC:PPACCIntermediateRepresentationCodeReference;
@@ -641,7 +670,7 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
    case Node.Kind of
 
     astnkINTEGER:begin
-     if assigned(OutputResultReference) then begin
+     if assigned(OutputResultReference) and (ValueKind=vkRVALUE) then begin
       AllocateReference(ReferenceA);
       try
        ReferenceA^.Kind:=pircrkCONSTANT;
@@ -659,7 +688,7 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
     end;
 
     astnkFLOAT:begin
-     if assigned(OutputResultReference) then begin
+     if assigned(OutputResultReference) and (ValueKind=vkRVALUE) then begin
       AllocateReference(ReferenceA);
       try
        ReferenceA^.Kind:=pircrkCONSTANT;
@@ -683,7 +712,17 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
     astnkLVAR,
     astnkGVAR:begin
      if assigned(OutputResultReference) and (OutputResultReference^.Kind=pircrkNONE) then begin
-      OutputResultReference^:=GetVariableReference(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node));
+      case ValueKind of
+       vkLVALUE:begin
+        OutputResultReference^:=GetVariableReference(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node));
+       end;
+       vkRVALUE:begin
+        OutputResultReference^:=GetVariableReference(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node));
+       end;
+       else begin
+        TPACCInstance(AInstance).AddError('Internal error 2017-01-22-09-38-0000',nil,true);
+       end;
+      end;
      end else begin
       TPACCInstance(AInstance).AddError('Internal error 2017-01-21-14-04-0000',nil,true);
      end;
@@ -719,29 +758,17 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
     astnkINIT:begin
     end;
 
-    astnkCONV,
-    astnkADDR:begin
+    astnkCONV:begin
      if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) and
         assigned(OutputResultReference) then begin
       AllocateReference(ReferenceA);
       try
        ReferenceA^.Kind:=pircrkNONE;
-       ProcessNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,ReferenceA);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,ReferenceA,ValueKind);
        if ReferenceA^.Kind=pircrkNONE then begin
         TPACCInstance(AInstance).AddError('Internal error 2017-01-21-13-58-0000',nil,true);
        end else begin
-        case Node.Kind of
-         astnkCONV:begin
-          Opcode:=pircoCONV;
-         end;
-         astnkADDR:begin
-          Opcode:=pircoADDR;
-         end;
-         else begin
-          Opcode:=pircoNONE;
-          TPACCInstance(AInstance).AddError('Internal error 2017-01-21-14-57-0000',nil,true);
-         end;
-        end;
+        Opcode:=pircoCONV;
         PrepareResultReference(Node.Type_);
         EmitInstruction(Opcode,OutputResultReference^,ReferenceA^);
         CheckResultReference(Node.Type_);
@@ -754,13 +781,36 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
      end;
     end;
 
+    astnkADDR:begin
+     if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) and
+        assigned(OutputResultReference) then begin
+      AllocateReference(ReferenceA);
+      try
+       ReferenceA^.Kind:=pircrkNONE;
+       ProcessNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,ReferenceA,vkLVALUE);
+       if ReferenceA^.Kind=pircrkNONE then begin
+        TPACCInstance(AInstance).AddError('Internal error 2017-01-22-09-33-0000',nil,true);
+       end else begin
+        Opcode:=pircoADDR;
+        PrepareResultReference(Node.Type_);
+        EmitInstruction(Opcode,OutputResultReference^,ReferenceA^);
+        CheckResultReference(Node.Type_);
+       end;
+      finally
+       FreeReference(ReferenceA);
+      end;
+     end else begin
+      TPACCInstance(AInstance).AddError('Internal error 2017-01-22-09-33-0002',nil,true);
+     end;
+    end;
+
     astnkDEREF:begin
      if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) and
         assigned(OutputResultReference) then begin
       AllocateReference(ReferenceA);
       try
        ReferenceA^.Kind:=pircrkNONE;
-       ProcessNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,ReferenceA);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,ReferenceA,vkLVALUE);
        if ReferenceA^.Kind=pircrkNONE then begin
         TPACCInstance(AInstance).AddError('Internal error 2017-01-21-15-11-0000',nil,true);
        end else begin
@@ -803,7 +853,7 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
      try
       ReferenceA^.Kind:=pircrkNONE;
       if assigned(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node).ReturnValue) then begin
-       ProcessNode(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node).ReturnValue,ReferenceA);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node).ReturnValue,ReferenceA,vkRVALUE);
       end;
       if CurrentBlock.Jump.Kind=pircjkNONE then begin
        CurrentBlock.Jump.Kind:=pircjkRET;
@@ -819,7 +869,7 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
 
     astnkSTATEMENTS:begin
      for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(Node).Children.Count-1 do begin
-      ProcessNode(TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index],nil);
+      ProcessNode(TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index],nil,vkNONE);
      end;
     end;
 
@@ -855,8 +905,8 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
       AllocateReference(ReferenceA);
       try
        ReferenceA^.Kind:=pircrkNONE;
-       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,ReferenceA);
-       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,OutputResultReference);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,ReferenceA,ValueKind);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,OutputResultReference,ValueKind);
       finally
        FreeReference(ReferenceA);
       end;
@@ -893,7 +943,7 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
        ReferenceA^.Kind:=pircrkNONE;
        ReferenceB^.Kind:=pircrkCONSTANT;
        ReferenceB^.ValueInteger:=1;
-       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,ReferenceA);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,ReferenceA,vkLVALUE);
        if ReferenceA^.Kind=pircrkNONE then begin
         TPACCInstance(AInstance).AddError('Internal error 2017-01-21-15-01-0000',nil,true);
        end else begin
@@ -952,8 +1002,8 @@ var CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
       try
        ReferenceA^.Kind:=pircrkNONE;
        ReferenceB^.Kind:=pircrkNONE;
-       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,ReferenceA);
-       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,ReferenceB);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,ReferenceA,vkRVALUE);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,ReferenceB,vkRVALUE);
        if (ReferenceA^.Kind=pircrkNONE) or
           (ReferenceB^.Kind=pircrkNONE) then begin
         TPACCInstance(AInstance).AddError('Internal error 2017-01-21-14-01-0000',nil,true);
@@ -1111,7 +1161,7 @@ begin
 
  end;}
 
- ProcessNode(AFunctionNode.Body,nil);
+ ProcessNode(AFunctionNode.Body,nil,vkNONE);
 
  if CurrentBlock.Jump.Kind=pircjkNONE then begin
   CurrentBlock.Jump.Kind:=pircjkRET;
