@@ -1361,6 +1361,7 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
 var Index:TPACCInt32;
     RootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNodeTranslationUnit;
     Node:TPACCAbstractSyntaxTreeNode;
+    Function_:TPACCIntermediateRepresentationCodeFunction;
 begin
  if assigned(ARootAbstractSyntaxTreeNode) and
     (TPACCAbstractSyntaxTreeNode(ARootAbstractSyntaxTreeNode).Kind=astnkTRANSLATIONUNIT) and
@@ -1373,7 +1374,10 @@ begin
      astnkDECL:begin
      end;
      astnkFUNC:begin
-      GenerateIntermediateRepresentationCodeForFunction(AInstance,TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node));
+      Function_:=GenerateIntermediateRepresentationCodeForFunction(AInstance,TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node));
+      if assigned(Function_) then begin
+       TPACCInstance(AInstance).IntermediateRepresentationCode.Functions.Add(Function_);
+      end;
      end;
     end;
    end;
