@@ -424,6 +424,36 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Instance:TObject read fInstance;
      end;
 
+     TPACCIntermediateRepresentationCodeFunctionList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeFunction;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeFunction);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeFunction read GetItem write SetItem; default;
+     end;
+
+     TPACCIntermediateRepresentationCode=class
+      private
+
+       fInstance:TObject;
+
+       fFunctions:TPACCIntermediateRepresentationCodeFunctionList;
+
+      public
+
+       constructor Create(const AInstance:TObject); reintroduce;
+       destructor Destroy; override;
+
+      published
+
+       property Instance:TObject read fInstance;
+
+       property Functions:TPACCIntermediateRepresentationCodeFunctionList read fFunctions;
+
+     end;
+
 procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
 
 implementation
@@ -1351,6 +1381,43 @@ begin
  end else begin
   TPACCInstance(AInstance).AddError('Internal error 2017-01-19-11-48-0000',nil,true);
  end;
+end;
+
+constructor TPACCIntermediateRepresentationCodeFunctionList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCIntermediateRepresentationCodeFunctionList.Destroy;
+begin
+ inherited Destroy;
+end;
+
+function TPACCIntermediateRepresentationCodeFunctionList.GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeFunction;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunctionList.SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeFunction);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
+constructor TPACCIntermediateRepresentationCode.Create(const AInstance:TObject);
+begin
+
+ inherited Create;
+
+ fInstance:=AInstance;
+
+ fFunctions:=TPACCIntermediateRepresentationCodeFunctionList.Create;
+
+end;
+
+destructor TPACCIntermediateRepresentationCode.Destroy;
+begin
+ fFunctions.Free;
+ inherited Destroy;
 end;
 
 end.

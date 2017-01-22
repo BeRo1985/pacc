@@ -5,7 +5,7 @@ interface
 
 uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCRawByteStringHashMap,PACCTarget,
      PACCPreprocessor,PACCLexer,PACCParser,PACCAnalyzer,PACCHighLevelOptimizer,
-     PACCLinker,PACCAbstractSyntaxTree;
+     PACCLinker,PACCAbstractSyntaxTree,PACCIntermediateRepresentationCode;
 
 type EPACCError=class(Exception)
       public
@@ -27,6 +27,8 @@ type EPACCError=class(Exception)
        Analyzer:TPACCAnalyzer;
        HighLevelOptimizer:TPACCHighLevelOptimizer;
        Linker:TPACCLinker;
+
+       IntermediateRepresentationCode:TPACCIntermediateRepresentationCode;
 
        TokenSymbols:TPACCTokenSymbols;
        CountTokenSymbols:TPACCInt;
@@ -159,9 +161,11 @@ begin
  Preprocessor:=TPACCPreprocessor.Create(self);
  Lexer:=TPACCLexer.Create(self);
  Parser:=TPACCParser.Create(self);
- Analyzer:=TPACCAnalyzer.Create(self); 
+ Analyzer:=TPACCAnalyzer.Create(self);
  HighLevelOptimizer:=TPACCHighLevelOptimizer.Create(self);
  Linker:=TPACCLinkerClass(Target.LinkerClass).Create(self);
+
+ IntermediateRepresentationCode:=TPACCIntermediateRepresentationCode.Create(self);
 
 end;
 
@@ -174,6 +178,8 @@ begin
 
  TokenSymbolStringHashMap.Free;
 
+ IntermediateRepresentationCode.Free;
+ 
  Linker.Free;
 
  HighLevelOptimizer.Free;
