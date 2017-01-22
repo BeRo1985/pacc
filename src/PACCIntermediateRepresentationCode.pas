@@ -1124,7 +1124,7 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
                           (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong)) then begin
              OutputTemporary:=CreateTemporary(pirctDOUBLE);
              EmitInstruction(pircoCLTD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
-            end else if TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind=tkFLOAT then begin
+            end else if TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
              OutputTemporary:=CreateTemporary(pirctDOUBLE);
              EmitInstruction(pircoCFTD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
             end else begin
@@ -1397,7 +1397,7 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
        TemporaryA:=-1;
        TemporaryB:=-1;
        ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,vkRVALUE);
-       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryA,vkRVALUE);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryB,vkRVALUE);
        if (Node.Type_^.Kind in [tkBOOL,tkCHAR,tkSHORT,tkINT]) or
           ((Node.Type_^.Kind=tkPOINTER) and
            (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt)) then begin
@@ -1408,9 +1408,9 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
                     (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong)) then begin
         OutputTemporary:=CreateTemporary(pirctLONG);
         EmitInstruction(pircoADDL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)]);
-       end else if Node.Type_^.Kind=tkFLOAT then begin
+       end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
         OutputTemporary:=CreateTemporary(pirctFLOAT);
-       EmitInstruction(pircoADDI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)]);
+        EmitInstruction(pircoADDF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)]);
        end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
         OutputTemporary:=CreateTemporary(pirctDOUBLE);
         EmitInstruction(pircoADDD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)]);
