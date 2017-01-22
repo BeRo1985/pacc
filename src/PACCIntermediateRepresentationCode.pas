@@ -1263,26 +1263,18 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
      end;
 
      astnkADDR:begin
-      {if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) and
-         assigned(OutputResultReference) then begin
-       AllocateReference(ReferenceA);
-       try
-        ReferenceA^.Kind:=pircrkNONE;
-        ProcessNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,ReferenceA,vkLVALUE);
-        if ReferenceA^.Kind=pircrkNONE then begin
-         TPACCInstance(AInstance).AddError('Internal error 2017-01-22-09-33-0000',nil,true);
-        end else begin
-         Opcode:=pircoADDR;
-         PrepareResultReference(Node.Type_);
-         EmitInstruction(Opcode,OutputResultReference^,ReferenceA^);
-         CheckResultReference(Node.Type_);
+      if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) then begin
+       case TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Kind of
+        astnkLVAR,astnkGVAR,astnkSTRUCT_REF:begin
+         ProcessNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,OutputTemporary,[],vkLVALUE);
         end;
-       finally
-        FreeReference(ReferenceA);
+        else begin
+         TPACCInstance(AInstance).AddError('Internal error 2017-01-22-17-17-0000',nil,true);
+        end;
        end;
       end else begin
        TPACCInstance(AInstance).AddError('Internal error 2017-01-22-09-33-0002',nil,true);
-      end;}
+      end;
      end;
 
      astnkDEREF:begin
