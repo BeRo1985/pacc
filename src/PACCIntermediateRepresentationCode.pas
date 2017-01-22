@@ -53,18 +53,20 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircoSWAPF, // Swap between float and float
        pircoSWAPD, // Swap between double and double
 
-       picroCITF, // Convert int to float
-       picroCLTF, // Convert long to float
-       picroCITD, // Convert int to double
-       picroCLTD, // Convert long to double
+       pircoCITF, // Convert int to float
+       pircoCLTF, // Convert long to float
+       pircoCITD, // Convert int to double
+       pircoCLTD, // Convert long to double
+       pircoCFTD, // Convert float to double
+       pircoCDTF, // Convert double to float
 
-       picroCITL, // Convert int to long         (CDQ instruction (doubleword eax => quadcore eax:edx) on x86)
-       picroCLTO, // Convert long to double-long (CQO instruction (  quadword rax => octocore rax:rdx) on x86)
+       pircoCITL, // Convert int to long         (CDQ instruction (doubleword eax => quadcore eax:edx) on x86)
+       pircoCLTO, // Convert long to double-long (CQO instruction (  quadword rax => octocore rax:rdx) on x86)
 
-       picroTFTI, // Truncate float to int
-       picroTFTL, // Truncate float to long
-       picroTDTI, // Truncate double to int
-       picroTDTL, // Truncate double to long
+       pircoTFTI, // Truncate float to int
+       pircoTFTL, // Truncate float to long
+       pircoTDTI, // Truncate double to int
+       pircoTDTL, // Truncate double to long
 
        pircoCASTFI, // Bitwise cast from float to int
        pircoCASTIF, // Bitwise cast from int to float
@@ -101,13 +103,13 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircoLDSIL, // Load from signed int to long
        pircoLDLL, // Load from long to long
 
-       picroSTIC, // Store from int to char
-       picroSTIS, // Store from int to short
-       picroSTII, // Store from int to int
-       picroSTLC, // Store from long to char
-       picroSTLS, // Store from long to short
-       picroSTLI, // Store from long to int
-       picroSTLL, // Store from long to long
+       pircoSTIC, // Store from int to char
+       pircoSTIS, // Store from int to short
+       pircoSTII, // Store from int to int
+       pircoSTLC, // Store from long to char
+       pircoSTLS, // Store from long to short
+       pircoSTLI, // Store from long to int
+       pircoSTLL, // Store from long to long
 
        pircoNEGI, // Negation int
        pircoADDI, // Addition int
@@ -143,61 +145,61 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircoSHRL, // Unsigned bitshift right long int
        pircoSARL, // Signed bitshift right long
 
-       picroNEGF, // Negation float
+       pircoNEGF, // Negation float
        pircoADDF, // Addition float
        pircoSUBF, // Subtraction float
        pircoMULF, // Multiplication float
        pircoDIVF, // Division float
 
-       picroNEGD, // Negation double
+       pircoNEGD, // Negation double
        pircoADDD, // Addition double
        pircoSUBD, // Subtraction double
        pircoMULD, // Multiplication double
        pircoDIVD, // Division double
 
-       pircoCSLEI, // Signed less than or equal int
-       pircoCSLTI, // Signed less than int
-       pircoCSGEI, // Signed greater than or equal int
-       pircoCSGTI, // Signed greater than int
-       pircoCULEI, // Unsigned less than or equal int
-       pircoCULTI, // Unsigned less than int
-       pircoCUGEI, // Unsigned greater than or equal int
-       pircoCUGTI, // Unsigned greater than int
-       pircoCEQI, // Equal int
-       pircoCNEI, // Not equal int
-       pircoCZI, // Zero int
-       pircoCNZI, // Not zero int
+       pircoCMPSLEI, // Signed less than or equal int
+       pircoCMPSLTI, // Signed less than int
+       pircoCMPSGEI, // Signed greater than or equal int
+       pircoCMPSGTI, // Signed greater than int
+       pircoCMPULEI, // Unsigned less than or equal int
+       pircoCUMPLTI, // Unsigned less than int
+       pircoCMPUGEI, // Unsigned greater than or equal int
+       pircoCMPUGTI, // Unsigned greater than int
+       pircoCMPEQI, // Equal int
+       pircoCMPNEI, // Not equal int
+       pircoCMPZI, // Zero int
+       pircoCMPNZI, // Not zero int
 
-       pircoCSLEL, // Signed less than or equal long
-       pircoCSLTL, // Signed less than long
-       pircoCSGEL, // Signed greater than or equal long
-       pircoCSGTL, // Signed greater than long
-       pircoCULEL, // Unsigned less than or equal long
-       pircoCULTL, // Unsigned less than long
-       pircoCUGEL, // Unsigned greater than or equal long
-       pircoCUGTL, // Unsigned greater than long
-       pircoCEQL, // Equal long
-       pircoCNEL, // Not equal long
-       pircoCZL, // Zero long
-       pircoCNZL, // Not zero long
+       pircoCMPSLEL, // Signed less than or equal long
+       pircoCMPSLTL, // Signed less than long
+       pircoCMPSGEL, // Signed greater than or equal long
+       pircoCMPSGTL, // Signed greater than long
+       pircoCMPULEL, // Unsigned less than or equal long
+       pircoCMPULTL, // Unsigned less than long
+       pircoCMPUGEL, // Unsigned greater than or equal long
+       pircoCMPUGTL, // Unsigned greater than long
+       pircoCMPEQL, // Equal long
+       pircoCMPNEL, // Not equal long
+       pircoCMPZL, // Zero long
+       pircoCMPNZL, // Not zero long
 
-       pircoCLEF, // Less than or equal float
-       pircoCLTF, // Less than float
-       pircoCGEF, // Greater than or equal float
-       pircoCGTF, // Greater than float
-       pircoCEQF, // Equal float
-       pircoCNEF, // Not equal float
-       pircoCOF, // Ordered float
-       pircoCNOF, // Not ordered float
+       pircoCMPLEF, // Less than or equal float
+       pircoCMPLTF, // Less than float
+       pircoCMPGEF, // Greater than or equal float
+       pircoCMPGTF, // Greater than float
+       pircoCMPEQF, // Equal float
+       pircoCMPNEF, // Not equal float
+       pircoCMPOF, // Ordered float
+       pircoCMPNOF, // Not ordered float
 
-       pircoCLED, // Less than or equal double
-       pircoCLTD, // Less than double
-       pircoCGED, // Greater than or equal double
-       pircoCGTD, // Greater than double
-       pircoCEQD, // Equal double
-       pircoCNED, // Not equal double
-       pircoCOD, // Ordered double
-       pircoCNOD, // Not ordered double
+       pircoCMPLED, // Less than or equal double
+       pircoCMPLTD, // Less than double
+       pircoCMPGED, // Greater than or equal double
+       pircoCMPGTD, // Greater than double
+       pircoCMPEQD, // Equal double
+       pircoCMPNED, // Not equal double
+       pircoCMPOD, // Ordered double
+       pircoCMPNOD, // Not ordered double
 
        pircoALLOCI, // Allocate int(typically 4)
        pircoALLOCL, // Allocate long (typically 8)
@@ -219,7 +221,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircoARGD, // Set function call argument double
        pircoCALL,
 
-       picroCOUNT
+       pircoCOUNT
       );
 
      PPACCIntermediateRepresentationCodeJumpKind=^TPACCIntermediateRepresentationCodeJumpKind;
@@ -980,15 +982,15 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
            end;
            tkFLOAT:begin
             OutputTemporary:=CreateTemporary(pirctINT);
-            EmitInstruction(picroTFTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTFTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
            end;
            tkDOUBLE:begin
             OutputTemporary:=CreateTemporary(pirctINT);
-            EmitInstruction(picroTDTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTDTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
            end;
            tkLDOUBLE:begin
             OutputTemporary:=CreateTemporary(pirctINT);
-            EmitInstruction(picroTDTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTDTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
            end;
            tkPOINTER:begin
             if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong then begin
@@ -1050,15 +1052,15 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
            end;
            tkFLOAT:begin
             OutputTemporary:=CreateTemporary(pirctLONG);
-            EmitInstruction(picroTFTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTFTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
            end;
            tkDOUBLE:begin
             OutputTemporary:=CreateTemporary(pirctLONG);
-            EmitInstruction(picroTDTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTDTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
            end;
            tkLDOUBLE:begin
             OutputTemporary:=CreateTemporary(pirctLONG);
-            EmitInstruction(picroTDTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTDTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
            end;
            tkPOINTER:begin
             if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong then begin
@@ -1080,8 +1082,54 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
          end else begin
           case TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_^.Kind of
            tkFLOAT:begin
+            if (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind in [tkBOOL,tkCHAR,tkSHORT,tkINT]) or
+                ((TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind=tkPOINTER) and
+                 (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt)) then begin
+             if tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Flags then begin
+              TemporaryB:=CreateTemporary(pirctLONG);
+              EmitInstruction(pircoZEIL,[CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA)]);
+              OutputTemporary:=CreateTemporary(pirctFLOAT);
+              EmitInstruction(pircoCLTF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB)]);
+             end else begin
+              OutputTemporary:=CreateTemporary(pirctFLOAT);
+              EmitInstruction(pircoCITF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             end;
+            end else if (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind in [tkLONG,tkLLONG]) or
+                        ((TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind=tkPOINTER) and
+                          (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong)) then begin
+             OutputTemporary:=CreateTemporary(pirctFLOAT);
+             EmitInstruction(pircoCLTF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            end else if TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind in [tkDOUBLE,tkLDOUBLE] then begin
+             OutputTemporary:=CreateTemporary(pirctFLOAT);
+             EmitInstruction(pircoCDTF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            end else begin
+             TPACCInstance(AInstance).AddError('Internal error 2017-01-22-15-32-0000',@Node.SourceLocation,true);
+            end;
            end;
            tkDOUBLE,tkLDOUBLE:begin
+            if (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind in [tkBOOL,tkCHAR,tkSHORT,tkINT]) or
+                ((TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind=tkPOINTER) and
+                 (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt)) then begin
+             if tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Flags then begin
+              TemporaryB:=CreateTemporary(pirctLONG);
+              EmitInstruction(pircoZEIL,[CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA)]);
+              OutputTemporary:=CreateTemporary(pirctDOUBLE);
+              EmitInstruction(pircoCLTD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB)]);
+             end else begin
+              OutputTemporary:=CreateTemporary(pirctDOUBLE);
+              EmitInstruction(pircoCITD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             end;
+            end else if (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind in [tkLONG,tkLLONG]) or
+                        ((TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind=tkPOINTER) and
+                          (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong)) then begin
+             OutputTemporary:=CreateTemporary(pirctDOUBLE);
+             EmitInstruction(pircoCLTD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            end else if TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind=tkFLOAT then begin
+             OutputTemporary:=CreateTemporary(pirctDOUBLE);
+             EmitInstruction(pircoCFTD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            end else begin
+             TPACCInstance(AInstance).AddError('Internal error 2017-01-22-15-32-0000',@Node.SourceLocation,true);
+            end;
            end;
            else begin
             TPACCInstance(AInstance).AddError('Internal error 2017-01-22-15-19-0000',@Node.SourceLocation,true);
@@ -1093,54 +1141,6 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
       end else begin
        TPACCInstance(AInstance).AddError('Internal error 2017-01-22-14-53-0000',@Node.SourceLocation,true);
       end;
- {    if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) and
-         assigned(OutputResultReference) then begin
-       AllocateReference(ReferenceA);
-       try
-        ReferenceA^.Kind:=pircrkNONE;
-        ProcessNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,ReferenceA,ValueKind);
-        if ReferenceA^.Kind=pircrkNONE then begin
-         TPACCInstance(AInstance).AddError('Internal error 2017-01-21-13-58-0000',nil,true);
-        end else begin
-         case Node.Type_^.Kind of
-          tkBOOL,
-          tkCHAR,
-          tkSHORT,
-          tkINT:begin
-           case ReferenceA^.Type_^.Kind of
-            tkBOOL,
-            tkCHAR:begin
-             OutputResultReference^:=Function_.CreateTemporaryReference(Node.Type_);
-             if (tfUnsigned in Node.Type_^.Flags) or (tfUnsigned in ReferenceA^.Type_^.Flags) then begin
-              Opcode:=pircoZEROEXTEND8TO32;
-             end else begin
-              Opcode:=pircoSIGNEXTEND8TO32;
-             end;
-             EmitInstruction(Opcode,OutputResultReference^,ReferenceA^);
-            end;
-            tkSHORT:begin
-             OutputResultReference^:=Function_.CreateTemporaryReference(Node.Type_);
-             if not ((tfUnsigned in Node.Type_^.Flags) or (tfUnsigned in ReferenceA^.Type_^.Flags)) then begin
-              Opcode:=pircoZEROEXTEND16TO32;
-             end else begin
-              Opcode:=pircoSIGNEXTEND16TO32;
-             end;
-             EmitInstruction(Opcode,OutputResultReference^,ReferenceA^);
-            end;
-            tkINT:begin
-             OutputResultReference^:=Function_.CreateTemporaryReference(Node.Type_);
-             EmitInstruction(pircoCOPY,OutputResultReference^,ReferenceA^);
-            end;
-           end;
-          end;
-         end;
-        end;
-       finally
-        FreeReference(ReferenceA);
-       end;
-      end else begin
-       TPACCInstance(AInstance).AddError('Internal error 2017-01-21-12-45-0000',nil,true);
-      end;}
      end;
 
      astnkADDR:begin
