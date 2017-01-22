@@ -41,17 +41,33 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircoMOVI, // Move from int to int
        pircoMOVL, // Move from long to long
        pircoMOVF, // Move from float to float
-       pircoMODD, // Move frim double to double
+       pircoMODD, // Move from double to double
+
+       pircoSWAPI, // Swap between int and int
+       pircoSWAPL, // Swap between long and long
+       pircoSWAPF, // Swap between float and float
+       pircoSWAPD, // Swap between double and double
 
        picroCITF, // Convert int to float
        picroCLTF, // Convert long to float
        picroCITD, // Convert int to double
        picroCLTD, // Convert long to double
 
+       picroCITL, // Convert int to long         (CDQ instruction (doubleword eax => quadcore eax:edx) on x86)
+       picroCLTO, // Convert long to double-long (CQO instruction (  quadword rax => octocore rax:rdx) on x86)
+
        picroTFTI, // Truncate float to int
        picroTFTL, // Truncate float to long
        picroTDTI, // Truncate double to int
        picroTDTL, // Truncate double to long
+
+       pircoCASTFI, // Bitwise cast from float to int
+       pircoCASTIF, // Bitwise cast from int to float
+       pircoCASTDL, // Bitwise cast from double to long
+       pircoCASTLD, // Bitwise cast from long to double
+
+       pircoADDRI, // Address-from to int (on 32-bit targets)
+       pircoADDRL, // Address-from to long (on 64-bit targets)
 
        pircoZECI, // Zero extend from char to int
        pircoZESI, // Zero extend from short to int
@@ -210,10 +226,10 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircjkCOUNT
       );
 
-     PPACCIntermediateRepresentationCodeType=^TPACCIntermediateRepresentationCodeType;
-     TPACCIntermediateRepresentationCodeType=
+     PPACCIntermediateRepresentationCodeClass=^TPACCIntermediateRepresentationCodeClass;
+     TPACCIntermediateRepresentationCodeClass=
       (
-       pirccTYPE,
+       pirccNONE,
        pirccINT,
        pirccLONG,
        pirccFLOAT,
@@ -299,7 +315,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       Arguments:array of TPACCIntermediateRepresentationCodeReference;
       Blocks:array of TPACCIntermediateRepresentationCodeBlock;
       CountArguments:TPACCInt32;
-      Type_:PPACCType;
+      Class_:TPACCIntermediateRepresentationCodeClass;
       Link:PPACCIntermediateRepresentationCodePhi;
      end;
 
@@ -410,49 +426,9 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
 procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
 
-function TypeToClass(const AInstance:TObject;const Type_:PPACCType):TPACCIntermediateRepresentationCodeClass;
-
 implementation
 
 uses PACCInstance;
-
-function TypeToClass(const AInstance:TObject;const Type_:PPACCType):TPACCIntermediateRepresentationCodeClass;
-begin
- case Type_^.Kind of
-  tkBOOL,
-  tkCHAR,
-  tkSHORT,
-  tkINT,
-  tkENUM:begin
-   result:=pirccWORD;
-  end;
-  tkLONG,
-  tkLLONG:begin
-   result:=pirccLONG;
-  end;
-  tkFLOAT:begin
-   result:=pirccSINGLE;
-  end;
-  tkDOUBLE,
-  tkLDOUBLE:begin
-   result:=pirccDOUBLE;
-  end;
-  tkPOINTER:begin
-   if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt then begin
-    result:=pirccWORD;
-   end else if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong then begin
-    result:=pirccLONG;
-   end else begin
-    result:=pirccNONE;
-    TPACCInstance(AInstance).AddError('Internal error 2017-01-22-10-33-0000',nil,true);
-   end;
-  end;
-  else begin
-   result:=pirccNONE;
-   TPACCInstance(AInstance).AddError('Internal error 2017-01-22-11-29-0000',nil,true);
-  end;
- end;
-end;
 
 function TPACCIntermediateRepresentationCodeBitSet.GetBit(const AIndex:TPACCInt32):boolean;
 begin
