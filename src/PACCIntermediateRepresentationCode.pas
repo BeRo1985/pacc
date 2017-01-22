@@ -791,21 +791,31 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
   end;
   function CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
   begin
+   result.Flags:=[];
    result.Kind:=pircokTEMPORARY;
    result.Temporary:=Temporary;
   end;
   function CreateIntegerValueOperand(const Value:TPACCInt64):TPACCIntermediateRepresentationCodeOperand;
   begin
+   result.Flags:=[];
    result.Kind:=pircokINTEGER;
    result.IntegerValue:=Value;
   end;
   function CreateFloatValueOperand(const Value:TPACCDouble):TPACCIntermediateRepresentationCodeOperand;
   begin
+   result.Flags:=[];
    result.Kind:=pircokFLOAT;
    result.FloatValue:=Value;
   end;
   function CreateVariableOperand(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeOperand;
   begin
+   result.Flags:=[];
+   result.Kind:=pircokVARIABLE;
+   result.Variable:=Variable;
+  end;
+  function CreateMemoryVariableOperand(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeOperand;
+  begin
+   result.Flags:=[pircofMEMORY];
    result.Kind:=pircokVARIABLE;
    result.Variable:=Variable;
   end;
@@ -892,10 +902,10 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
        vkLVALUE:begin
         if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt then begin
          OutputTemporary:=CreateTemporary(pirctINT);
-         EmitInstruction(pircoADDROFI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+         EmitInstruction(pircoADDROFI,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
         end else begin
          OutputTemporary:=CreateTemporary(pirctLONG);
-         EmitInstruction(pircoADDROFL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+         EmitInstruction(pircoADDROFL,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
         end;
        end;
        vkRVALUE:begin
@@ -903,57 +913,57 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
          tkBOOL,tkCHAR:begin
           OutputTemporary:=CreateTemporary(pirctINT);
           if tfUnsigned in Node.Type_^.Flags then begin
-           EmitInstruction(pircoLDUCI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDUCI,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
           end else begin
-           EmitInstruction(pircoLDSCI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDSCI,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
           end;
          end;
          tkSHORT:begin
           OutputTemporary:=CreateTemporary(pirctINT);
           if tfUnsigned in Node.Type_^.Flags then begin
-           EmitInstruction(pircoLDUSI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDUSI,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
           end else begin
-           EmitInstruction(pircoLDSSI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDSSI,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
           end;
          end;
          tkINT,tkENUM:begin
           OutputTemporary:=CreateTemporary(pirctINT);
           if tfUnsigned in Node.Type_^.Flags then begin
-           EmitInstruction(pircoLDUII,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDUII,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
           end else begin
-           EmitInstruction(pircoLDSII,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDSII,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
           end;
          end;
          tkLONG,tkLLONG:begin
           OutputTemporary:=CreateTemporary(pirctLONG);
           if tfUnsigned in Node.Type_^.Flags then begin
-           EmitInstruction(pircoLDULL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDULL,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
           end else begin
-           EmitInstruction(pircoLDSLL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDSLL,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
           end;
          end;
          tkFLOAT:begin
           OutputTemporary:=CreateTemporary(pirctFLOAT);
-          EmitInstruction(pircoLDF,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+          EmitInstruction(pircoLDF,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
          end;
          tkDOUBLE,tkLDOUBLE:begin
           OutputTemporary:=CreateTemporary(pirctDOUBLE);
-          EmitInstruction(pircoLDD,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+          EmitInstruction(pircoLDD,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
          end;
          tkPOINTER:begin
           if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt then begin
            OutputTemporary:=CreateTemporary(pirctINT);
            if tfUnsigned in Node.Type_^.Flags then begin
-            EmitInstruction(pircoLDUII,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+            EmitInstruction(pircoLDUII,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
            end else begin
-            EmitInstruction(pircoLDSII,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+            EmitInstruction(pircoLDSII,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
            end;
           end else begin
            OutputTemporary:=CreateTemporary(pirctLONG);
            if tfUnsigned in Node.Type_^.Flags then begin
-            EmitInstruction(pircoLDULL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+            EmitInstruction(pircoLDULL,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
            end else begin
-            EmitInstruction(pircoLDSLL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+            EmitInstruction(pircoLDSLL,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
            end;
           end;
          end;
