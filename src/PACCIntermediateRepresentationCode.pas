@@ -890,6 +890,13 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
      astnkGVAR:begin
       case ValueKind of
        vkLVALUE:begin
+        if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt then begin
+         OutputTemporary:=CreateTemporary(pirctINT);
+         EmitInstruction(pircoADDROFI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+        end else begin
+         OutputTemporary:=CreateTemporary(pirctLONG);
+         EmitInstruction(pircoADDROFL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+        end;
        end;
        vkRVALUE:begin
         case Node.Type_^.Kind of
