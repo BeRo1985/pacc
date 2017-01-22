@@ -3049,8 +3049,8 @@ var CurrentState:TState;
     end;
     if (Kind=0) and (CurrentState.Token^.TokenType=TOK_IDENT) and not assigned(UserType) then begin
      Definition:=GetTypeDef(TPACCInstance(Instance).TokenSymbols[CurrentState.Token^.Index].Name);
-     NextToken;
      if assigned(Definition) then begin
+      NextToken;
       if assigned(UserType) then begin
        Error;
       end else begin

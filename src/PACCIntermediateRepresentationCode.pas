@@ -3,7 +3,7 @@ unit PACCIntermediateRepresentationCode;
 
 interface
 
-uses SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCPointerHashMap,PACCAbstractSyntaxTree;
+uses TypInfo,SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCPointerHashMap,PACCAbstractSyntaxTree;
 
 // A intermediate representation instruction set for 32-bit and 64-bit targets (sorry not for 8-bit and 16-bit targets, at least not yet,
 // at least that would be a task of somebody else then, to write a corresponding patch for it and submit it, because I myself as
@@ -824,7 +824,7 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
   begin
    if assigned(Node) then begin
 
- // writeln(TypInfo.GetEnumName(TypeInfo(TPACCAbstractSyntaxTreeNodeKind),TPACCInt32(Node.Kind)));
+   writeln(TypInfo.GetEnumName(TypeInfo(TPACCAbstractSyntaxTreeNodeKind),TPACCInt32(Node.Kind)));
 
     case Node.Kind of
 
@@ -1391,7 +1391,19 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
      astnkOP_LABEL_ADDR:begin
      end;
 
-     astnkOP_ADD,
+     astnkOP_ADD:begin
+      if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
+         assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
+       TemporaryA:=-1;
+       TemporaryB:=-1;
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,vkRVALUE);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryA,vkRVALUE);
+       
+      end else begin
+       TPACCInstance(AInstance).AddError('Internal error 2017-01-22-15-41-0000',@Node.SourceLocation,true);
+      end;
+     end;
+
      astnkOP_SUB,
      astnkOP_MUL,
      astnkOP_DIV,
