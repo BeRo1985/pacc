@@ -100,6 +100,8 @@ type EPACCError=class(Exception)
 
        function TypeConversion(const Node:TPACCAbstractSyntaxTreeNode):TPACCAbstractSyntaxTreeNode;
 
+       function GetPromotionType(const Type_:PPACCType):PPACCType;
+
        function EvaluateIntegerExpression(const Node:TPACCAbstractSyntaxTreeNode;const Address:PPACCAbstractSyntaxTreeNode):TPACCInt64;
 
        function EvaluateFloatExpression(const Node:TPACCAbstractSyntaxTreeNode;const Kind:TPACCTypeKind):TPACCLongDouble;
@@ -610,6 +612,43 @@ begin
    end;
    else begin
     result:=Node;
+   end;
+  end;
+ end else begin
+  result:=nil;
+ end;
+end;
+
+function TPACCInstance.GetPromotionType(const Type_:PPACCType):PPACCType;
+begin
+ if assigned(Type_) then begin
+  case Type_^.Kind of
+   tkARRAY:begin
+    // C11 6.3.2.1p3: An array of T is converted to a pointer to T.
+    result:=NewPointerType(Type_^.ChildType);
+   end;
+   tkFUNCTION:begin
+    // C11 6.3.2.1p4: A function designator is converted to a pointer to the function.
+    result:=NewPointerType(Type_);
+   end;
+   tkSHORT,tkCHAR,tkBOOL:begin
+    // C11 6.3.1.1p2: The integer promotions
+    result:=TypeINT;
+   end;
+   tkINT:begin
+    result:=TypeINT;
+   end;
+   tkLONG,tkLLONG:begin
+    result:=TypeLONG;
+   end;
+   tkFLOAT:begin
+    result:=TypeFLOAT;
+   end;
+   tkDOUBLE,tkLDOUBLE:begin
+    result:=TypeDOUBLE;
+   end;
+   else begin
+    result:=nil;
    end;
   end;
  end else begin
