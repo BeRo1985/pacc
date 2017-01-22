@@ -820,7 +820,7 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
    result.Kind:=pircokVARIABLE;
    result.Variable:=Variable;
   end;
-  procedure EmitInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AOperands:array of TPACCIntermediateRepresentationCodeOperand); overload;
+  procedure EmitInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AOperands:array of TPACCIntermediateRepresentationCodeOperand;const SourceLocation:TPACCSourceLocation); overload;
   var Index:TPACCInt32;
       Instruction:TPACCIntermediateRepresentationCodeInstruction;
   begin
@@ -870,12 +870,12 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
          ((Node.Type_^.Kind=tkPOINTER) and
           (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt)) then begin
        OutputTemporary:=CreateTemporary(pirctINT);
-       EmitInstruction(pircoSETI,[CreateTemporaryOperand(OutputTemporary),CreateIntegerValueOperand(TPACCAbstractSyntaxTreeNodeIntegerValue(Node).Value)]);
+       EmitInstruction(pircoSETI,[CreateTemporaryOperand(OutputTemporary),CreateIntegerValueOperand(TPACCAbstractSyntaxTreeNodeIntegerValue(Node).Value)],Node.SourceLocation);
       end else if (Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
                   ((Node.Type_^.Kind=tkPOINTER) and
                    (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong)) then begin
        OutputTemporary:=CreateTemporary(pirctLONG);
-       EmitInstruction(pircoSETL,[CreateTemporaryOperand(OutputTemporary),CreateIntegerValueOperand(TPACCAbstractSyntaxTreeNodeIntegerValue(Node).Value)]);
+       EmitInstruction(pircoSETL,[CreateTemporaryOperand(OutputTemporary),CreateIntegerValueOperand(TPACCAbstractSyntaxTreeNodeIntegerValue(Node).Value)],Node.SourceLocation);
       end else begin
        TPACCInstance(AInstance).AddError('Internal error 2017-01-22-16-01-0000',@Node.SourceLocation,true);
       end;
@@ -884,10 +884,10 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
      astnkFLOAT:begin
       if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
        OutputTemporary:=CreateTemporary(pirctFLOAT);
-       EmitInstruction(pircoSETF,[CreateTemporaryOperand(OutputTemporary),CreateFloatValueOperand(TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value)]);
+       EmitInstruction(pircoSETF,[CreateTemporaryOperand(OutputTemporary),CreateFloatValueOperand(TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value)],Node.SourceLocation);
       end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
        OutputTemporary:=CreateTemporary(pirctDOUBLE);
-       EmitInstruction(pircoSETD,[CreateTemporaryOperand(OutputTemporary),CreateFloatValueOperand(TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value)]);
+       EmitInstruction(pircoSETD,[CreateTemporaryOperand(OutputTemporary),CreateFloatValueOperand(TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value)],Node.SourceLocation);
       end else begin
        TPACCInstance(AInstance).AddError('Internal error 2017-01-22-16-04-0000',@Node.SourceLocation,true);
       end;
@@ -903,10 +903,10 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
        vkLVALUE:begin
         if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt then begin
          OutputTemporary:=CreateTemporary(pirctINT);
-         EmitInstruction(pircoADDROFI,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+         EmitInstruction(pircoADDROFI,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
         end else begin
          OutputTemporary:=CreateTemporary(pirctLONG);
-         EmitInstruction(pircoADDROFL,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+         EmitInstruction(pircoADDROFL,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
         end;
        end;
        vkRVALUE:begin
@@ -914,57 +914,57 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
          tkBOOL,tkCHAR:begin
           OutputTemporary:=CreateTemporary(pirctINT);
           if tfUnsigned in Node.Type_^.Flags then begin
-           EmitInstruction(pircoLDUCI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDUCI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
           end else begin
-           EmitInstruction(pircoLDSCI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDSCI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
           end;
          end;
          tkSHORT:begin
           OutputTemporary:=CreateTemporary(pirctINT);
           if tfUnsigned in Node.Type_^.Flags then begin
-           EmitInstruction(pircoLDUSI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDUSI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
           end else begin
-           EmitInstruction(pircoLDSSI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDSSI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
           end;
          end;
          tkINT,tkENUM:begin
           OutputTemporary:=CreateTemporary(pirctINT);
           if tfUnsigned in Node.Type_^.Flags then begin
-           EmitInstruction(pircoLDUII,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDUII,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
           end else begin
-           EmitInstruction(pircoLDSII,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDSII,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
           end;
          end;
          tkLONG,tkLLONG:begin
           OutputTemporary:=CreateTemporary(pirctLONG);
           if tfUnsigned in Node.Type_^.Flags then begin
-           EmitInstruction(pircoLDULL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDULL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
           end else begin
-           EmitInstruction(pircoLDSLL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+           EmitInstruction(pircoLDSLL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
           end;
          end;
          tkFLOAT:begin
           OutputTemporary:=CreateTemporary(pirctFLOAT);
-          EmitInstruction(pircoLDF,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+          EmitInstruction(pircoLDF,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
          end;
          tkDOUBLE,tkLDOUBLE:begin
           OutputTemporary:=CreateTemporary(pirctDOUBLE);
-          EmitInstruction(pircoLDD,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+          EmitInstruction(pircoLDD,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
          end;
          tkPOINTER:begin
           if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt then begin
            OutputTemporary:=CreateTemporary(pirctINT);
            if tfUnsigned in Node.Type_^.Flags then begin
-            EmitInstruction(pircoLDUII,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+            EmitInstruction(pircoLDUII,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
            end else begin
-            EmitInstruction(pircoLDSII,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+            EmitInstruction(pircoLDSII,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
            end;
           end else begin
            OutputTemporary:=CreateTemporary(pirctLONG);
            if tfUnsigned in Node.Type_^.Flags then begin
-            EmitInstruction(pircoLDULL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+            EmitInstruction(pircoLDULL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
            end else begin
-            EmitInstruction(pircoLDSLL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))]);
+            EmitInstruction(pircoLDSLL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
            end;
           end;
          end;
@@ -976,28 +976,28 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
        vkOVALUE:begin
         case Node.Type_^.Kind of
          tkBOOL,tkCHAR:begin
-          EmitInstruction(pircoSTIC,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])]);
+          EmitInstruction(pircoSTIC,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])],Node.SourceLocation);
          end;
          tkSHORT:begin
-          EmitInstruction(pircoSTIS,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])]);
+          EmitInstruction(pircoSTIS,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])],Node.SourceLocation);
          end;
          tkINT,tkENUM:begin
-          EmitInstruction(pircoSTII,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])]);
+          EmitInstruction(pircoSTII,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])],Node.SourceLocation);
          end;
          tkLONG,tkLLONG:begin
-          EmitInstruction(pircoSTLL,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])]);
+          EmitInstruction(pircoSTLL,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])],Node.SourceLocation);
          end;
          tkFLOAT:begin
-          EmitInstruction(pircoSTF,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])]);
+          EmitInstruction(pircoSTF,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])],Node.SourceLocation);
          end;
          tkDOUBLE,tkLDOUBLE:begin
-          EmitInstruction(pircoSTD,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])]);
+          EmitInstruction(pircoSTD,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])],Node.SourceLocation);
          end;
          tkPOINTER:begin
           if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt then begin
-           EmitInstruction(pircoSTII,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])]);
+           EmitInstruction(pircoSTII,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])],Node.SourceLocation);
           end else begin
-           EmitInstruction(pircoSTLL,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])]);
+           EmitInstruction(pircoSTLL,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateTemporaryOperand(InputTemporaries[0])],Node.SourceLocation);
           end;
          end;
          else begin
@@ -1065,27 +1065,27 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
             OutputTemporary:=CreateTemporary(pirctINT);
             if (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_^.Flags) or
                (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Flags) then begin
-             EmitInstruction(pircoZECI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoZECI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end else begin
-             EmitInstruction(pircoSECI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoSECI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end;
            end;
            tkCHAR:begin
             OutputTemporary:=CreateTemporary(pirctINT);
             if (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_^.Flags) or
                (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Flags) then begin
-             EmitInstruction(pircoZECI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoZECI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end else begin
-             EmitInstruction(pircoSECI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoSECI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end;
            end;
            tkSHORT:begin
             OutputTemporary:=CreateTemporary(pirctINT);
             if (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_^.Flags) or
                (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Flags) then begin
-             EmitInstruction(pircoZESI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoZESI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end else begin
-             EmitInstruction(pircoSESI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoSESI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end;
            end;
            tkINT,tkENUM:begin
@@ -1093,28 +1093,28 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
            end;
            tkLONG:begin
             OutputTemporary:=CreateTemporary(pirctINT);
-            EmitInstruction(pircoTRLI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTRLI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
            end;
            tkLLONG:begin
             OutputTemporary:=CreateTemporary(pirctINT);
-            EmitInstruction(pircoTRLI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTRLI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
            end;
            tkFLOAT:begin
             OutputTemporary:=CreateTemporary(pirctINT);
-            EmitInstruction(pircoTFTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTFTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
            end;
            tkDOUBLE:begin
             OutputTemporary:=CreateTemporary(pirctINT);
-            EmitInstruction(pircoTDTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTDTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
            end;
            tkLDOUBLE:begin
             OutputTemporary:=CreateTemporary(pirctINT);
-            EmitInstruction(pircoTDTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTDTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
            end;
            tkPOINTER:begin
             if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong then begin
              OutputTemporary:=CreateTemporary(pirctINT);
-             EmitInstruction(pircoTRLI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoTRLI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end else begin
              OutputTemporary:=TemporaryA;
             end;
@@ -1131,36 +1131,36 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
             OutputTemporary:=CreateTemporary(pirctLONG);
             if (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_^.Flags) or
                (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Flags) then begin
-             EmitInstruction(pircoZECL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoZECL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end else begin
-             EmitInstruction(pircoSECL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoSECL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end;
            end;
            tkCHAR:begin
             OutputTemporary:=CreateTemporary(pirctLONG);
             if (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_^.Flags) or
                (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Flags) then begin
-             EmitInstruction(pircoZECL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoZECL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end else begin
-             EmitInstruction(pircoSECL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoSECL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end;
            end;
            tkSHORT:begin
             OutputTemporary:=CreateTemporary(pirctLONG);
             if (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_^.Flags) or
                (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Flags) then begin
-             EmitInstruction(pircoZESL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoZESL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end else begin
-             EmitInstruction(pircoSESL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoSESL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end;
            end;
            tkINT,tkENUM:begin
             OutputTemporary:=CreateTemporary(pirctLONG);
             if (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_^.Flags) or
                (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Flags) then begin
-             EmitInstruction(pircoZEIL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoZEIL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end else begin
-             EmitInstruction(pircoSEIL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoSEIL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end;
            end;
            tkLONG:begin
@@ -1171,15 +1171,15 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
            end;
            tkFLOAT:begin
             OutputTemporary:=CreateTemporary(pirctLONG);
-            EmitInstruction(pircoTFTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTFTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
            end;
            tkDOUBLE:begin
             OutputTemporary:=CreateTemporary(pirctLONG);
-            EmitInstruction(pircoTDTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTDTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
            end;
            tkLDOUBLE:begin
             OutputTemporary:=CreateTemporary(pirctLONG);
-            EmitInstruction(pircoTDTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+            EmitInstruction(pircoTDTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
            end;
            tkPOINTER:begin
             if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong then begin
@@ -1188,9 +1188,9 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
              OutputTemporary:=CreateTemporary(pirctLONG);
              if (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_^.Flags) or
                 (tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Flags) then begin
-              EmitInstruction(pircoZEIL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+              EmitInstruction(pircoZEIL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
              end else begin
-              EmitInstruction(pircoSEIL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+              EmitInstruction(pircoSEIL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
              end;
             end;
            end;
@@ -1206,21 +1206,21 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
                  (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt)) then begin
              if tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Flags then begin
               TemporaryB:=CreateTemporary(pirctLONG);
-              EmitInstruction(pircoZEIL,[CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA)]);
+              EmitInstruction(pircoZEIL,[CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
               OutputTemporary:=CreateTemporary(pirctFLOAT);
-              EmitInstruction(pircoCLTF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB)]);
+              EmitInstruction(pircoCLTF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
              end else begin
               OutputTemporary:=CreateTemporary(pirctFLOAT);
-              EmitInstruction(pircoCITF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+              EmitInstruction(pircoCITF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
              end;
             end else if (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
                         ((TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind=tkPOINTER) and
                           (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong)) then begin
              OutputTemporary:=CreateTemporary(pirctFLOAT);
-             EmitInstruction(pircoCLTF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoCLTF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end else if TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
              OutputTemporary:=CreateTemporary(pirctFLOAT);
-             EmitInstruction(pircoCDTF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoCDTF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end else begin
              TPACCInstance(AInstance).AddError('Internal error 2017-01-22-15-32-0000',@Node.SourceLocation,true);
             end;
@@ -1231,21 +1231,21 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
                  (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt)) then begin
              if tfUnsigned in TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Flags then begin
               TemporaryB:=CreateTemporary(pirctLONG);
-              EmitInstruction(pircoZEIL,[CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA)]);
+              EmitInstruction(pircoZEIL,[CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
               OutputTemporary:=CreateTemporary(pirctDOUBLE);
-              EmitInstruction(pircoCLTD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB)]);
+              EmitInstruction(pircoCLTD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
              end else begin
               OutputTemporary:=CreateTemporary(pirctDOUBLE);
-              EmitInstruction(pircoCITD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+              EmitInstruction(pircoCITD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
              end;
             end else if (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
                         ((TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind=tkPOINTER) and
                           (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong)) then begin
              OutputTemporary:=CreateTemporary(pirctDOUBLE);
-             EmitInstruction(pircoCLTD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoCLTD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end else if TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
              OutputTemporary:=CreateTemporary(pirctDOUBLE);
-             EmitInstruction(pircoCFTD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)]);
+             EmitInstruction(pircoCFTD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
             end else begin
              TPACCInstance(AInstance).AddError('Internal error 2017-01-22-15-32-0000',@Node.SourceLocation,true);
             end;
@@ -1466,32 +1466,32 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
         ProcessNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,TemporaryA,[],vkRVALUE);
         if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
          OutputTemporary:=CreateTemporary(pirctINT);
-         EmitInstruction(pircoADDI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateIntegerValueOperand(1)]);
+         EmitInstruction(pircoADDI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateIntegerValueOperand(1)],Node.SourceLocation);
         end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
          OutputTemporary:=CreateTemporary(pirctLONG);
-         EmitInstruction(pircoADDL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateIntegerValueOperand(1)]);
+         EmitInstruction(pircoADDL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateIntegerValueOperand(1)],Node.SourceLocation);
         end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
          OutputTemporary:=CreateTemporary(pirctFLOAT);
-         EmitInstruction(pircoADDF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateFloatValueOperand(1)]);
+         EmitInstruction(pircoADDF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateFloatValueOperand(1)],Node.SourceLocation);
         end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
          OutputTemporary:=CreateTemporary(pirctDOUBLE);
-         EmitInstruction(pircoADDD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateFloatValueOperand(1)]);
+         EmitInstruction(pircoADDD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateFloatValueOperand(1)],Node.SourceLocation);
         end else if Node.Type_^.Kind=tkPOINTER then begin
          if assigned(Node.Type_^.ChildType) then begin
           if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt then begin
            OutputTemporary:=CreateTemporary(pirctINT);
-           EmitInstruction(pircoADDI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateIntegerValueOperand(Node.Type_^.ChildType.Size)]);
+           EmitInstruction(pircoADDI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateIntegerValueOperand(Node.Type_^.ChildType.Size)],Node.SourceLocation);
           end else begin
            OutputTemporary:=CreateTemporary(pirctLONG);
-           EmitInstruction(pircoADDL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateIntegerValueOperand(Node.Type_^.ChildType.Size)]);
+           EmitInstruction(pircoADDL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateIntegerValueOperand(Node.Type_^.ChildType.Size)],Node.SourceLocation);
           end;
          end else begin
           if TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt then begin
            OutputTemporary:=CreateTemporary(pirctINT);
-           EmitInstruction(pircoADDI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateIntegerValueOperand(1)]);
+           EmitInstruction(pircoADDI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateIntegerValueOperand(1)],Node.SourceLocation);
           end else begin
            OutputTemporary:=CreateTemporary(pirctLONG);
-           EmitInstruction(pircoADDL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateIntegerValueOperand(1)]);
+           EmitInstruction(pircoADDL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryB),CreateTemporaryOperand(TemporaryA),CreateIntegerValueOperand(1)],Node.SourceLocation);
           end;
          end;
         end else begin
@@ -1530,18 +1530,18 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
           ((Node.Type_^.Kind=tkPOINTER) and
            (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfInt)) then begin
         OutputTemporary:=CreateTemporary(pirctINT);
-        EmitInstruction(pircoADDI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)]);
+        EmitInstruction(pircoADDI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
        end else if (Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
                    ((Node.Type_^.Kind=tkPOINTER) and
                     (TPACCInstance(AInstance).Target.SizeOfPointer=TPACCInstance(AInstance).Target.SizeOfLong)) then begin
         OutputTemporary:=CreateTemporary(pirctLONG);
-        EmitInstruction(pircoADDL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)]);
+        EmitInstruction(pircoADDL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
        end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
         OutputTemporary:=CreateTemporary(pirctFLOAT);
-        EmitInstruction(pircoADDF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)]);
+        EmitInstruction(pircoADDF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
        end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
         OutputTemporary:=CreateTemporary(pirctDOUBLE);
-        EmitInstruction(pircoADDD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)]);
+        EmitInstruction(pircoADDD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
        end else begin
         TPACCInstance(AInstance).AddError('Internal error 2017-01-22-15-52-0000',@Node.SourceLocation,true);
        end;
