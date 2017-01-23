@@ -522,6 +522,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitAssignmentBinaryOp(const Node:TPACCAbstractSyntaxTreeNode;const BinaryOpHook:TPACCIntermediateRepresentationCodeBinaryOpHook;var OutputTemporary:TPACCInt32);
        procedure EmitAssignOp(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32);
        procedure EmitAssignSrc(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+       procedure EmitIntegerValue(const Node:TPACCAbstractSyntaxTreeNodeIntegerValue;var OutputTemporary:TPACCInt32);
+       procedure EmitFloatValue(const Node:TPACCAbstractSyntaxTreeNodeFloatValue;var OutputTemporary:TPACCInt32);
        procedure EmitNode(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -1441,6 +1443,36 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.EmitIntegerValue(const Node:TPACCAbstractSyntaxTreeNodeIntegerValue;var OutputTemporary:TPACCInt32);
+begin
+ if (Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
+    ((Node.Type_^.Kind=tkPOINTER) and
+     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
+  OutputTemporary:=CreateTemporary(pirctINT);
+  EmitInstruction(pircoSETI,[CreateTemporaryOperand(OutputTemporary),CreateIntegerValueOperand(TPACCAbstractSyntaxTreeNodeIntegerValue(Node).Value)],Node.SourceLocation);
+ end else if (Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
+             ((Node.Type_^.Kind=tkPOINTER) and
+              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
+  OutputTemporary:=CreateTemporary(pirctLONG);
+  EmitInstruction(pircoSETL,[CreateTemporaryOperand(OutputTemporary),CreateIntegerValueOperand(TPACCAbstractSyntaxTreeNodeIntegerValue(Node).Value)],Node.SourceLocation);
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-22-16-01-0000',@Node.SourceLocation,true);
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.EmitFloatValue(const Node:TPACCAbstractSyntaxTreeNodeFloatValue;var OutputTemporary:TPACCInt32);
+begin
+ if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctFLOAT);
+  EmitInstruction(pircoSETF,[CreateTemporaryOperand(OutputTemporary),CreateFloatValueOperand(TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value)],Node.SourceLocation);
+ end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctDOUBLE);
+  EmitInstruction(pircoSETD,[CreateTemporaryOperand(OutputTemporary),CreateFloatValueOperand(TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value)],Node.SourceLocation);
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-22-16-04-0000',@Node.SourceLocation,true);
+ end;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitNode(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
 var Index,TemporaryA,TemporaryB:TPACCInt32;
     Opcode:TPACCIntermediateRepresentationCodeOpcode;
@@ -1452,31 +1484,11 @@ begin
   case Node.Kind of
 
    astnkINTEGER:begin
-    if (Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
-       ((Node.Type_^.Kind=tkPOINTER) and
-        (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
-     OutputTemporary:=CreateTemporary(pirctINT);
-     EmitInstruction(pircoSETI,[CreateTemporaryOperand(OutputTemporary),CreateIntegerValueOperand(TPACCAbstractSyntaxTreeNodeIntegerValue(Node).Value)],Node.SourceLocation);
-    end else if (Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
-                ((Node.Type_^.Kind=tkPOINTER) and
-                 (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
-     OutputTemporary:=CreateTemporary(pirctLONG);
-     EmitInstruction(pircoSETL,[CreateTemporaryOperand(OutputTemporary),CreateIntegerValueOperand(TPACCAbstractSyntaxTreeNodeIntegerValue(Node).Value)],Node.SourceLocation);
-    end else begin
-     TPACCInstance(fInstance).AddError('Internal error 2017-01-22-16-01-0000',@Node.SourceLocation,true);
-    end;
+    EmitIntegerValue(TPACCAbstractSyntaxTreeNodeIntegerValue(Node),OutputTemporary);
    end;
 
    astnkFLOAT:begin
-    if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
-     OutputTemporary:=CreateTemporary(pirctFLOAT);
-     EmitInstruction(pircoSETF,[CreateTemporaryOperand(OutputTemporary),CreateFloatValueOperand(TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value)],Node.SourceLocation);
-    end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
-     OutputTemporary:=CreateTemporary(pirctDOUBLE);
-     EmitInstruction(pircoSETD,[CreateTemporaryOperand(OutputTemporary),CreateFloatValueOperand(TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value)],Node.SourceLocation);
-    end else begin
-     TPACCInstance(fInstance).AddError('Internal error 2017-01-22-16-04-0000',@Node.SourceLocation,true);
-    end;
+    EmitFloatValue(TPACCAbstractSyntaxTreeNodeFloatValue(Node),OutputTemporary);
    end;
 
    astnkSTRING:begin
