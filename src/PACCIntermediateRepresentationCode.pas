@@ -528,10 +528,11 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitCONV(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitADDR(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitDEREF(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
-       procedure EmitRETURN(const Node:TPACCAbstractSyntaxTreeNodeRETURNStatement;var OutputTemporary:TPACCInt32);
-       procedure EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements;var OutputTemporary:TPACCInt32);
+       procedure EmitRETURN(const Node:TPACCAbstractSyntaxTreeNodeRETURNStatement);
        procedure EmitCOMMA(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
-       procedure EmitNode(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+       procedure EmitExpression(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+       procedure EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
+       procedure EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements);
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
       public
@@ -1316,7 +1317,7 @@ begin
  LValueTemporary:=-1;
  if LValueNode.Kind in [astnkLVAR,astnkGVAR] then begin
   if PostOp then begin
-   EmitNode(LValueNode,TemporaryA,[],pircvkRVALUE);
+   EmitExpression(LValueNode,TemporaryA,[],pircvkRVALUE);
    if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
     OutputTemporary:=CreateTemporary(pirctINT);
     EmitInstruction(pircoMOVI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
@@ -1341,13 +1342,13 @@ begin
    UnaryOpHook(TemporaryB,TemporaryA,Node);
    EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(LValueNode),TemporaryB);
   end else begin
-   EmitNode(LValueNode,TemporaryA,[],pircvkRVALUE);
+   EmitExpression(LValueNode,TemporaryA,[],pircvkRVALUE);
    UnaryOpHook(OutputTemporary,TemporaryA,Node);
    EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(LValueNode),OutputTemporary);
   end;
  end else begin
   if PostOp then begin
-   EmitNode(LValueNode,LValueTemporary,[],pircvkLVALUE);
+   EmitExpression(LValueNode,LValueTemporary,[],pircvkLVALUE);
    EmitLoad(TemporaryA,LValueTemporary,LValueNode.Type_);
    if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
     OutputTemporary:=CreateTemporary(pirctINT);
@@ -1373,7 +1374,7 @@ begin
    UnaryOpHook(TemporaryB,TemporaryA,Node);
    EmitStore(LValueTemporary,TemporaryB,LValueNode.Type_);
   end else begin
-   EmitNode(LValueNode,LValueTemporary,[],pircvkLVALUE);
+   EmitExpression(LValueNode,LValueTemporary,[],pircvkLVALUE);
    EmitLoad(TemporaryA,LValueTemporary,LValueNode.Type_);
    UnaryOpHook(OutputTemporary,TemporaryA,Node);
    EmitStore(LValueTemporary,OutputTemporary,LValueNode.Type_);
@@ -1389,8 +1390,8 @@ begin
   OutputTemporary:=-1;
   TemporaryA:=-1;
   TemporaryB:=-1;
-  EmitNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,[],pircvkRVALUE);
-  EmitNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryB,[],pircvkRVALUE);
+  EmitExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,[],pircvkRVALUE);
+  EmitExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryB,[],pircvkRVALUE);
   BinaryOpHook(OutputTemporary,TemporaryA,TemporaryB,Node);
  end else begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-22-15-41-0000',@Node.SourceLocation,true);
@@ -1406,9 +1407,9 @@ begin
   TemporaryA:=-1;
   TemporaryB:=-1;
   TemporaryC:=-1;
-  EmitNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,[],pircvkLVALUE);
+  EmitExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,[],pircvkLVALUE);
   EmitLoad(TemporaryB,TemporaryA,TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Type_);
-  EmitNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryC,[],pircvkRVALUE);
+  EmitExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryC,[],pircvkRVALUE);
   BinaryOpHook(OutputTemporary,TemporaryB,TemporaryC,Node);
   EmitStore(TemporaryA,OutputTemporary,TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Type_);
  end else begin
@@ -1423,8 +1424,8 @@ begin
  try
   AssignOpLValueTemporary:=-1;
   OutputTemporary:=-1;
-  EmitNode(Node.Left,AssignOpLValueTemporary,[],pircvkLVALUE);
-  EmitNode(Node.Right,OutputTemporary,[],pircvkRVALUE);
+  EmitExpression(Node.Left,AssignOpLValueTemporary,[],pircvkLVALUE);
+  EmitExpression(Node.Right,OutputTemporary,[],pircvkRVALUE);
   EmitStore(AssignOpLValueTemporary,OutputTemporary,Node.Left.Type_);
  finally
   AssignOpLValueTemporary:=LastAssignOpLValueTemporary;
@@ -1607,10 +1608,10 @@ begin
       ((TPACCInstance(fInstance).IsIntType(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_) and TPACCInstance(fInstance).IsIntType(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_)) or
        (TPACCInstance(fInstance).IsFloatType(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_) and TPACCInstance(fInstance).IsFloatType(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_)) or
        ((TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Type_^.Kind=tkPOINTER) and (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_^.Kind=tkPOINTER)))) then begin
-   EmitNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,OutputTemporary,[],ValueKind);
+   EmitExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,OutputTemporary,[],ValueKind);
   end else begin
    TemporaryA:=-1;
-   EmitNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,TemporaryA,[],ValueKind);
+   EmitExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,TemporaryA,[],ValueKind);
    if TemporaryA<0 then begin
     TPACCInstance(fInstance).AddError('Internal error 2017-01-22-15-21-0000',@Node.SourceLocation,true);
    end else begin
@@ -1834,10 +1835,10 @@ begin
      end;
     end;
     astnkSTRUCT_REF:begin
-     EmitNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,OutputTemporary,[],pircvkLVALUE);
+     EmitExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,OutputTemporary,[],pircvkLVALUE);
     end;
     astnkDEREF:begin
-     EmitNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Operand,OutputTemporary,[],pircvkLVALUE);
+     EmitExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Operand,OutputTemporary,[],pircvkLVALUE);
     end;
     astnkFUNCDESG:begin
      if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
@@ -1866,21 +1867,21 @@ begin
  if ValueKind=pircvkLVALUE then begin
   LValueTemporary:=-1;
   OutputTemporary:=-1;
-  EmitNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,LValueTemporary,[],pircvkLVALUE);
+  EmitExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,LValueTemporary,[],pircvkLVALUE);
   EmitLoad(OutputTemporary,LValueTemporary,Node.Type_);
  end else begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-23-16-15-0000',nil,true);
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.EmitRETURN(const Node:TPACCAbstractSyntaxTreeNodeRETURNStatement;var OutputTemporary:TPACCInt32);
+procedure TPACCIntermediateRepresentationCodeFunction.EmitRETURN(const Node:TPACCAbstractSyntaxTreeNodeRETURNStatement);
 var TemporaryA:TPACCInt32;
 begin
  if assigned(FunctionDeclaration.Type_) and
     assigned(FunctionDeclaration.Type_^.ReturnType) then begin
   TemporaryA:=-1;
   if assigned(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node).ReturnValue) then begin
-   EmitNode(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node).ReturnValue,TemporaryA,[],pircvkRVALUE);
+   EmitExpression(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node).ReturnValue,TemporaryA,[],pircvkRVALUE);
    if TemporaryA<0 then begin
     TPACCInstance(fInstance).AddError('Internal error 2017-01-22-14-51-0000',@Node.SourceLocation,true);
    end;
@@ -1944,29 +1945,20 @@ begin
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements;var OutputTemporary:TPACCInt32);
-var Index,TemporaryA:TPACCInt32;
-begin
- for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(Node).Children.Count-1 do begin
-  TemporaryA:=-1;
-  EmitNode(TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index],TemporaryA,[],pircvkNONE);
- end;
-end;
-
 procedure TPACCIntermediateRepresentationCodeFunction.EmitCOMMA(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
 var TemporaryA:TPACCInt32;
 begin
  if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
     assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
   TemporaryA:=-1;
-  EmitNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,[],ValueKind);
-  EmitNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,OutputTemporary,[],ValueKind);
+  EmitExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,[],ValueKind);
+  EmitExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,OutputTemporary,[],ValueKind);
  end else begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-21-15-08-0000',nil,true);
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.EmitNode(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+procedure TPACCIntermediateRepresentationCodeFunction.EmitExpression(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
 begin
  if assigned(Node) then begin
 
@@ -2033,56 +2025,10 @@ begin
     EmitDEREF(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node),OutputTemporary,ValueKind);
    end;
 
-   astnkFOR:begin
-   end;
-
-   astnkDO:begin
-   end;
-
-   astnkWHILE:begin
-   end;
-
-   astnkSWITCH:begin
-   end;
-
-   astnkIF:begin
-   end;
-
    astnkTERNARY:begin
    end;
 
-   astnkRETURN:begin
-    EmitRETURN(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node),OutputTemporary);
-   end;
-
-   astnkSTATEMENTS:begin
-    EmitStatements(TPACCAbstractSyntaxTreeNodeStatements(Node),OutputTemporary);
-   end;
-
    astnkSTRUCT_REF:begin
-   end;
-
-   astnkGOTO:begin
-    EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_));
-   end;
-
-   astnkCOMPUTED_GOTO:begin
-   end;
-
-   astnkLABEL:begin
-    EmitLabel(TPACCAbstractSyntaxTreeNodeLabel(Node));
-   end;
-
-   astnkHIDDEN_LABEL:begin
-    EmitLabel(TPACCAbstractSyntaxTreeNodeLabel(Node));
-   end;
-
-   astnkBREAK:begin
-    EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeBREAKOrCONTINUEStatement(Node).Label_));
-   end;
-
-   astnkCONTINUE:begin
-    EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeBREAKOrCONTINUEStatement(Node).Label_));
    end;
 
    astnkOP_COMMA:begin
@@ -2230,8 +2176,60 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
+var Index,TemporaryA:TPACCInt32;
+begin
+ if assigned(Node) then begin
+  case Node.Kind of
+   astnkSTATEMENTS:begin
+    EmitStatements(TPACCAbstractSyntaxTreeNodeStatements(Node));
+   end;
+   astnkFOR:begin
+   end;
+   astnkDO:begin
+   end;
+   astnkWHILE:begin
+   end;
+   astnkSWITCH:begin
+   end;
+   astnkIF:begin
+   end;
+   astnkRETURN:begin
+    EmitRETURN(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node));
+   end;
+   astnkGOTO:begin
+    EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_));
+   end;
+   astnkCOMPUTED_GOTO:begin
+   end;
+   astnkLABEL:begin
+    EmitLabel(TPACCAbstractSyntaxTreeNodeLabel(Node));
+   end;
+   astnkHIDDEN_LABEL:begin
+    EmitLabel(TPACCAbstractSyntaxTreeNodeLabel(Node));
+   end;
+   astnkBREAK:begin
+    EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeBREAKOrCONTINUEStatement(Node).Label_));
+   end;
+   astnkCONTINUE:begin
+    EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeBREAKOrCONTINUEStatement(Node).Label_));
+   end;
+   else begin
+    EmitExpression(Node,TemporaryA,[],pircvkRVALUE);
+   end;
+  end;
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements);
+var Index:TPACCInt32;
+begin
+ for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(Node).Children.Count-1 do begin
+  EmitStatement(TPACCAbstractSyntaxTreeNodeStatements(Node).Children[Index]);
+ end;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
-var IgnoredTemporary:TPACCInt32;
 begin
 
  FunctionDeclaration:=AFunctionNode;
@@ -2266,7 +2264,7 @@ begin
 
  end;}
 
- EmitNode(AFunctionNode.Body,IgnoredTemporary,[],pircvkNONE);
+ EmitStatements(TPACCAbstractSyntaxTreeNodeStatements(AFunctionNode.Body));
 
  if CurrentBlock.Jump.Kind=pircjkNONE then begin
   CurrentBlock.Jump.Kind:=pircjkRET;
