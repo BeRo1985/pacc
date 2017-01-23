@@ -551,7 +551,11 @@ var CurrentState:TState;
     end;
     if Op=astnkOP_SUB then begin
      // C11 6.5.6.9: Pointer subtractions have type ptrdiff_t.
-     result:=TPACCAbstractSyntaxTreeNodeBinaryOperator.Create(TPACCInstance(Instance),Op,TPACCInstance(Instance).TypeLONG,lhs.SourceLocation,lhs,rhs);
+     if TPACCInstance(Instance).Target.SizeOfPointer=TPACCInstance(Instance).Target.SizeOfInt then begin
+      result:=TPACCAbstractSyntaxTreeNodeBinaryOperator.Create(TPACCInstance(Instance),Op,TPACCInstance(Instance).TypeINT,lhs.SourceLocation,lhs,rhs);
+     end else begin
+      result:=TPACCAbstractSyntaxTreeNodeBinaryOperator.Create(TPACCInstance(Instance),Op,TPACCInstance(Instance).TypeLONG,lhs.SourceLocation,lhs,rhs);
+     end;
     end else begin
      // C11 6.5.8.6, 6.5.9.3: Pointer comparisons have type int.
      result:=TPACCAbstractSyntaxTreeNodeBinaryOperator.Create(TPACCInstance(Instance),Op,TPACCInstance(Instance).TypeINT,lhs.SourceLocation,lhs,rhs);
