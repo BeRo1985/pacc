@@ -245,6 +245,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircjkRETF, // Return float
        pircjkRETD, // Return doube
        pircjkJMP,  // Jump
+       pircjkJMPA, // Jump to address 
        pircjkJF,   // Jump if false
        pircjkJT,   // Jump if true
        pircjkCOUNT
@@ -478,6 +479,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitFloatValue(const Node:TPACCAbstractSyntaxTreeNodeFloatValue;var OutputTemporary:TPACCInt32);
        procedure EmitStoreToVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;const InputTemporary:TPACCInt32);
        procedure EmitVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+       procedure EmitComputedJump(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator);
        procedure EmitCONV(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitADDR(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitDEREF(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
@@ -1533,6 +1535,16 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.EmitComputedJump(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator);
+var ComputedTargetTemporary:TPACCInt32;
+begin
+ ComputedTargetTemporary:=-1;
+ EmitExpression(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,ComputedTargetTemporary,[],pircvkRVALUE);
+ CurrentBlock.Jump.Kind:=pircjkJMPA;
+ CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ComputedTargetTemporary);
+ CloseBlock;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitCONV(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
 var TemporaryA,TemporaryB:TPACCInt32;
 begin
@@ -2042,9 +2054,10 @@ begin
 
    astnkGOTO:begin
     EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_));
-   end;   
+   end;
 
    astnkCOMPUTED_GOTO:begin
+    EmitComputedJump(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node));
    end;
 
    astnkLABEL:begin
