@@ -47,6 +47,8 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
       astnkOP_COMMA,
       astnkOP_ARROW,
       astnkOP_ASSIGN,
+      astnkOP_ASSIGN_OP,
+      astnkOP_ASSIGN_SRC,
       astnkOP_CAST,
       astnkOP_NOT,
       astnkOP_NEG,
@@ -74,19 +76,7 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
       astnkOP_GT,
       astnkOP_LT,
       astnkOP_GE,
-      astnkOP_LE,
-      astnkOP_A_ADD,
-      astnkOP_A_SUB,
-      astnkOP_A_MUL,
-      astnkOP_A_DIV,
-      astnkOP_A_MOD,
-      astnkOP_A_AND,
-      astnkOP_A_OR,
-      astnkOP_A_XOR,
-      astnkOP_A_SHR,
-      astnkOP_A_SHL,
-      astnkOP_A_SAL,
-      astnkOP_A_SAR
+      astnkOP_LE
      );
 
      TPACCAbstractSyntaxTreeNode=class;

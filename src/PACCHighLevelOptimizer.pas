@@ -375,6 +375,16 @@ begin
      result:=false;
     end;
    end;
+   astnkOP_ASSIGN_OP:begin
+    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
+     result:=false;
+    end;
+    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
+     result:=false;
+    end;
+   end;
+   astnkOP_ASSIGN_SRC:begin
+   end;
    astnkOP_CAST:begin
     if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) then begin
      result:=false;
@@ -565,102 +575,6 @@ begin
     end;
    end;
    astnkOP_LE:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
-   astnkOP_A_ADD:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
-   astnkOP_A_SUB:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
-   astnkOP_A_MUL:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
-   astnkOP_A_DIV:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
-   astnkOP_A_MOD:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
-   astnkOP_A_AND:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
-   astnkOP_A_OR:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
-   astnkOP_A_XOR:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
-   astnkOP_A_SHR:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
-   astnkOP_A_SHL:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
-   astnkOP_A_SAL:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
-   astnkOP_A_SAR:begin
     if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
      result:=false;
     end;
@@ -1299,6 +1213,16 @@ begin
     if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
      result:=true;
     end;
+   end;
+   astnkOP_ASSIGN_OP:begin
+    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
+     result:=true;
+    end;
+    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
+     result:=true;
+    end;
+   end;
+   astnkOP_ASSIGN_SRC:begin
    end;
    astnkOP_CAST:begin
     if OptimizeNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) then begin
@@ -2211,102 +2135,6 @@ begin
        result:=true;
       end;
      end;
-    end;
-   end;
-   astnkOP_A_ADD:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
-    end;
-   end;
-   astnkOP_A_SUB:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
-    end;
-   end;
-   astnkOP_A_MUL:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
-    end;
-   end;
-   astnkOP_A_DIV:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
-    end;
-   end;
-   astnkOP_A_MOD:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
-    end;
-   end;
-   astnkOP_A_AND:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
-    end;
-   end;
-   astnkOP_A_OR:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
-    end;
-   end;
-   astnkOP_A_XOR:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
-    end;
-   end;
-   astnkOP_A_SHR:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
-    end;
-   end;
-   astnkOP_A_SHL:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
-    end;
-   end;
-   astnkOP_A_SAL:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
-    end;
-   end;
-   astnkOP_A_SAR:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
     end;
    end;
   end;

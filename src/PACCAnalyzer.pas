@@ -489,6 +489,18 @@ var FunctionUsedVariablesHashMap:TPACCPointerHashMap;
      end;
      Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
     end;
+    astnkOP_ASSIGN_OP:begin
+     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
+     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
+     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
+        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
+        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
+        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
+      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
+     end;
+    end;
+    astnkOP_ASSIGN_SRC:begin
+    end;
     astnkOP_CAST:begin
      Scan(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand);
     end;
@@ -591,126 +603,6 @@ var FunctionUsedVariablesHashMap:TPACCPointerHashMap;
     astnkOP_LE:begin
      Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
      Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-    end;
-    astnkOP_A_ADD:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
-      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
-     end;
-    end;
-    astnkOP_A_SUB:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
-      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
-     end;
-    end;
-    astnkOP_A_MUL:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
-      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
-     end;
-    end;
-    astnkOP_A_DIV:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
-      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
-     end;
-    end;
-    astnkOP_A_MOD:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
-      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
-     end;
-    end;
-    astnkOP_A_AND:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
-      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
-     end;
-    end;
-    astnkOP_A_OR:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
-      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
-     end;
-    end;
-    astnkOP_A_XOR:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
-      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
-     end;
-    end;
-    astnkOP_A_SHR:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
-      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
-     end;
-    end;
-    astnkOP_A_SHL:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
-      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
-     end;
-    end;
-    astnkOP_A_SAL:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
-      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
-     end;
-    end;
-    astnkOP_A_SAR:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-     if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-        (TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Kind=astnkLVAR) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index>=0) and
-        (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index<length(FunctionInitializedVariables)) then begin
-      FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left).Index]:=true;
-     end;
     end;
    end;
   end;

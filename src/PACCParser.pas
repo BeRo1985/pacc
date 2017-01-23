@@ -1531,65 +1531,88 @@ var CurrentState:TState;
  end;
  function ParseAssignmentExpression:TPACCAbstractSyntaxTreeNode;
  var Op:TPACCAbstractSyntaxTreeNodeKind;
-     Value,Right:TPACCAbstractSyntaxTreeNode;
+     Right:TPACCAbstractSyntaxTreeNode;
  begin
   result:=ParseLogicalOrExpression;
   case CurrentState.Token^.TokenType of
    TOK_QUEST:begin
     result:=ParseConditionalExpressionEx(result);
    end;
-   TOK_ASSIGN,TOK_A_ADD,TOK_A_SUB,TOK_A_MUL,TOK_A_DIV,TOK_A_MOD,TOK_A_AND,TOK_A_OR,TOK_A_XOR,TOK_A_SHL,TOK_A_SHR:begin
+   TOK_ASSIGN:begin
+    NextToken;
+    Right:=TPACCInstance(Instance).TypeConversion(ParseAssignmentExpression);
+    EnsureLValue(result);
+    if TPACCInstance(Instance).IsArithmeticType(result.Type_) and (result.Type_.Kind<>Right.Type_.Kind) then begin
+     Right:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),
+                                                            astnkCONV,
+                                                            result.Type_,
+                                                            Right.SourceLocation,
+                                                            Right);
+    end;
+    result:=TPACCAbstractSyntaxTreeNodeBinaryOperator.Create(TPACCInstance(Instance),
+                                                             astnkOP_ASSIGN,
+                                                             result.Type_,
+                                                             result.SourceLocation,
+                                                             result,
+                                                             Right);
+   end;
+   TOK_A_ADD,TOK_A_SUB,TOK_A_MUL,TOK_A_DIV,TOK_A_MOD,TOK_A_AND,TOK_A_OR,TOK_A_XOR,TOK_A_SHL,TOK_A_SHR:begin
+    // 6.5.16.2 Compound assignment
+    // A compound assignment of the form E1 op = E2 is equivalent to the simple assignment
+    // exüression E1 = E1 op (E2), except that the lvalue E1 is >>>>>>evaluated only once<<<<<<<, and with
+    // respect to an indeterminately-sequenced function call, the operation of a compound
+    // assignment is a single evaluation.
     case CurrentState.Token^.TokenType of
      TOK_A_ADD:begin
-      Op:=astnkOP_A_ADD;
+      Op:=astnkOP_ADD;
      end;
      TOK_A_SUB:begin
-      Op:=astnkOP_A_SUB;
+      Op:=astnkOP_SUB;
      end;
      TOK_A_MUL:begin
-      Op:=astnkOP_A_MUL;
+      Op:=astnkOP_MUL;
      end;
      TOK_A_DIV:begin
-      Op:=astnkOP_A_DIV;
+      Op:=astnkOP_DIV;
      end;
      TOK_A_MOD:begin
-      Op:=astnkOP_A_MOD;
+      Op:=astnkOP_MOD;
      end;
      TOK_A_AND:begin
-      Op:=astnkOP_A_AND;
+      Op:=astnkOP_AND;
      end;
      TOK_A_OR:begin
-      Op:=astnkOP_A_OR;
+      Op:=astnkOP_OR;
      end;
      TOK_A_XOR:begin
-      Op:=astnkOP_A_XOR;
+      Op:=astnkOP_XOR;
      end;
      TOK_A_SHL:begin
-      Op:=astnkOP_A_SHL;
+      Op:=astnkOP_SHL;
      end;
-     TOK_A_SHR:begin
+     else {TOK_A_SHR:}begin
       if tfUnsigned in result.Type_^.Flags then begin
-       Op:=astnkOP_A_SHR;
+       Op:=astnkOP_SHR;
       end else begin
-       Op:=astnkOP_A_SAR;
+       Op:=astnkOP_SAR;
       end;
-     end;
-     else begin
-      Op:=astnkOP_ASSIGN;
      end;
     end;
     NextToken;
-    Value:=TPACCInstance(Instance).TypeConversion(ParseAssignmentExpression);
+    Right:=TPACCInstance(Instance).TypeConversion(ParseAssignmentExpression);
     EnsureLValue(result);
-    if Op=astnkOP_ASSIGN then begin
-     Right:=Value;
-    end else begin
-     Right:=BinaryOperation(Op,TPACCInstance(Instance).TypeConversion(result),Value);
-    end;
+    Right:=BinaryOperation(Op,
+                           TPACCInstance(Instance).TypeConversion(TPACCAbstractSyntaxTreeNode.Create(TPACCInstance(Instance),astnkOP_ASSIGN_SRC,result.Type_,result.SourceLocation)),
+                           Right);
     if TPACCInstance(Instance).IsArithmeticType(result.Type_) and (result.Type_.Kind<>Right.Type_.Kind) then begin
      Right:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkCONV,result.Type_,Right.SourceLocation,Right);
     end;
-    result:=TPACCAbstractSyntaxTreeNodeBinaryOperator.Create(TPACCInstance(Instance),astnkOP_ASSIGN,result.Type_,result.SourceLocation,result,Right);
+    result:=TPACCAbstractSyntaxTreeNodeBinaryOperator.Create(TPACCInstance(Instance),
+                                                             astnkOP_ASSIGN_OP,
+                                                             result.Type_,
+                                                             result.SourceLocation,
+                                                             result,
+                                                             Right);
    end;
   end;
  end;

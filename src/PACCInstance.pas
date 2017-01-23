@@ -760,13 +760,13 @@ begin
   astnkOP_DIV:begin
    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) div EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
   end;
-  astnkOP_A_AND:begin
+  astnkOP_AND:begin
    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) and EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
   end;
-  astnkOP_A_OR:begin
+  astnkOP_OR:begin
    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) or EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
   end;
-  astnkOP_A_XOR:begin
+  astnkOP_XOR:begin
    result:=EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,Address) xor EvaluateIntegerExpression(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,Address);
   end;
   astnkOP_EQ:begin

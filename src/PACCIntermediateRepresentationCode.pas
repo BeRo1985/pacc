@@ -515,6 +515,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure BinaryOpSAR(var OutputTemporary:TPACCInt32;const InputLeftTemporary,InputRightTemporary:TPACCInt32;const Node:TPACCAbstractSyntaxTreeNode);
        procedure ProcessLoadUnaryOpStore(const LValueNode,Node:TPACCAbstractSyntaxTreeNode;const UnaryOpHook:TPACCIntermediateRepresentationCodeUnaryOpHook;var OutputTemporary:TPACCInt32;const PostOp:boolean);
        procedure ProcessBinaryOp(const Node:TPACCAbstractSyntaxTreeNode;const BinaryOpHook:TPACCIntermediateRepresentationCodeBinaryOpHook;var OutputTemporary:TPACCInt32);
+       procedure ProcessAssignmentBinaryOp(const Node:TPACCAbstractSyntaxTreeNode;const BinaryOpHook:TPACCIntermediateRepresentationCodeBinaryOpHook;var OutputTemporary:TPACCInt32);
        procedure ProcessNode(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -1339,6 +1340,25 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.ProcessAssignmentBinaryOp(const Node:TPACCAbstractSyntaxTreeNode;const BinaryOpHook:TPACCIntermediateRepresentationCodeBinaryOpHook;var OutputTemporary:TPACCInt32);
+var TemporaryA,TemporaryB,TemporaryC:TPACCInt32;
+begin
+ if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
+    assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
+  OutputTemporary:=-1;
+  TemporaryA:=-1;
+  TemporaryB:=-1;
+  TemporaryC:=-1;
+  ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,[],pircvkLVALUE);
+//  EmitLoad(TemporaryB,TemporaryA,TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Type_);
+  ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryC,[],pircvkRVALUE);
+  BinaryOpHook(OutputTemporary,TemporaryB,TemporaryC,Node);
+//  EmitStore(TemporaryA,OutputTemporary,TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Type_);
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-23-14-04-0000',@Node.SourceLocation,true);
+ end;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.ProcessNode(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
 var Index,TemporaryA,TemporaryB,TemporaryC:TPACCInt32;
     Opcode:TPACCIntermediateRepresentationCodeOpcode;
@@ -1924,6 +1944,12 @@ begin
    astnkOP_ASSIGN:begin
    end;
 
+   astnkOP_ASSIGN_OP:begin
+   end;
+
+   astnkOP_ASSIGN_SRC:begin
+   end;
+
    astnkOP_CAST:begin
    end;
 
@@ -2044,42 +2070,6 @@ begin
    end;
 
    astnkOP_LE:begin
-   end;
-
-   astnkOP_A_ADD:begin
-   end;
-
-   astnkOP_A_SUB:begin
-   end;
-
-   astnkOP_A_MUL:begin
-   end;
-
-   astnkOP_A_DIV:begin
-   end;
-
-   astnkOP_A_MOD:begin
-   end;
-
-   astnkOP_A_AND:begin
-   end;
-
-   astnkOP_A_OR:begin
-   end;
-
-   astnkOP_A_XOR:begin
-   end;
-
-   astnkOP_A_SHR:begin
-   end;
-
-   astnkOP_A_SHL:begin
-   end;
-
-   astnkOP_A_SAL:begin
-   end;
-
-   astnkOP_A_SAR:begin
    end;
 
   end;
