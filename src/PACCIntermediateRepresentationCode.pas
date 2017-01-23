@@ -260,51 +260,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pirctDOUBLE
       );
 
-     PPACCIntermediateRepresentationCodeReferenceKind=^TPACCIntermediateRepresentationCodeReferenceKind;
-     TPACCIntermediateRepresentationCodeReferenceKind=
-      (
-       pircrkNONE,
-       pircrkCONSTANT,
-       pircrkTEMPORARY,
-       pircrkVARIABLE,
-       pircrkLABEL,
-       pircrkREGISTER,
-       pircrkSTACKSLOT,
-       pircrkCOUNT
-      );
-
-     PPACCIntermediateRepresentationCodeReference=^TPACCIntermediateRepresentationCodeReference;
-     TPACCIntermediateRepresentationCodeReference=record
-      Type_:PPACCType;
-      case Kind:TPACCIntermediateRepresentationCodeReferenceKind of
-       pircrkNONE:(
-       );
-       pircrkCONSTANT:(
-        case boolean of
-         false:(
-          ValueInteger:TPACCInt64;
-         );
-         true:(
-          ValueFloat:TPACCDouble;
-         );
-       );
-       pircrkTEMPORARY:(
-        TemporaryIndex:TPACCInt32;
-       );
-       pircrkVARIABLE:(
-        Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
-       );
-       pircrkLABEL:(
-        Label_:TPACCAbstractSyntaxTreeNodeLabel;
-       );
-       pircrkREGISTER:(
-        RegisterIndex:TPACCInt32;
-       );
-       pircrkSTACKSLOT:(
-        StackSlotIndex:TPACCInt32;
-       );
-     end;
-
      PPACCIntermediateRepresentationCodeTemporary=^TPACCIntermediateRepresentationCodeTemporary;
      TPACCIntermediateRepresentationCodeTemporary=record
       Index:TPACCInt32;
@@ -383,8 +338,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
      PPACCIntermediateRepresentationCodePhi=^TPACCIntermediateRepresentationCodePhi;
      TPACCIntermediateRepresentationCodePhi=record
-      To_:TPACCIntermediateRepresentationCodeReference;
-      Arguments:array of TPACCIntermediateRepresentationCodeReference;
+      To_:TPACCIntermediateRepresentationCodeOperand;
+      Arguments:array of TPACCIntermediateRepresentationCodeOperand;
       Blocks:array of TPACCIntermediateRepresentationCodeBlock;
       CountArguments:TPACCInt32;
       Type_:TPACCIntermediateRepresentationCodeType;
@@ -485,8 +440,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        AssignOpLValueTemporary:TPACCInt32;
 
-       function GetVariableReference(Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeReference;
-       function CreateTemporaryVariableReference(const Type_:PPACCType):TPACCIntermediateRepresentationCodeReference;
        function NewHiddenLabel:TPACCAbstractSyntaxTreeNodeLabel;
        procedure CloseBlock;
        function FindBlock(const Label_:TPACCAbstractSyntaxTreeNodeLabel):TPACCIntermediateRepresentationCodeBlock;
@@ -760,23 +713,6 @@ begin
  VariableTemporaryReferenceHashMap.Free;
  Temporaries:=nil;
  inherited Destroy;
-end;
-
-function TPACCIntermediateRepresentationCodeFunction.GetVariableReference(Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeReference;
-begin
- result.Kind:=pircrkVARIABLE;
- result.Type_:=Variable.Type_;
- result.Variable:=Variable;
-end;
-
-function TPACCIntermediateRepresentationCodeFunction.CreateTemporaryVariableReference(const Type_:PPACCType):TPACCIntermediateRepresentationCodeReference;
-var Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
-begin
- Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(fInstance,astnkLVAR,Type_,TPACCInstance(fInstance).SourceLocation,'',0);
- Variable.Index:=FunctionDeclaration.LocalVariables.Add(Variable);
- result.Kind:=pircrkVARIABLE;
- result.Type_:=Variable.Type_;
- result.Variable:=Variable;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.NewHiddenLabel:TPACCAbstractSyntaxTreeNodeLabel;
@@ -2106,7 +2042,7 @@ begin
 
    astnkGOTO:begin
     EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_));
-   end;
+   end;   
 
    astnkCOMPUTED_GOTO:begin
    end;
