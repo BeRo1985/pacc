@@ -470,6 +470,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitBinaryOpSHL(var OutputTemporary:TPACCInt32;const InputLeftTemporary,InputRightTemporary:TPACCInt32;const Node:TPACCAbstractSyntaxTreeNode);
        procedure EmitBinaryOpSHR(var OutputTemporary:TPACCInt32;const InputLeftTemporary,InputRightTemporary:TPACCInt32;const Node:TPACCAbstractSyntaxTreeNode);
        procedure EmitBinaryOpSAR(var OutputTemporary:TPACCInt32;const InputLeftTemporary,InputRightTemporary:TPACCInt32;const Node:TPACCAbstractSyntaxTreeNode);
+       procedure EmitNOT(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+       procedure EmitNEG(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitLoadUnaryOpStore(const LValueNode,Node:TPACCAbstractSyntaxTreeNode;const UnaryOpHook:TPACCIntermediateRepresentationCodeUnaryOpHook;var OutputTemporary:TPACCInt32;const PostOp:boolean);
        procedure EmitBinaryOp(const Node:TPACCAbstractSyntaxTreeNode;const BinaryOpHook:TPACCIntermediateRepresentationCodeBinaryOpHook;var OutputTemporary:TPACCInt32);
        procedure EmitAssignmentBinaryOp(const Node:TPACCAbstractSyntaxTreeNode;const BinaryOpHook:TPACCIntermediateRepresentationCodeBinaryOpHook;var OutputTemporary:TPACCInt32);
@@ -1246,12 +1248,50 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.EmitNOT(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+var ValueTemporary:TPACCInt32;
+begin
+ ValueTemporary:=-1;
+ EmitExpression(Node.Operand,ValueTemporary,[],pircvkRVALUE);
+ if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctINT);
+  EmitInstruction(pircoNOTI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(ValueTemporary)],Node.SourceLocation);
+ end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctLONG);
+  EmitInstruction(pircoNOTL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(ValueTemporary)],Node.SourceLocation);
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-23-18-03-0000',@Node.SourceLocation,true);
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.EmitNEG(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+var ValueTemporary:TPACCInt32;
+begin
+ ValueTemporary:=-1;
+ EmitExpression(Node.Operand,ValueTemporary,[],pircvkRVALUE);
+ if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctINT);
+  EmitInstruction(pircoNEGI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(ValueTemporary)],Node.SourceLocation);
+ end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctLONG);
+  EmitInstruction(pircoNEGL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(ValueTemporary)],Node.SourceLocation);
+ end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctFLOAT);
+  EmitInstruction(pircoNEGF,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(ValueTemporary)],Node.SourceLocation);
+ end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctDOUBLE);
+  EmitInstruction(pircoNEGD,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(ValueTemporary)],Node.SourceLocation);
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-23-18-03-0000',@Node.SourceLocation,true);
+ end;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitLoadUnaryOpStore(const LValueNode,Node:TPACCAbstractSyntaxTreeNode;const UnaryOpHook:TPACCIntermediateRepresentationCodeUnaryOpHook;var OutputTemporary:TPACCInt32;const PostOp:boolean);
 var TemporaryA,TemporaryB,TemporaryC,LValueTemporary:TPACCInt32;
 begin
  OutputTemporary:=-1;
  TemporaryA:=-1;
- TemporaryB:=-1;          
+ TemporaryB:=-1;
  TemporaryC:=-1;
  LValueTemporary:=-1;
  if LValueNode.Kind in [astnkLVAR,astnkGVAR] then begin
@@ -2018,9 +2058,11 @@ begin
    end;
 
    astnkOP_NOT:begin
+    EmitNOT(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node),OutputTemporary,ValueKind);
    end;
 
    astnkOP_NEG:begin
+    EmitNEG(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node),OutputTemporary,ValueKind);
    end;
 
    astnkOP_PRE_INC:begin
