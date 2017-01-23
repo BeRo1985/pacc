@@ -499,7 +499,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AOperands:array of TPACCIntermediateRepresentationCodeOperand;const SourceLocation:TPACCSourceLocation); overload;
        procedure UnaryOpHookInc(var OutputTemporary:TPACCInt32;const InputTemporary:TPACCInt32;const OpNode:TPACCAbstractSyntaxTreeNode);
        procedure UnaryOpHookDec(var OutputTemporary:TPACCInt32;const InputTemporary:TPACCInt32;const OpNode:TPACCAbstractSyntaxTreeNode);
-       procedure ProcessLoadUnaryOpStore(const LValueNode,OpNode:TPACCAbstractSyntaxTreeNode;const UnaryOpHook:TPACCIntermediateRepresentationCodeUnaryOpHook;var OutputTemporary:TPACCInt32;const PreOp,PostOp:boolean);
+       procedure ProcessLoadUnaryOpStore(const LValueNode,OpNode:TPACCAbstractSyntaxTreeNode;const UnaryOpHook:TPACCIntermediateRepresentationCodeUnaryOpHook;var OutputTemporary:TPACCInt32;const PostOp:boolean);
        procedure ProcessNode(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -937,7 +937,7 @@ begin
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.ProcessLoadUnaryOpStore(const LValueNode,OpNode:TPACCAbstractSyntaxTreeNode;const UnaryOpHook:TPACCIntermediateRepresentationCodeUnaryOpHook;var OutputTemporary:TPACCInt32;const PreOp,PostOp:boolean);
+procedure TPACCIntermediateRepresentationCodeFunction.ProcessLoadUnaryOpStore(const LValueNode,OpNode:TPACCAbstractSyntaxTreeNode;const UnaryOpHook:TPACCIntermediateRepresentationCodeUnaryOpHook;var OutputTemporary:TPACCInt32;const PostOp:boolean);
 var TemporaryA,TemporaryB,TemporaryC:TPACCInt32;
 begin
  OutputTemporary:=-1;
@@ -1574,7 +1574,7 @@ begin
 
    astnkOP_PRE_INC:begin
     if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) then begin
-     ProcessLoadUnaryOpStore(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Node,UnaryOpHookInc,OutputTemporary,true,false);
+     ProcessLoadUnaryOpStore(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Node,UnaryOpHookInc,OutputTemporary,false);
     end else begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-21-15-01-0002',nil,true);
     end;
@@ -1582,7 +1582,7 @@ begin
 
    astnkOP_PRE_DEC:begin
     if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) then begin
-     ProcessLoadUnaryOpStore(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Node,UnaryOpHookDec,OutputTemporary,true,false);
+     ProcessLoadUnaryOpStore(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Node,UnaryOpHookDec,OutputTemporary,false);
     end else begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-23-02-21-0000',nil,true);
     end;
@@ -1590,7 +1590,7 @@ begin
 
    astnkOP_POST_INC:begin
     if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) then begin
-     ProcessLoadUnaryOpStore(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Node,UnaryOpHookInc,OutputTemporary,false,true);
+     ProcessLoadUnaryOpStore(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Node,UnaryOpHookInc,OutputTemporary,true);
     end else begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-23-02-22-0000',nil,true);
     end;
@@ -1598,7 +1598,7 @@ begin
 
    astnkOP_POST_DEC:begin
     if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) then begin
-     ProcessLoadUnaryOpStore(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Node,UnaryOpHookDec,OutputTemporary,false,true);
+     ProcessLoadUnaryOpStore(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,Node,UnaryOpHookDec,OutputTemporary,true);
     end else begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-23-02-22-0001',nil,true);
     end;
