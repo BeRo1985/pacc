@@ -495,7 +495,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        function CreateIntegerValueOperand(const Value:TPACCInt64):TPACCIntermediateRepresentationCodeOperand;
        function CreateFloatValueOperand(const Value:TPACCDouble):TPACCIntermediateRepresentationCodeOperand;
        function CreateVariableOperand(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeOperand;
-       function CreateMemoryVariableOperand(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeOperand;
+       function CreateLabelOperand(const Label_:TPACCAbstractSyntaxTreeNodeLabel):TPACCIntermediateRepresentationCodeOperand;
+       function SetOperandFlags(const Operand:TPACCIntermediateRepresentationCodeOperand;const IncludeFlags,ExcludeFlags:TPACCIntermediateRepresentationCodeOperandFlags):TPACCIntermediateRepresentationCodeOperand;
        procedure EmitInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AOperands:array of TPACCIntermediateRepresentationCodeOperand;const SourceLocation:TPACCSourceLocation); overload;
        procedure UnaryOpHookInc(var OutputTemporary:TPACCInt32;const InputTemporary:TPACCInt32;const OpNode:TPACCAbstractSyntaxTreeNode);
        procedure UnaryOpHookDec(var OutputTemporary:TPACCInt32;const InputTemporary:TPACCInt32;const OpNode:TPACCAbstractSyntaxTreeNode);
@@ -844,11 +845,17 @@ begin
  result.Variable:=Variable;
 end;
 
-function TPACCIntermediateRepresentationCodeFunction.CreateMemoryVariableOperand(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeOperand;
+function TPACCIntermediateRepresentationCodeFunction.CreateLabelOperand(const Label_:TPACCAbstractSyntaxTreeNodeLabel):TPACCIntermediateRepresentationCodeOperand;
 begin
- result.Flags:=[pircofMEMORY];
- result.Kind:=pircokVARIABLE;
- result.Variable:=Variable;
+ result.Flags:=[];
+ result.Kind:=pircokLABEL;
+ result.Label_:=Label_;
+end;
+
+function TPACCIntermediateRepresentationCodeFunction.SetOperandFlags(const Operand:TPACCIntermediateRepresentationCodeOperand;const IncludeFlags,ExcludeFlags:TPACCIntermediateRepresentationCodeOperandFlags):TPACCIntermediateRepresentationCodeOperand;
+begin
+ result:=Operand;
+ result.Flags:=(result.Flags-ExcludeFlags)+IncludeFlags;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AOperands:array of TPACCIntermediateRepresentationCodeOperand;const SourceLocation:TPACCSourceLocation);
@@ -1026,10 +1033,10 @@ begin
      pircvkLVALUE:begin
       if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
        OutputTemporary:=CreateTemporary(pirctINT);
-       EmitInstruction(pircoADDROFI,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
+       EmitInstruction(pircoADDROFI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
       end else begin
        OutputTemporary:=CreateTemporary(pirctLONG);
-       EmitInstruction(pircoADDROFL,[CreateTemporaryOperand(OutputTemporary),CreateMemoryVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
+       EmitInstruction(pircoADDROFL,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))],Node.SourceLocation);
       end;
      end;
      pircvkRVALUE:begin
@@ -1605,6 +1612,13 @@ begin
    end;
 
    astnkOP_LABEL_ADDR:begin
+    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+     OutputTemporary:=CreateTemporary(pirctINT);
+     EmitInstruction(pircoADDROFI,[CreateTemporaryOperand(OutputTemporary),CreateLabelOperand(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_))],Node.SourceLocation);
+    end else begin
+     OutputTemporary:=CreateTemporary(pirctLONG);
+     EmitInstruction(pircoADDROFL,[CreateTemporaryOperand(OutputTemporary),CreateLabelOperand(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_))],Node.SourceLocation);
+    end;
    end;
 
    astnkOP_ADD:begin
