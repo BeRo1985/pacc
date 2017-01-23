@@ -473,6 +473,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
      TPACCIntermediateRepresentationCodeUnaryOpHook=procedure(var OutputTemporary:TPACCInt32;const InputTemporary:TPACCInt32;const OpNode:TPACCAbstractSyntaxTreeNode) of object;
 
+     TPACCIntermediateRepresentationCodeBinaryOpHook=procedure(var OutputTemporary:TPACCInt32;const InputLeftTemporary,InputRightTemporary:TPACCInt32;const OpNode:TPACCAbstractSyntaxTreeNode) of object;
+
      TPACCIntermediateRepresentationCodeFunction=class
       private
 
@@ -501,6 +503,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure UnaryOpHookInc(var OutputTemporary:TPACCInt32;const InputTemporary:TPACCInt32;const OpNode:TPACCAbstractSyntaxTreeNode);
        procedure UnaryOpHookDec(var OutputTemporary:TPACCInt32;const InputTemporary:TPACCInt32;const OpNode:TPACCAbstractSyntaxTreeNode);
        procedure ProcessLoadUnaryOpStore(const LValueNode,OpNode:TPACCAbstractSyntaxTreeNode;const UnaryOpHook:TPACCIntermediateRepresentationCodeUnaryOpHook;var OutputTemporary:TPACCInt32;const PostOp:boolean);
+       procedure ProcessLoadBinaryOpStore(const OpNode:TPACCAbstractSyntaxTreeNode;const BinaryOpHook:TPACCIntermediateRepresentationCodeBinaryOpHook;var OutputTemporary:TPACCInt32);
        procedure ProcessNode(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -983,6 +986,17 @@ begin
    ProcessNode(LValueNode,TemporaryB,[OutputTemporary],pircvkOVALUE);
   end;
  end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.ProcessLoadBinaryOpStore(const OpNode:TPACCAbstractSyntaxTreeNode;const BinaryOpHook:TPACCIntermediateRepresentationCodeBinaryOpHook;var OutputTemporary:TPACCInt32);
+var TemporaryA,TemporaryB:TPACCInt32;
+begin
+ OutputTemporary:=-1;
+ TemporaryA:=-1;
+ TemporaryB:=-1;
+ ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(OpNode).Left,TemporaryA,[],pircvkRVALUE);
+ ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(OpNode).Right,TemporaryB,[],pircvkRVALUE);
+ BinaryOpHook(OutputTemporary,TemporaryA,TemporaryB,OpNode);
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.ProcessNode(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
