@@ -2100,6 +2100,25 @@ begin
     end;
    end;
 
+   astnkRETURN:begin
+    EmitRETURN(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node));
+   end;
+
+   astnkGOTO:begin
+    EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_));
+   end;
+
+   astnkCOMPUTED_GOTO:begin
+   end;
+
+   astnkLABEL:begin
+    EmitLabel(TPACCAbstractSyntaxTreeNodeLabel(Node));
+   end;
+
+   astnkHIDDEN_LABEL:begin
+    EmitLabel(TPACCAbstractSyntaxTreeNodeLabel(Node));
+   end;
+
    astnkOP_ADD:begin
     EmitBinaryOp(Node,EmitBinaryOpADD,OutputTemporary);
    end;
@@ -2193,20 +2212,6 @@ begin
    astnkSWITCH:begin
    end;
    astnkIF:begin
-   end;
-   astnkRETURN:begin
-    EmitRETURN(TPACCAbstractSyntaxTreeNodeRETURNStatement(Node));
-   end;
-   astnkGOTO:begin
-    EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_));
-   end;
-   astnkCOMPUTED_GOTO:begin
-   end;
-   astnkLABEL:begin
-    EmitLabel(TPACCAbstractSyntaxTreeNodeLabel(Node));
-   end;
-   astnkHIDDEN_LABEL:begin
-    EmitLabel(TPACCAbstractSyntaxTreeNodeLabel(Node));
    end;
    astnkBREAK:begin
     EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeBREAKOrCONTINUEStatement(Node).Label_));
