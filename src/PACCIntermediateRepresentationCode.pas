@@ -1493,6 +1493,7 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
        end else begin
         TemporaryA:=-1;
         ProcessNode(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand,TemporaryA,[],vkLVALUE);
+        TPACCInstance(AInstance).AddError('Internal error 2017-01-23-01-40-0000',nil,true);
        end;
       end else begin
        TPACCInstance(AInstance).AddError('Internal error 2017-01-21-15-01-0002',nil,true);
