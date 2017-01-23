@@ -1713,7 +1713,37 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
       end;
      end;
 
-     astnkOP_MOD,
+     astnkOP_MOD:begin
+      if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
+         assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
+       TemporaryA:=-1;
+       TemporaryB:=-1;
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,[],vkRVALUE);
+       ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryB,[],vkRVALUE);
+       if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
+        OutputTemporary:=CreateTemporary(pirctINT);
+        if (tfUnsigned in TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Type_^.Flags) or
+           (tfUnsigned in TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right.Type_^.Flags) then begin
+         EmitInstruction(pircoUMODI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
+        end else begin
+         EmitInstruction(pircoSMODI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
+        end;
+       end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
+        OutputTemporary:=CreateTemporary(pirctLONG);
+        if (tfUnsigned in TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left.Type_^.Flags) or
+           (tfUnsigned in TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right.Type_^.Flags) then begin
+         EmitInstruction(pircoUMODL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
+        end else begin
+         EmitInstruction(pircoSMODL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
+        end;
+       end else begin
+        TPACCInstance(AInstance).AddError('Internal error 2017-01-23-01-21-0000',@Node.SourceLocation,true);
+       end;
+      end else begin
+       TPACCInstance(AInstance).AddError('Internal error 2017-01-23-01-21-0001',@Node.SourceLocation,true);
+      end;
+     end;
+
      astnkOP_AND,
      astnkOP_OR,
      astnkOP_XOR,
