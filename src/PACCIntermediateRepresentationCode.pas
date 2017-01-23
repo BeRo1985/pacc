@@ -473,6 +473,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitLoadUnaryOpStore(const LValueNode,Node:TPACCAbstractSyntaxTreeNode;const UnaryOpHook:TPACCIntermediateRepresentationCodeUnaryOpHook;var OutputTemporary:TPACCInt32;const PostOp:boolean);
        procedure EmitBinaryOp(const Node:TPACCAbstractSyntaxTreeNode;const BinaryOpHook:TPACCIntermediateRepresentationCodeBinaryOpHook;var OutputTemporary:TPACCInt32);
        procedure EmitAssignmentBinaryOp(const Node:TPACCAbstractSyntaxTreeNode;const BinaryOpHook:TPACCIntermediateRepresentationCodeBinaryOpHook;var OutputTemporary:TPACCInt32);
+       procedure EmitAssign(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32);
        procedure EmitAssignOp(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32);
        procedure EmitAssignSrc(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitIntegerValue(const Node:TPACCAbstractSyntaxTreeNodeIntegerValue;var OutputTemporary:TPACCInt32);
@@ -1355,6 +1356,22 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.EmitAssign(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32);
+var AssignLValueTemporary:TPACCInt32;
+begin
+ if Node.Left.Kind in [astnkLVAR,astnkGVAR] then begin
+  OutputTemporary:=-1;
+  EmitExpression(Node.Right,OutputTemporary,[],pircvkRVALUE);
+  EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Left),OutputTemporary);
+ end else begin
+  AssignLValueTemporary:=-1;
+  OutputTemporary:=-1;
+  EmitExpression(Node.Left,AssignLValueTemporary,[],pircvkLVALUE);
+  EmitExpression(Node.Right,OutputTemporary,[],pircvkRVALUE);
+  EmitStore(AssignLValueTemporary,OutputTemporary,Node.Left.Type_);
+ end;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitAssignOp(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32);
 var LastAssignOpLValueTemporary:TPACCInt32;
 begin
@@ -1987,6 +2004,7 @@ begin
    end;
 
    astnkOP_ASSIGN:begin
+    EmitAssign(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node),OutputTemporary);
    end;
 
    astnkOP_ASSIGN_OP:begin
