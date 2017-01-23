@@ -1206,14 +1206,41 @@ end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.BinaryOpAND(var OutputTemporary:TPACCInt32;const InputLeftTemporary,InputRightTemporary:TPACCInt32;const Node:TPACCAbstractSyntaxTreeNode);
 begin
+ if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctINT);
+  EmitInstruction(pircoANDI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(InputLeftTemporary),CreateTemporaryOperand(InputRightTemporary)],Node.SourceLocation);
+ end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctLONG);
+  EmitInstruction(pircoANDL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(InputLeftTemporary),CreateTemporaryOperand(InputRightTemporary)],Node.SourceLocation);
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-23-01-23-0000',@Node.SourceLocation,true);
+ end;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.BinaryOpOR(var OutputTemporary:TPACCInt32;const InputLeftTemporary,InputRightTemporary:TPACCInt32;const Node:TPACCAbstractSyntaxTreeNode);
 begin
+ if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctINT);
+  EmitInstruction(pircoORI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(InputLeftTemporary),CreateTemporaryOperand(InputRightTemporary)],Node.SourceLocation);
+ end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctLONG);
+  EmitInstruction(pircoORL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(InputLeftTemporary),CreateTemporaryOperand(InputRightTemporary)],Node.SourceLocation);
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-23-01-23-0002',@Node.SourceLocation,true);
+ end;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.BinaryOpXOR(var OutputTemporary:TPACCInt32;const InputLeftTemporary,InputRightTemporary:TPACCInt32;const Node:TPACCAbstractSyntaxTreeNode);
 begin
+ if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctINT);
+  EmitInstruction(pircoXORI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(InputLeftTemporary),CreateTemporaryOperand(InputRightTemporary)],Node.SourceLocation);
+ end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
+  OutputTemporary:=CreateTemporary(pirctLONG);
+  EmitInstruction(pircoXORL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(InputLeftTemporary),CreateTemporaryOperand(InputRightTemporary)],Node.SourceLocation);
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-23-01-24-0000',@Node.SourceLocation,true);
+ end;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.BinaryOpSHL(var OutputTemporary:TPACCInt32;const InputLeftTemporary,InputRightTemporary:TPACCInt32;const Node:TPACCAbstractSyntaxTreeNode);
@@ -1942,66 +1969,15 @@ begin
    end;
 
    astnkOP_AND:begin
-    if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-       assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     TemporaryA:=-1;
-     TemporaryB:=-1;
-     ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,[],pircvkRVALUE);
-     ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryB,[],pircvkRVALUE);
-     if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
-      OutputTemporary:=CreateTemporary(pirctINT);
-      EmitInstruction(pircoANDI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
-     end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
-      OutputTemporary:=CreateTemporary(pirctLONG);
-      EmitInstruction(pircoANDL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
-     end else begin
-      TPACCInstance(fInstance).AddError('Internal error 2017-01-23-01-23-0000',@Node.SourceLocation,true);
-     end;
-    end else begin
-     TPACCInstance(fInstance).AddError('Internal error 2017-01-23-01-23-0001',@Node.SourceLocation,true);
-    end;
+    ProcessBinaryOp(Node,BinaryOpAND,OutputTemporary);
    end;
 
    astnkOP_OR:begin
-    if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-       assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     TemporaryA:=-1;
-     TemporaryB:=-1;
-     ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,[],pircvkRVALUE);
-     ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryB,[],pircvkRVALUE);
-     if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
-      OutputTemporary:=CreateTemporary(pirctINT);
-      EmitInstruction(pircoORI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
-     end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
-      OutputTemporary:=CreateTemporary(pirctLONG);
-      EmitInstruction(pircoORL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
-     end else begin
-      TPACCInstance(fInstance).AddError('Internal error 2017-01-23-01-23-0002',@Node.SourceLocation,true);
-     end;
-    end else begin
-     TPACCInstance(fInstance).AddError('Internal error 2017-01-23-01-23-0003',@Node.SourceLocation,true);
-    end;
+    ProcessBinaryOp(Node,BinaryOpOR,OutputTemporary);
    end;
 
    astnkOP_XOR:begin
-    if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and
-       assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     TemporaryA:=-1;
-     TemporaryB:=-1;
-     ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left,TemporaryA,[],pircvkRVALUE);
-     ProcessNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right,TemporaryB,[],pircvkRVALUE);
-     if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
-      OutputTemporary:=CreateTemporary(pirctINT);
-      EmitInstruction(pircoXORI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
-     end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
-      OutputTemporary:=CreateTemporary(pirctLONG);
-      EmitInstruction(pircoXORL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(TemporaryA),CreateTemporaryOperand(TemporaryB)],Node.SourceLocation);
-     end else begin
-      TPACCInstance(fInstance).AddError('Internal error 2017-01-23-01-24-0000',@Node.SourceLocation,true);
-     end;
-    end else begin
-     TPACCInstance(fInstance).AddError('Internal error 2017-01-23-01-24-0001',@Node.SourceLocation,true);
-    end;
+    ProcessBinaryOp(Node,BinaryOpXOR,OutputTemporary);
    end;
 
    astnkOP_SHL:begin
