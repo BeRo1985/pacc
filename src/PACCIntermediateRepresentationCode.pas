@@ -1359,13 +1359,12 @@ end;
 procedure TPACCIntermediateRepresentationCodeFunction.EmitAssign(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32);
 var AssignLValueTemporary:TPACCInt32;
 begin
+ OutputTemporary:=-1;
  if Node.Left.Kind in [astnkLVAR,astnkGVAR] then begin
-  OutputTemporary:=-1;
   EmitExpression(Node.Right,OutputTemporary,[],pircvkRVALUE);
   EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Left),OutputTemporary);
  end else begin
   AssignLValueTemporary:=-1;
-  OutputTemporary:=-1;
   EmitExpression(Node.Left,AssignLValueTemporary,[],pircvkLVALUE);
   EmitExpression(Node.Right,OutputTemporary,[],pircvkRVALUE);
   EmitStore(AssignLValueTemporary,OutputTemporary,Node.Left.Type_);
