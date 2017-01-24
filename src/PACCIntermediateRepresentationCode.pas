@@ -616,6 +616,20 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        fDeclaration:TPACCAbstractSyntaxTreeNodeDeclaration;
 
+       fLabel:TPACCAbstractSyntaxTreeNodeLabel;
+
+       fVariable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+
+       function NewHiddenLabel:TPACCAbstractSyntaxTreeNodeLabel;
+
+       procedure EmitUI8(const Value:TPACCUInt8;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
+       procedure EmitUI16(const Value:TPACCUInt16;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
+       procedure EmitUI32(const Value:TPACCUInt32;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
+       procedure EmitUI64(const Value:TPACCUInt64;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
+       procedure EmitStringData(const Node:TPACCAbstractSyntaxTreeNodeStringValue);
+       procedure EmitPrimitiveTypeData(const Type_:PPACCType;const Node:TPACCAbstractSyntaxTreeNode);
+       procedure EmitInitializerList(const Nodes:TPACCAbstractSyntaxTreeNodeList;Size,Offset:TPACCInt64);
+
       public
 
        DataItems:TPACCIntermediateRepresentationCodeDeclarationDataItems;
@@ -631,6 +645,10 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Instance:TObject read fInstance;
 
        property Declaration:TPACCAbstractSyntaxTreeNodeDeclaration read fDeclaration;
+
+       property Label_:TPACCAbstractSyntaxTreeNodeLabel read fLabel write fLabel;
+
+       property Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable read fVariable write fVariable;
 
      end;
 
@@ -3860,6 +3878,10 @@ begin
 
  fDeclaration:=nil;
 
+ fLabel:=nil;
+
+ fVariable:=nil;
+
  DataItems:=nil;
  CountDataItems:=0;
 
@@ -3871,10 +3893,254 @@ begin
  inherited Destroy;
 end;
 
+function TPACCIntermediateRepresentationCodeDeclaration.NewHiddenLabel:TPACCAbstractSyntaxTreeNodeLabel;
+begin
+ result:=TPACCAbstractSyntaxTreeNodeLabel.Create(fInstance,astnkHIDDEN_LABEL,nil,TPACCInstance(fInstance).SourceLocation,'');
+end;
+
+procedure TPACCIntermediateRepresentationCodeDeclaration.EmitUI8(const Value:TPACCUInt8;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
+begin
+end;
+
+procedure TPACCIntermediateRepresentationCodeDeclaration.EmitUI16(const Value:TPACCUInt16;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
+begin
+end;
+
+procedure TPACCIntermediateRepresentationCodeDeclaration.EmitUI32(const Value:TPACCUInt32;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
+begin
+end;
+
+procedure TPACCIntermediateRepresentationCodeDeclaration.EmitUI64(const Value:TPACCUInt64;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
+begin
+end;
+
+procedure TPACCIntermediateRepresentationCodeDeclaration.EmitStringData(const Node:TPACCAbstractSyntaxTreeNodeStringValue);
+var Index:TPACCInt32;
+begin
+ for Index:=1 to length(Node.Value) do begin
+  EmitUI8(TPACCUInt8(AnsiChar(Node.Value[Index])),nil,1);
+ end;
+ case Node.Type_.ChildType^.Size of
+  2:begin
+   EmitUI16(0,nil,1);
+  end;
+  4:begin
+   EmitUI32(0,nil,1);
+  end;
+  8:begin
+   EmitUI64(0,nil,1);
+  end;
+  else begin
+   EmitUI8(0,nil,1);
+  end;
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeDeclaration.EmitPrimitiveTypeData(const Type_:PPACCType;const Node:TPACCAbstractSyntaxTreeNode);
+var f:TPACCFloat;
+    d:TPACCDouble;
+    i32:TPACCInt32;
+    i64:TPACCInt64;
+    BaseNode:TPACCAbstractSyntaxTreeNode;
+    BaseType:PPACCType;
+    StringDeclaration:TPACCIntermediateRepresentationCodeDeclaration;
+begin
+ case Type_^.Kind of
+  tkFLOAT:begin
+   f:=TPACCInstance(Instance).EvaluateFloatExpression(Node,tkFLOAT);
+   EmitUI32(TPACCUInt32(pointer(@f)^),nil,1);
+  end;
+  tkDOUBLE:begin
+   d:=TPACCInstance(Instance).EvaluateFloatExpression(Node,tkDOUBLE);
+   EmitUI64(TPACCUInt64(pointer(@d)^),nil,1);
+  end;
+  tkBOOL:begin
+   EmitUI8(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),nil,1);
+  end;
+  tkCHAR:begin
+   EmitUI8(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),nil,1);
+  end;
+  tkSHORT:begin
+   EmitUI16(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),nil,1);
+  end;
+  tkINT:begin
+   EmitUI32(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),nil,1);
+  end;
+  tkLONG,tkLLONG:begin
+   EmitUI64(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),nil,1);
+  end;
+  tkPOINTER:begin
+   if Node.Kind=astnkOP_LABEL_ADDR then begin
+    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+     EmitUI32(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_),1);
+    end else begin
+     EmitUI64(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_),1);
+    end;
+   end else if (Node is TPACCAbstractSyntaxTreeNodeUnaryOperator) and
+               (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Kind=astnkSTRING) and
+               (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.Kind=tkARRAY) and
+               (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.ChildType^.Kind=tkCHAR) then begin
+    StringDeclaration:=TPACCIntermediateRepresentationCodeDeclaration.Create(fInstance);
+    TPACCInstance(fInstance).IntermediateRepresentationCode.Declarations.Add(StringDeclaration);
+    StringDeclaration.Label_:=NewHiddenLabel;
+    StringDeclaration.EmitStringData(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand));
+    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+     EmitUI32(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(StringDeclaration.Label_)),1);
+    end else begin
+     EmitUI64(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(StringDeclaration.Label_)),1);
+    end;
+   end else if Node.Kind=astnkGVAR then begin
+    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+     EmitUI32(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),1);
+    end else begin
+     EmitUI64(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),1);
+    end;
+   end else begin
+    BaseNode:=nil;
+    i64:=TPACCInstance(Instance).EvaluateIntegerExpression(Node,@BaseNode);
+    if assigned(BaseNode) then begin
+     BaseType:=BaseNode.Type_;
+     if BaseNode.Kind in [astnkCONV,astnkADDR] then begin
+      BaseNode:=TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand;
+     end;
+     if BaseNode.Kind=astnkGVAR then begin
+      Assert(assigned(BaseType.ChildType));
+      if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+       EmitUI32(i64*BaseType.ChildType^.Size,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),1);
+      end else begin
+       EmitUI64(i64*BaseType.ChildType^.Size,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),1);
+      end;
+     end else begin
+      TPACCInstance(Instance).AddError('Global variable expected',@BaseNode.SourceLocation,true);
+     end;
+    end else begin
+     EmitUI32(TPACCUInt32(i64) and $ffffffff,nil,1);
+    end;
+   end;
+  end;
+  else begin
+   TPACCInstance(Instance).AddError('Internal error 2017-01-25-00-21-0000',@Node.SourceLocation,true);
+  end;
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeDeclaration.EmitInitializerList(const Nodes:TPACCAbstractSyntaxTreeNodeList;Size,Offset:TPACCInt64);
+var Index:TPACCInt32;
+    Node:TPACCAbstractSyntaxTreeNodeInitializer;
+    Value:TPACCAbstractSyntaxTreeNode;
+    Delta,Data:TPACCInt64;
+    ToType:PPACCType;
+    SubDeclaration:TPACCIntermediateRepresentationCodeDeclaration;
+begin
+ Index:=0;
+ while Index<Nodes.Count do begin
+  Node:=TPACCAbstractSyntaxTreeNodeInitializer(Nodes[Index]);
+  Value:=Node.InitializionValue;
+  Delta:=Node.InitializionOffset-Offset;
+  if Delta>0 then begin
+   EmitUI8(0,nil,Delta);
+  end;
+  if Node.ToType^.BitSize>0 then begin
+   if Node.ToType^.BitOffset=0 then begin
+    Data:=TPACCInstance(Instance).EvaluateIntegerExpression(Value,nil);
+    ToType:=Node.ToType;
+    inc(Index);
+    while Index<Nodes.Count do begin
+     Node:=TPACCAbstractSyntaxTreeNodeInitializer(Nodes[Index]);
+     if Node.Type_.BitSize<=0 then begin
+      break;
+     end else begin
+      Value:=Node.InitializionValue;
+      ToType:=Node.ToType;
+      Data:=Data or ((TPACCInstance(Instance).EvaluateIntegerExpression(Value,nil) and ((TPACCInt64(1) shl ToType^.BitSize)-1)) shl ToType^.BitOffset);
+      inc(Index);
+     end;
+    end;
+    case ToType^.Kind of
+     tkBOOL:begin
+      EmitUI8(Data,nil,1);
+     end;
+     tkCHAR:begin
+      EmitUI8(Data,nil,1);
+     end;
+     tkSHORT:begin
+      EmitUI16(Data,nil,1);
+     end;
+     tkINT:begin
+      EmitUI32(Data,nil,1);
+     end;
+     tkLONG,tkLLONG:begin
+      EmitUI64(Data,nil,1);
+     end;
+     else begin
+      TPACCInstance(Instance).AddError('Internal error 2017-01-17-11-27-0000',@Node.SourceLocation,true);
+     end;
+    end;
+    inc(Offset,ToType^.Size);
+    dec(Size,ToType^.Size);
+    if Index=Nodes.Count then begin
+     break;
+    end;
+   end else begin
+    TPACCInstance(Instance).AddError('Internal error 2017-01-17-11-21-0000',@Node.SourceLocation,true);
+   end;
+  end else begin
+   inc(Offset,Node.ToType^.Size);
+   dec(Size,Node.ToType^.Size);
+  end;
+  if Value.Kind=astnkADDR then begin
+   case TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand.Kind of
+    astnkLVAR:begin
+     SubDeclaration:=TPACCIntermediateRepresentationCodeDeclaration.Create(fInstance);
+     TPACCInstance(fInstance).IntermediateRepresentationCode.Declarations.Add(SubDeclaration);
+     SubDeclaration.Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand);
+     SubDeclaration.EmitInitializerList(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).LocalVariableInitialization,
+                                        TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).Type_.Size,
+                                        0);
+     if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+      EmitUI32(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand))),1);
+     end else begin
+      EmitUI64(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand))),1);
+     end;
+    end;
+    astnkGVAR:begin
+     if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+      EmitUI32(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand))),1);
+     end else begin
+      EmitUI64(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand))),1);
+     end;
+    end;
+    astnkFUNCDESG:begin
+     if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+      EmitUI32(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).Variable))),1);
+     end else begin
+      EmitUI64(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).Variable))),1);
+     end;
+    end;
+    else begin
+     TPACCInstance(Instance).AddError('Internal error 2017-01-25-00-41-0000',@Node.SourceLocation,true);
+    end;
+   end;
+  end else if (Value.Kind=astnkLVAR) and assigned(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Value).LocalVariableInitialization) then begin
+   EmitInitializerList(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Value).LocalVariableInitialization,
+                       TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Value).Type_.Size,
+                       0);
+  end else begin
+   EmitPrimitiveTypeData(Node.ToType,Node.InitializionValue);
+  end;
+  inc(Index);
+ end;
+ if Size>0 then begin
+  EmitUI8(0,nil,Size);
+ end;
+end;
+
 procedure TPACCIntermediateRepresentationCodeDeclaration.EmitDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
 begin
  fDeclaration:=Node;
-
+ EmitInitializerList(Node.DeclarationInitialization,
+                     Node.DeclarationVariable.Type_^.Size,
+                     0);
 end;
 
 constructor TPACCIntermediateRepresentationCodeDeclarationList.Create;
