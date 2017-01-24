@@ -246,6 +246,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircjkRETD, // Return doube
        pircjkJMP,  // Jump
        pircjkJMPA, // Jump to address
+       pircjkJMPT, // Jump table
        pircjkJZI,   // Jump if zero int
        pircjkJNZI,  // Jump if not zero int
        pircjkJZL,   // Jump if zero long
@@ -382,7 +383,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        Jump:TPACCIntermediateRepresentationCodeJump;
 
-       Successors:array[0..1] of TPACCIntermediateRepresentationCodeBlock;
+       Successors:array of TPACCIntermediateRepresentationCodeBlock;
 
        Link:TPACCIntermediateRepresentationCodeBlock;
 
@@ -638,8 +639,7 @@ begin
 
  Jump.Kind:=pircjkNONE;
 
- Successors[0]:=nil;
- Successors[1]:=nil;
+ Successors:=nil;
 
  Link:=nil;
 
@@ -676,6 +676,8 @@ begin
  end;
 
  Instructions:=nil;
+
+ Successors:=nil;
 
  Fronts:=nil;
  CountFronts:=0;
@@ -800,6 +802,7 @@ begin
  if assigned(CurrentBlock) and (CurrentBlock.Jump.Kind=pircjkNONE) then begin
   CloseBlock;
   CurrentBlock.Jump.Kind:=pircjkJMP;
+  SetLength(CurrentBlock.Successors,1);
   CurrentBlock.Successors[0]:=Block;
  end;
  if Block.Jump.Kind<>pircjkNONE then begin
@@ -816,13 +819,22 @@ var Block:TPACCIntermediateRepresentationCodeBlock;
 begin
  Block:=FindBlock(Label_);
  CurrentBlock.Jump.Kind:=pircjkJMP;
+ SetLength(CurrentBlock.Successors,1);
  CurrentBlock.Successors[0]:=Block;
  CloseBlock;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitJumpTable(const Operand:TPACCIntermediateRepresentationCodeOperand;
                                                                     const Blocks:array of TPACCIntermediateRepresentationCodeBlock);
+var Index:TPACCInt32;
 begin
+ CurrentBlock.Jump.Kind:=pircjkJMPT;
+ CurrentBlock.Jump.Operand:=Operand;
+ SetLength(CurrentBlock.Successors,length(Blocks));
+ for Index:=0 to length(Blocks)-1 do begin
+  CurrentBlock.Successors[Index]:=Blocks[Index];
+ end;
+ CloseBlock;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitPhi(const Type_:TPACCIntermediateRepresentationCodeType;
@@ -1904,6 +1916,7 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-28-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(LeftTemporary);
+ SetLength(CurrentBlock.Successors,2);
  if IsAND then begin
   CurrentBlock.Successors[0]:=b0;
   CurrentBlock.Successors[1]:=b2;
@@ -1932,6 +1945,7 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-29-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(RightTemporary);
+ SetLength(CurrentBlock.Successors,2);
  CurrentBlock.Successors[0]:=b1;
  CurrentBlock.Successors[1]:=b2;
  CloseBlock;
@@ -1983,6 +1997,7 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-48-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(OperandTemporary);
+ SetLength(CurrentBlock.Successors,2);
  CurrentBlock.Successors[0]:=b0;
  CurrentBlock.Successors[1]:=b1;
  CloseBlock;
@@ -2606,6 +2621,7 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-13-52-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
+ SetLength(CurrentBlock.Successors,2);
  CurrentBlock.Successors[0]:=b0;
  CurrentBlock.Successors[1]:=b1;
  CloseBlock;
@@ -3009,6 +3025,7 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-14-39-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
+ SetLength(CurrentBlock.Successors,2);
  CurrentBlock.Successors[0]:=BodyBlock;
  CurrentBlock.Successors[1]:=BreakBlock;
  CloseBlock;
@@ -3066,6 +3083,7 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-14-39-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
+ SetLength(CurrentBlock.Successors,2);
  CurrentBlock.Successors[0]:=BodyBlock;
  CurrentBlock.Successors[1]:=BreakBlock;
  CloseBlock;
@@ -3107,6 +3125,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.EmitSWITCHStatement(const 
   EmitInstruction(Opcode,[CreateTemporaryOperand(ConditionTemporary),ValueOperand,CreateIntegerValueOperand(ComparsionValue)],Node.SourceLocation);
   CurrentBlock.Jump.Kind:=JumpKind;
   CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
+  SetLength(CurrentBlock.Successors,2);
   CurrentBlock.Successors[0]:=TrueBlock;
   CurrentBlock.Successors[1]:=FalseBlock;
   CloseBlock;
@@ -3274,6 +3293,7 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-13-52-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
+ SetLength(CurrentBlock.Successors,2);
  CurrentBlock.Successors[0]:=b0;
  CurrentBlock.Successors[1]:=b1;
  CloseBlock;
