@@ -594,7 +594,7 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
 
 implementation
 
-uses PACCInstance;
+uses PACCInstance,PACCSort;
 
 function TPACCIntermediateRepresentationCodeBitSet.GetBit(const AIndex:TPACCInt32):boolean;
 begin
@@ -2708,7 +2708,75 @@ begin
  end;
 end;
 
+function TPACCIntermediateRepresentationCodeFunctionEmitDECLCompareInitializers(a,b:pointer):TPACCInt32;
+begin
+ result:=TPACCAbstractSyntaxTreeNodeInitializer(a).InitializionOffset-TPACCAbstractSyntaxTreeNodeInitializer(b).InitializionOffset;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitDECL(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
+ procedure EmitInitializerList(const Nodes:TPACCAbstractSyntaxTreeNodeList;const VariableTemporary:TPACCInt32;const Size,Offset:TPACCInt64);
+ var Index,TargetTemporary,ValueTemporary:TPACCInt32;
+     SubNode:TPACCAbstractSyntaxTreeNodeInitializer;
+     TempNodes:TPACCAbstractSyntaxTreeNodeList;
+     LastEnd:TPACCInt64;
+ begin
+
+  TempNodes:=TPACCAbstractSyntaxTreeNodeList.Create;
+  try
+
+   for Index:=0 to Nodes.Count-1 do begin
+    SubNode:=TPACCAbstractSyntaxTreeNodeInitializer(Nodes[Index]);
+    TempNodes.Add(SubNode);
+   end;
+
+   TempNodes.Sort(TPACCIntermediateRepresentationCodeFunctionEmitDECLCompareInitializers);
+
+   TargetTemporary:=-1;
+
+   LastEnd:=0;
+   for Index:=0 to TempNodes.Count-1 do begin
+    SubNode:=TPACCAbstractSyntaxTreeNodeInitializer(TempNodes[Index]);
+    if LastEnd<SubNode.InitializionOffset then begin
+     if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+      EmitInstruction(pircoADDI,[CreateTemporaryOperand(TargetTemporary),CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+SubNode.InitializionOffset)],SubNode.SourceLocation);
+      EmitInstruction(pircoZEROMEMI,[CreateTemporaryOperand(TargetTemporary),CreateIntegerValueOperand(SubNode.Type_.Size)],SubNode.SourceLocation);
+     end else begin
+      EmitInstruction(pircoADDL,[CreateTemporaryOperand(TargetTemporary),CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+SubNode.InitializionOffset)],SubNode.SourceLocation);
+      EmitInstruction(pircoZEROMEML,[CreateTemporaryOperand(TargetTemporary),CreateIntegerValueOperand(SubNode.Type_.Size)],SubNode.SourceLocation);
+     end;
+    end else begin
+     ValueTemporary:=-1;
+     if SubNode.Kind=astnkLVAR then begin
+      EmitInitializerList(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).LocalVariableInitialization,
+                          VariableTemporary,
+                          TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).Type_.Size,
+                          Offset+SubNode.InitializionOffset);
+     end else begin
+      EmitExpression(SubNode,ValueTemporary,[],pircvkRVALUE);
+      if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+       EmitInstruction(pircoADDI,[CreateTemporaryOperand(TargetTemporary),CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+SubNode.InitializionOffset)],SubNode.SourceLocation);
+      end else begin
+       EmitInstruction(pircoADDL,[CreateTemporaryOperand(TargetTemporary),CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+SubNode.InitializionOffset)],SubNode.SourceLocation);
+      end;
+      EmitStore(TargetTemporary,ValueTemporary,SubNode.Type_);
+     end;
+    end;
+    LastEnd:=SubNode.InitializionOffset+SubNode.Type_.Size;
+   end;
+   if LastEnd<Size then begin
+    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+     EmitInstruction(pircoADDI,[CreateTemporaryOperand(TargetTemporary),CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+LastEnd)],Node.SourceLocation);
+     EmitInstruction(pircoZEROMEMI,[CreateTemporaryOperand(TargetTemporary),CreateIntegerValueOperand(Size-LastEnd)],Node.SourceLocation);
+    end else begin
+     EmitInstruction(pircoADDL,[CreateTemporaryOperand(TargetTemporary),CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+LastEnd)],Node.SourceLocation);
+     EmitInstruction(pircoZEROMEML,[CreateTemporaryOperand(TargetTemporary),CreateIntegerValueOperand(Size-LastEnd)],Node.SourceLocation);
+    end;
+   end;
+
+  finally
+   TempNodes.Free;
+  end;
+ end;
 var Index,VariableTemporary,ValueTemporary:TPACCInt32;
 begin
  if assigned(Node.DeclarationInitialization) then begin
@@ -2726,8 +2794,8 @@ begin
     EmitStore(VariableTemporary,ValueTemporary,Node.DeclarationVariable.Type_);
    end;
   end else begin
-   for Index:=0 to Node.DeclarationInitialization.Count-1 do begin
-   end;
+   EmitExpression(Node.DeclarationVariable,VariableTemporary,[],pircvkLVALUE);
+   EmitInitializerList(Node.DeclarationInitialization,VariableTemporary,Node.DeclarationVariable.Type_^.Size,0);
   end;
  end;
 end;
