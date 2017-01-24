@@ -576,12 +576,42 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeFunction read GetItem write SetItem; default;
      end;
 
+     TPACCIntermediateRepresentationCodeDeclaration=class
+      private
+
+       fInstance:TObject;
+
+      public
+
+       constructor Create(const AInstance:TObject); reintroduce;
+       destructor Destroy; override;
+
+       procedure EmitDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
+
+      published
+
+       property Instance:TObject read fInstance;
+
+     end;
+
+     TPACCIntermediateRepresentationCodeDeclarationList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeDeclaration;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeDeclaration);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeDeclaration read GetItem write SetItem; default;
+     end;
+
      TPACCIntermediateRepresentationCode=class
       private
 
        fInstance:TObject;
 
        fFunctions:TPACCIntermediateRepresentationCodeFunctionList;
+
+       fDeclarations:TPACCIntermediateRepresentationCodeDeclarationList;
 
        fExternalDeclarations:TPACCAbstractSyntaxTreeNodeList;
 
@@ -595,6 +625,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Instance:TObject read fInstance;
 
        property Functions:TPACCIntermediateRepresentationCodeFunctionList read fFunctions;
+
+       property Declarations:TPACCIntermediateRepresentationCodeDeclarationList read fDeclarations;
 
        property ExternalDeclarations:TPACCAbstractSyntaxTreeNodeList read fExternalDeclarations;
 
@@ -744,6 +776,7 @@ begin
  inherited Create;
 
  fInstance:=AInstance;
+
  TPACCInstance(fInstance).AllocatedObjects.Add(self);
 
  Blocks:=TPACCIntermediateRepresentationCodeBlockList.Create;
@@ -3756,45 +3789,6 @@ begin
 
 end;
 
-procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
-var Index:TPACCInt32;
-    RootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNodeTranslationUnit;
-    Node:TPACCAbstractSyntaxTreeNode;
-    Function_:TPACCIntermediateRepresentationCodeFunction;
-begin
- if assigned(ARootAbstractSyntaxTreeNode) and
-    (TPACCAbstractSyntaxTreeNode(ARootAbstractSyntaxTreeNode).Kind=astnkTRANSLATIONUNIT) and
-    (ARootAbstractSyntaxTreeNode is TPACCAbstractSyntaxTreeNodeTranslationUnit) then begin
-  RootAbstractSyntaxTreeNode:=TPACCAbstractSyntaxTreeNodeTranslationUnit(ARootAbstractSyntaxTreeNode);
-  for Index:=0 to RootAbstractSyntaxTreeNode.Children.Count-1 do begin
-   Node:=RootAbstractSyntaxTreeNode.Children[Index];
-   if assigned(Node) then begin
-    case Node.Kind of
-     astnkEXTERN_DECL:begin
-      if TPACCAbstractSyntaxTreeNodeDeclaration(Node).DeclarationVariable.Kind=astnkGVAR then begin
-       TPACCInstance(AInstance).IntermediateRepresentationCode.ExternalDeclarations.Add(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeDeclaration(Node).DeclarationVariable));
-      end else begin
-       TPACCInstance(AInstance).AddError('Internal error 2017-01-24-21-39-0000',@Node.SourceLocation,true);
-      end;
-     end;
-     astnkDECL:begin
-     end;
-     astnkFUNC:begin
-      Function_:=TPACCIntermediateRepresentationCodeFunction.Create(AInstance);
-      TPACCInstance(AInstance).IntermediateRepresentationCode.Functions.Add(Function_);
-      Function_.EmitFunction(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node));
-     end;
-     else begin
-      TPACCInstance(AInstance).AddError('Internal error 2017-01-22-14-05-0000',@Node.SourceLocation,true);
-     end;
-    end;
-   end;
-  end;
- end else begin
-  TPACCInstance(AInstance).AddError('Internal error 2017-01-19-11-48-0000',nil,true);
- end;
-end;
-
 constructor TPACCIntermediateRepresentationCodeFunctionList.Create;
 begin
  inherited Create;
@@ -3815,6 +3809,47 @@ begin
  inherited Items[AIndex]:=pointer(AItem);
 end;
 
+constructor TPACCIntermediateRepresentationCodeDeclaration.Create(const AInstance:TObject);
+begin
+
+ inherited Create;
+
+ fInstance:=AInstance;
+
+ TPACCInstance(fInstance).AllocatedObjects.Add(self);
+
+end;
+
+destructor TPACCIntermediateRepresentationCodeDeclaration.Destroy;
+begin
+ inherited Destroy;
+end;
+
+procedure TPACCIntermediateRepresentationCodeDeclaration.EmitDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
+begin
+
+end;
+
+constructor TPACCIntermediateRepresentationCodeDeclarationList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCIntermediateRepresentationCodeDeclarationList.Destroy;
+begin
+ inherited Destroy;
+end;
+
+function TPACCIntermediateRepresentationCodeDeclarationList.GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeDeclaration;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCIntermediateRepresentationCodeDeclarationList.SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeDeclaration);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
 constructor TPACCIntermediateRepresentationCode.Create(const AInstance:TObject);
 begin
 
@@ -3824,6 +3859,8 @@ begin
 
  fFunctions:=TPACCIntermediateRepresentationCodeFunctionList.Create;
 
+ fDeclarations:=TPACCIntermediateRepresentationCodeDeclarationList.Create;
+
  fExternalDeclarations:=TPACCAbstractSyntaxTreeNodeList.Create;
 
 end;
@@ -3831,8 +3868,52 @@ end;
 destructor TPACCIntermediateRepresentationCode.Destroy;
 begin
  fFunctions.Free;
+ fDeclarations.Free;
  fExternalDeclarations.Free;
  inherited Destroy;
+end;
+
+procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
+var Index:TPACCInt32;
+    RootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNodeTranslationUnit;
+    Node:TPACCAbstractSyntaxTreeNode;
+    Function_:TPACCIntermediateRepresentationCodeFunction;
+    Declaration:TPACCIntermediateRepresentationCodeDeclaration;
+begin
+ if assigned(ARootAbstractSyntaxTreeNode) and
+    (TPACCAbstractSyntaxTreeNode(ARootAbstractSyntaxTreeNode).Kind=astnkTRANSLATIONUNIT) and
+    (ARootAbstractSyntaxTreeNode is TPACCAbstractSyntaxTreeNodeTranslationUnit) then begin
+  RootAbstractSyntaxTreeNode:=TPACCAbstractSyntaxTreeNodeTranslationUnit(ARootAbstractSyntaxTreeNode);
+  for Index:=0 to RootAbstractSyntaxTreeNode.Children.Count-1 do begin
+   Node:=RootAbstractSyntaxTreeNode.Children[Index];
+   if assigned(Node) then begin
+    case Node.Kind of
+     astnkEXTERN_DECL:begin
+      if TPACCAbstractSyntaxTreeNodeDeclaration(Node).DeclarationVariable.Kind=astnkGVAR then begin
+       TPACCInstance(AInstance).IntermediateRepresentationCode.ExternalDeclarations.Add(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeDeclaration(Node).DeclarationVariable));
+      end else begin
+       TPACCInstance(AInstance).AddError('Internal error 2017-01-24-21-39-0000',@Node.SourceLocation,true);
+      end;
+     end;
+     astnkDECL:begin
+      Declaration:=TPACCIntermediateRepresentationCodeDeclaration.Create(AInstance);
+      TPACCInstance(AInstance).IntermediateRepresentationCode.Declarations.Add(Declaration);
+      Declaration.EmitDeclaration(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
+     end;
+     astnkFUNC:begin
+      Function_:=TPACCIntermediateRepresentationCodeFunction.Create(AInstance);
+      TPACCInstance(AInstance).IntermediateRepresentationCode.Functions.Add(Function_);
+      Function_.EmitFunction(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node));
+     end;
+     else begin
+      TPACCInstance(AInstance).AddError('Internal error 2017-01-22-14-05-0000',@Node.SourceLocation,true);
+     end;
+    end;
+   end;
+  end;
+ end else begin
+  TPACCInstance(AInstance).AddError('Internal error 2017-01-19-11-48-0000',nil,true);
+ end;
 end;
 
 end.
