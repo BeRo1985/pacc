@@ -1041,40 +1041,99 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitStore(const DestinationLValueTemporary,InputValueTemporary:TPACCInt32;const Type_:PPACCType;const SourceLocation:TPACCSourceLocation);
+var ValueTemporary,MaskedValueTemporary,MaskedInputValueTemporary,ShiftedInputValueTemporary,CombinedValueTemporary:TPACCInt32;
 begin
  if (Type_^.BitSize>0) and
     (Type_^.Kind in (PACCIntermediateRepresentationCodeINTTypeKinds+PACCIntermediateRepresentationCodeLONGTypeKinds)) then begin
-
- end else begin
   case Type_^.Kind of
    tkBOOL,tkCHAR:begin
-    EmitInstruction(pircoSTIC,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+    ValueTemporary:=CreateTemporary(pirctINT);
+    if tfUnsigned in Type_^.Flags then begin
+     EmitInstruction(pircoLDUCI,[CreateTemporaryOperand(ValueTemporary),CreateTemporaryOperand(DestinationLValueTemporary)],SourceLocation);
+    end else begin
+     EmitInstruction(pircoLDSCI,[CreateTemporaryOperand(ValueTemporary),CreateTemporaryOperand(DestinationLValueTemporary)],SourceLocation);
+    end;
    end;
    tkSHORT:begin
-    EmitInstruction(pircoSTIS,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+    ValueTemporary:=CreateTemporary(pirctINT);
+    if tfUnsigned in Type_^.Flags then begin
+     EmitInstruction(pircoLDUSI,[CreateTemporaryOperand(ValueTemporary),CreateTemporaryOperand(DestinationLValueTemporary)],SourceLocation);
+    end else begin
+     EmitInstruction(pircoLDSSI,[CreateTemporaryOperand(ValueTemporary),CreateTemporaryOperand(DestinationLValueTemporary)],SourceLocation);
+    end;
    end;
    tkINT,tkENUM:begin
-    EmitInstruction(pircoSTII,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+    ValueTemporary:=CreateTemporary(pirctINT);
+    if tfUnsigned in Type_^.Flags then begin
+     EmitInstruction(pircoLDUII,[CreateTemporaryOperand(ValueTemporary),CreateTemporaryOperand(DestinationLValueTemporary)],SourceLocation);
+    end else begin
+     EmitInstruction(pircoLDSII,[CreateTemporaryOperand(ValueTemporary),CreateTemporaryOperand(DestinationLValueTemporary)],SourceLocation);
+    end;
    end;
    tkLONG,tkLLONG:begin
-    EmitInstruction(pircoSTLL,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
-   end;
-   tkFLOAT:begin
-    EmitInstruction(pircoSTF,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
-   end;
-   tkDOUBLE,tkLDOUBLE:begin
-    EmitInstruction(pircoSTD,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
-   end;
-   tkPOINTER:begin
-    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
-     EmitInstruction(pircoSTII,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+    ValueTemporary:=CreateTemporary(pirctLONG);
+    if tfUnsigned in Type_^.Flags then begin
+     EmitInstruction(pircoLDULL,[CreateTemporaryOperand(ValueTemporary),CreateTemporaryOperand(DestinationLValueTemporary)],SourceLocation);
     end else begin
-     EmitInstruction(pircoSTLL,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+     EmitInstruction(pircoLDSLL,[CreateTemporaryOperand(ValueTemporary),CreateTemporaryOperand(DestinationLValueTemporary)],SourceLocation);
     end;
    end;
    else begin
-    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-17-28-0000',@SourceLocation,true);
+    ValueTemporary:=-1;
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-17-41-0000',@SourceLocation,true);
    end;
+  end;
+  if Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
+   MaskedValueTemporary:=CreateTemporary(pirctINT);
+   MaskedInputValueTemporary:=CreateTemporary(pirctINT);
+   ShiftedInputValueTemporary:=CreateTemporary(pirctINT);
+   CombinedValueTemporary:=CreateTemporary(pirctINT);
+   EmitInstruction(pircoANDI,[CreateTemporaryOperand(MaskedValueTemporary),CreateTemporaryOperand(ValueTemporary),CreateIntegerValueOperand(not (((TPACCInt64(1) shl Type_^.BitSize)-1) shl Type_^.BitOffset))],SourceLocation);
+   EmitInstruction(pircoANDI,[CreateTemporaryOperand(MaskedInputValueTemporary),CreateTemporaryOperand(InputValueTemporary),CreateIntegerValueOperand((TPACCInt64(1) shl Type_^.BitSize)-1)],SourceLocation);
+   EmitInstruction(pircoSHRI,[CreateTemporaryOperand(ShiftedInputValueTemporary),CreateTemporaryOperand(MaskedInputValueTemporary),CreateIntegerValueOperand(Type_^.BitOffset)],SourceLocation);
+   EmitInstruction(pircoORI,[CreateTemporaryOperand(CombinedValueTemporary),CreateTemporaryOperand(MaskedValueTemporary),CreateTemporaryOperand(ShiftedInputValueTemporary)],SourceLocation);
+  end else begin
+   MaskedValueTemporary:=CreateTemporary(pirctLONG);
+   MaskedInputValueTemporary:=CreateTemporary(pirctLONG);
+   ShiftedInputValueTemporary:=CreateTemporary(pirctLONG);
+   CombinedValueTemporary:=CreateTemporary(pirctLONG);
+   EmitInstruction(pircoANDL,[CreateTemporaryOperand(MaskedValueTemporary),CreateTemporaryOperand(ValueTemporary),CreateIntegerValueOperand(not (((TPACCInt64(1) shl Type_^.BitSize)-1) shl Type_^.BitOffset))],SourceLocation);
+   EmitInstruction(pircoANDL,[CreateTemporaryOperand(MaskedInputValueTemporary),CreateTemporaryOperand(InputValueTemporary),CreateIntegerValueOperand((TPACCInt64(1) shl Type_^.BitSize)-1)],SourceLocation);
+   EmitInstruction(pircoSHRL,[CreateTemporaryOperand(ShiftedInputValueTemporary),CreateTemporaryOperand(MaskedInputValueTemporary),CreateIntegerValueOperand(Type_^.BitOffset)],SourceLocation);
+   EmitInstruction(pircoORL,[CreateTemporaryOperand(CombinedValueTemporary),CreateTemporaryOperand(MaskedValueTemporary),CreateTemporaryOperand(ShiftedInputValueTemporary)],SourceLocation);
+  end;
+  ValueTemporary:=CombinedValueTemporary;
+ end else begin
+  ValueTemporary:=InputValueTemporary;
+ end;
+ case Type_^.Kind of
+  tkBOOL,tkCHAR:begin
+   EmitInstruction(pircoSTIC,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(ValueTemporary)],SourceLocation);
+  end;
+  tkSHORT:begin
+   EmitInstruction(pircoSTIS,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(ValueTemporary)],SourceLocation);
+  end;
+  tkINT,tkENUM:begin
+   EmitInstruction(pircoSTII,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(ValueTemporary)],SourceLocation);
+  end;
+  tkLONG,tkLLONG:begin
+   EmitInstruction(pircoSTLL,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(ValueTemporary)],SourceLocation);
+  end;
+  tkFLOAT:begin
+   EmitInstruction(pircoSTF,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(ValueTemporary)],SourceLocation);
+  end;
+  tkDOUBLE,tkLDOUBLE:begin
+   EmitInstruction(pircoSTD,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(ValueTemporary)],SourceLocation);
+  end;
+  tkPOINTER:begin
+   if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+    EmitInstruction(pircoSTII,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(ValueTemporary)],SourceLocation);
+   end else begin
+    EmitInstruction(pircoSTLL,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(ValueTemporary)],SourceLocation);
+   end;
+  end;
+  else begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-17-40-0000',@SourceLocation,true);
   end;
  end;
 end;
