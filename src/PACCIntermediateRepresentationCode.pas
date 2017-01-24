@@ -248,8 +248,14 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircjkRETD, // Return doube
        pircjkJMP,  // Jump
        pircjkJMPA, // Jump to address
-       pircjkJZ,   // Jump if zero
-       pircjkJNZ,  // Jump if not zero
+       pircjkJZI,   // Jump if zero int
+       pircjkJNZI,  // Jump if not zero int
+       pircjkJZL,   // Jump if zero long
+       pircjkJNZL,  // Jump if not zero long
+       pircjkJZF,   // Jump if zero float
+       pircjkJNZF,  // Jump if not zero float
+       pircjkJZD,   // Jump if zero double
+       pircjkJNZD,  // Jump if not zero double
        pircjkCOUNT
       );
 
@@ -1607,29 +1613,79 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitLogicalAND(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32);
-var lt,lf,ld:TPACCAbstractSyntaxTreeNodeLabel;
-    bt,bf:TPACCIntermediateRepresentationCodeBlock;
+var l0,l1,l2,l3:TPACCAbstractSyntaxTreeNodeLabel;
+    b0,b1,b2,b3:TPACCIntermediateRepresentationCodeBlock;
     LeftTemporary,RightTemporary:TPACCInt32;
 begin
- lt:=NewHiddenLabel;
- lf:=NewHiddenLabel;
- ld:=NewHiddenLabel;
- bt:=FindBlock(lt);
- bf:=FindBlock(lf);
+
+ l0:=NewHiddenLabel;
+ l1:=NewHiddenLabel;
+ l2:=NewHiddenLabel;
+ l3:=NewHiddenLabel;
+ b0:=FindBlock(l0);
+ b1:=FindBlock(l1);
+ b2:=FindBlock(l2);
+ b3:=FindBlock(l3);
+
+ LeftTemporary:=-1;
  EmitExpression(Node.Left,LeftTemporary,[],pircvkRVALUE);
- CurrentBlock.Jump.Kind:=pircjkJNZ;
- CurrentBlock.Jump.Operand:=CreateTemporaryOperand(OutputTemporary);
- CurrentBlock.Successors[0]:=bt;
- CurrentBlock.Successors[1]:=bf;
+ if (Node.Left.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
+    ((Node.Left.Type_^.Kind=tkPOINTER) and
+     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZI;
+ end else if (Node.Left.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
+             ((Node.Left.Type_^.Kind=tkPOINTER) and
+              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZL;
+ end else if Node.Left.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZF;
+ end else if Node.Left.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZD;
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-28-0000',@Node.SourceLocation,true);
+ end;
+ CurrentBlock.Jump.Operand:=CreateTemporaryOperand(LeftTemporary);
+ CurrentBlock.Successors[0]:=b0;
+ CurrentBlock.Successors[1]:=b2;
  CloseBlock;
- EmitLabel(lt);
+
+ EmitLabel(l0);
+ RightTemporary:=-1;
  EmitExpression(Node.Right,RightTemporary,[],pircvkRVALUE);
- EmitJump(ld);
- EmitLabel(lf);
- EmitJump(ld);
- EmitLabel(ld);
+ if (Node.Right.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
+    ((Node.Right.Type_^.Kind=tkPOINTER) and
+     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZI;
+ end else if (Node.Right.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
+             ((Node.Right.Type_^.Kind=tkPOINTER) and
+              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZL;
+ end else if Node.Right.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZF;
+ end else if Node.Right.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZD;
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-29-0000',@Node.SourceLocation,true);
+ end;
+ CurrentBlock.Jump.Operand:=CreateTemporaryOperand(RightTemporary);
+ CurrentBlock.Successors[0]:=b1;
+ CurrentBlock.Successors[1]:=b2;
+ CloseBlock;
+
+ EmitLabel(l1);
+ EmitJump(l3);
+
+ EmitLabel(l2);
+ EmitJump(l3);
+
+ EmitLabel(l3);
  OutputTemporary:=CreateTemporary(pirctINT);
- EmitInstruction(pircoPHI,[CreateTemporaryOperand(OutputTemporary),CreateLabelOperand(lt),CreateIntegerValueOperand(1),CreateLabelOperand(lf),CreateIntegerValueOperand(0)],Node.SourceLocation);
+ EmitInstruction(pircoPHI,
+                 [CreateTemporaryOperand(OutputTemporary),
+                  CreateLabelOperand(l0),CreateIntegerValueOperand(1),
+                  CreateLabelOperand(l2),CreateIntegerValueOperand(0)],
+                 Node.SourceLocation);
+                 
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitLogicalOR(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32);
