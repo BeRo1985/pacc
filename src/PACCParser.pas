@@ -2797,6 +2797,7 @@ var CurrentState:TState;
       end;
      end;
     end;
+    result:=Fields;
    end;
   var Tag:TPACCRawByteString;
   begin
