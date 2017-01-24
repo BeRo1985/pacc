@@ -514,8 +514,10 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitSTRUCT_REF(const Node:TPACCAbstractSyntaxTreeNodeStructReference;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitCOMMA(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitExpression(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
-       procedure EmitFOR(const Node:TPACCAbstractSyntaxTreeNodeFORStatement);
-       procedure EmitWHILEOrDO(const Node:TPACCAbstractSyntaxTreeNodeWHILEOrDOStatement;const IsWHILE:boolean);
+       procedure EmitFORStatement(const Node:TPACCAbstractSyntaxTreeNodeFORStatement);
+       procedure EmitWHILEOrDOStatement(const Node:TPACCAbstractSyntaxTreeNodeWHILEOrDOStatement;const IsWHILE:boolean);
+       procedure EmitSWITCHStatement(const Node:TPACCAbstractSyntaxTreeNodeSWITCHStatement);
+       procedure EmitIFStatement(const Node:TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator);
        procedure EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
        procedure EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements);
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
@@ -2963,7 +2965,7 @@ begin
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.EmitFOR(const Node:TPACCAbstractSyntaxTreeNodeFORStatement);
+procedure TPACCIntermediateRepresentationCodeFunction.EmitFORStatement(const Node:TPACCAbstractSyntaxTreeNodeFORStatement);
 var ConditionLabel,BodyLabel,ContinueLabel,BreakLabel:TPACCAbstractSyntaxTreeNodeLabel;
     ConditionBlock,BodyBlock,ContinueBlock,BreakBlock:TPACCIntermediateRepresentationCodeBlock;
     IgnoredTemporary,ConditionTemporary:TPACCInt32;
@@ -3016,7 +3018,7 @@ begin
 
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.EmitWHILEOrDO(const Node:TPACCAbstractSyntaxTreeNodeWHILEOrDOStatement;const IsWHILE:boolean);
+procedure TPACCIntermediateRepresentationCodeFunction.EmitWHILEOrDOStatement(const Node:TPACCAbstractSyntaxTreeNodeWHILEOrDOStatement;const IsWHILE:boolean);
 var BodyLabel,ContinueLabel,BreakLabel:TPACCAbstractSyntaxTreeNodeLabel;
     BodyBlock,ContinueBlock,BreakBlock:TPACCIntermediateRepresentationCodeBlock;
     ConditionTemporary:TPACCInt32;
@@ -3065,6 +3067,57 @@ begin
 
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.EmitSWITCHStatement(const Node:TPACCAbstractSyntaxTreeNodeSWITCHStatement);
+begin
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.EmitIFStatement(const Node:TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator);
+var l0,l1,l2:TPACCAbstractSyntaxTreeNodeLabel;
+    b0,b1,b2:TPACCIntermediateRepresentationCodeBlock;
+    ConditionTemporary:TPACCInt32;
+begin
+
+ l0:=NewHiddenLabel;
+ l1:=NewHiddenLabel;
+ l2:=NewHiddenLabel;
+ b0:=FindBlock(l0);
+ b1:=FindBlock(l1);
+ b2:=FindBlock(l2);
+
+ ConditionTemporary:=-1;
+ EmitExpression(Node.Condition,ConditionTemporary,[],pircvkRVALUE);
+ if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
+    ((Node.Condition.Type_^.Kind=tkPOINTER) and
+     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZI;
+ end else if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
+             ((Node.Condition.Type_^.Kind=tkPOINTER) and
+              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZL;
+ end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZF;
+ end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZD;
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-13-52-0000',@Node.SourceLocation,true);
+ end;
+ CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
+ CurrentBlock.Successors[0]:=b0;
+ CurrentBlock.Successors[1]:=b1;
+ CloseBlock;
+
+ EmitLabel(l0);
+ EmitStatement(Node.Then_);
+ EmitJump(l2);
+
+ EmitLabel(l1);
+ EmitStatement(Node.Else_);
+ EmitJump(l2);
+
+ EmitLabel(l2);
+
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
 var Index,TemporaryA:TPACCInt32;
 begin
@@ -3074,17 +3127,19 @@ begin
     EmitStatements(TPACCAbstractSyntaxTreeNodeStatements(Node));
    end;
    astnkFOR:begin
-    EmitFOR(TPACCAbstractSyntaxTreeNodeFORStatement(Node));
+    EmitFORStatement(TPACCAbstractSyntaxTreeNodeFORStatement(Node));
    end;
    astnkDO:begin
-    EmitWHILEOrDO(TPACCAbstractSyntaxTreeNodeWHILEOrDOStatement(Node),false);
+    EmitWHILEOrDOStatement(TPACCAbstractSyntaxTreeNodeWHILEOrDOStatement(Node),false);
    end;
    astnkWHILE:begin
-    EmitWHILEOrDO(TPACCAbstractSyntaxTreeNodeWHILEOrDOStatement(Node),true);
+    EmitWHILEOrDOStatement(TPACCAbstractSyntaxTreeNodeWHILEOrDOStatement(Node),true);
    end;
    astnkSWITCH:begin
+    EmitSWITCHStatement(TPACCAbstractSyntaxTreeNodeSWITCHStatement(Node));
    end;
    astnkIF:begin
+    EmitIFStatement(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node));
    end;
    astnkBREAK:begin
     EmitJump(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeBREAKOrCONTINUEStatement(Node).Label_));
