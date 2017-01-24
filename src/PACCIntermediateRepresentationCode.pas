@@ -590,6 +590,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      PPACCIntermediateRepresentationCodeDeclarationDataItem=^TPACCIntermediateRepresentationCodeDeclarationDataItem;
      TPACCIntermediateRepresentationCodeDeclarationDataItem=record
       ValueOffsetBase:TPACCAbstractSyntaxTreeNode;
+      Count:TPACCUInt64;
       case Kind:TPACCIntermediateRepresentationCodeDeclarationDataItemKind of
        pircdikNONE:(
        );
@@ -620,6 +621,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        fVariable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
 
+       fSize:TPACCInt64;
+
        function NewHiddenLabel:TPACCAbstractSyntaxTreeNodeLabel;
 
        procedure EmitUI8(const Value:TPACCUInt8;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
@@ -649,6 +652,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Label_:TPACCAbstractSyntaxTreeNodeLabel read fLabel write fLabel;
 
        property Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable read fVariable write fVariable;
+
+       property Size:TPACCInt64 read fSize write fSize;
 
      end;
 
@@ -3882,6 +3887,8 @@ begin
 
  fVariable:=nil;
 
+ fSize:=0;
+
  DataItems:=nil;
  CountDataItems:=0;
 
@@ -3899,19 +3906,71 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeDeclaration.EmitUI8(const Value:TPACCUInt8;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
+var Index:TPACCInt32;
+    DataItem:PPACCIntermediateRepresentationCodeDeclarationDataItem;
 begin
+ Index:=CountDataItems;
+ inc(CountDataItems);
+ if length(DataItems)<CountDataItems then begin
+  SetLength(DataItems,CountDataItems*2);
+ end;
+ DataItem:=@DataItems[Index];
+ DataItem^.Kind:=pircdikUI8;
+ DataItem^.ValueUI8:=Value;
+ DataItem^.ValueOffsetBase:=ValueOffsetBase;
+ DataItem^.Count:=Count;
+ fSize:=fSize+(TPACCInt64(Count)*SizeOf(TPACCUInt8));
 end;
 
 procedure TPACCIntermediateRepresentationCodeDeclaration.EmitUI16(const Value:TPACCUInt16;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
+var Index:TPACCInt32;
+    DataItem:PPACCIntermediateRepresentationCodeDeclarationDataItem;
 begin
+ Index:=CountDataItems;
+ inc(CountDataItems);
+ if length(DataItems)<CountDataItems then begin
+  SetLength(DataItems,CountDataItems*2);
+ end;
+ DataItem:=@DataItems[Index];
+ DataItem^.Kind:=pircdikUI16;
+ DataItem^.ValueUI16:=Value;
+ DataItem^.ValueOffsetBase:=ValueOffsetBase;
+ DataItem^.Count:=Count;
+ fSize:=fSize+(TPACCInt64(Count)*SizeOf(TPACCUInt16));
 end;
 
 procedure TPACCIntermediateRepresentationCodeDeclaration.EmitUI32(const Value:TPACCUInt32;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
+var Index:TPACCInt32;
+    DataItem:PPACCIntermediateRepresentationCodeDeclarationDataItem;
 begin
+ Index:=CountDataItems;
+ inc(CountDataItems);
+ if length(DataItems)<CountDataItems then begin
+  SetLength(DataItems,CountDataItems*2);
+ end;
+ DataItem:=@DataItems[Index];
+ DataItem^.Kind:=pircdikUI32;
+ DataItem^.ValueUI32:=Value;
+ DataItem^.ValueOffsetBase:=ValueOffsetBase;
+ DataItem^.Count:=Count;
+ fSize:=fSize+(TPACCInt64(Count)*SizeOf(TPACCUInt32));
 end;
 
 procedure TPACCIntermediateRepresentationCodeDeclaration.EmitUI64(const Value:TPACCUInt64;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
+var Index:TPACCInt32;
+    DataItem:PPACCIntermediateRepresentationCodeDeclarationDataItem;
 begin
+ Index:=CountDataItems;
+ inc(CountDataItems);
+ if length(DataItems)<CountDataItems then begin
+  SetLength(DataItems,CountDataItems*2);
+ end;
+ DataItem:=@DataItems[Index];
+ DataItem^.Kind:=pircdikUI64;
+ DataItem^.ValueUI64:=Value;
+ DataItem^.ValueOffsetBase:=ValueOffsetBase;
+ DataItem^.Count:=Count;
+ fSize:=fSize+(TPACCInt64(Count)*SizeOf(TPACCUInt64));
 end;
 
 procedure TPACCIntermediateRepresentationCodeDeclaration.EmitStringData(const Node:TPACCAbstractSyntaxTreeNodeStringValue);
