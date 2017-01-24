@@ -576,12 +576,50 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeFunction read GetItem write SetItem; default;
      end;
 
+     PPACCIntermediateRepresentationCodeDeclarationDataItemKind=^TPACCIntermediateRepresentationCodeDeclarationDataItemKind;
+     TPACCIntermediateRepresentationCodeDeclarationDataItemKind=
+      (
+       pircdikNONE,
+       pircdikUI8,
+       pircdikUI16,
+       pircdikUI32,
+       pircdikUI64,
+       pircdikCOUNT
+      );
+
+     PPACCIntermediateRepresentationCodeDeclarationDataItem=^TPACCIntermediateRepresentationCodeDeclarationDataItem;
+     TPACCIntermediateRepresentationCodeDeclarationDataItem=record
+      ValueOffsetBase:TPACCAbstractSyntaxTreeNode;
+      case Kind:TPACCIntermediateRepresentationCodeDeclarationDataItemKind of
+       pircdikNONE:(
+       );
+       pircdikUI8:(
+        ValueUI8:TPACCUInt8;
+       );
+       pircdikUI16:(
+        ValueUI16:TPACCUInt16;
+       );
+       pircdikUI32:(
+        ValueUI32:TPACCUInt32;
+       );
+       pircdikUI64:(
+        ValueUI64:TPACCUInt64;
+       );
+     end;
+
+     TPACCIntermediateRepresentationCodeDeclarationDataItems=array of TPACCIntermediateRepresentationCodeDeclarationDataItem;
+
      TPACCIntermediateRepresentationCodeDeclaration=class
       private
 
        fInstance:TObject;
 
+       fDeclaration:TPACCAbstractSyntaxTreeNodeDeclaration;
+
       public
+
+       DataItems:TPACCIntermediateRepresentationCodeDeclarationDataItems;
+       CountDataItems:TPACCInt32;
 
        constructor Create(const AInstance:TObject); reintroduce;
        destructor Destroy; override;
@@ -591,6 +629,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       published
 
        property Instance:TObject read fInstance;
+
+       property Declaration:TPACCAbstractSyntaxTreeNodeDeclaration read fDeclaration;
 
      end;
 
@@ -3818,15 +3858,22 @@ begin
 
  TPACCInstance(fInstance).AllocatedObjects.Add(self);
 
+ fDeclaration:=nil;
+
+ DataItems:=nil;
+ CountDataItems:=0;
+
 end;
 
 destructor TPACCIntermediateRepresentationCodeDeclaration.Destroy;
 begin
+ SetLength(DataItems,0);
  inherited Destroy;
 end;
 
 procedure TPACCIntermediateRepresentationCodeDeclaration.EmitDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
 begin
+ fDeclaration:=Node;
 
 end;
 
