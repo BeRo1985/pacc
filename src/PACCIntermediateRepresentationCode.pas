@@ -43,8 +43,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        pircoASM,
 
-       pircoPHI,
-
        pircoSETI, // Set int
        pircoSETL, // Set long
        pircoSETF, // Set float
@@ -345,12 +343,13 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
      TPACCIntermediateRepresentationCodeBlocks=array of TPACCIntermediateRepresentationCodeBlock;
 
+     PPPACCIntermediateRepresentationCodePhi=^PPACCIntermediateRepresentationCodePhi;
      PPACCIntermediateRepresentationCodePhi=^TPACCIntermediateRepresentationCodePhi;
      TPACCIntermediateRepresentationCodePhi=record
       To_:TPACCIntermediateRepresentationCodeOperand;
-      Arguments:array of TPACCIntermediateRepresentationCodeOperand;
+      Operands:array of TPACCIntermediateRepresentationCodeOperand;
       Blocks:array of TPACCIntermediateRepresentationCodeBlock;
-      CountArguments:TPACCInt32;
+      CountOperands:TPACCInt32;
       Type_:TPACCIntermediateRepresentationCodeType;
       Link:PPACCIntermediateRepresentationCodePhi;
      end;
@@ -444,7 +443,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        fInstance:TObject;
 
        CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
-       BlockLink,PhiLink:PPACCIntermediateRepresentationCodeBlock;
+       BlockLink:PPACCIntermediateRepresentationCodeBlock;
+       PhiLink:PPPACCIntermediateRepresentationCodePhi;
        NeedNewBlock:boolean;
 
        AssignOpLValueTemporary:TPACCInt32;
@@ -454,6 +454,11 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        function FindBlock(const Label_:TPACCAbstractSyntaxTreeNodeLabel):TPACCIntermediateRepresentationCodeBlock;
        procedure EmitLabel(const Label_:TPACCAbstractSyntaxTreeNodeLabel);
        procedure EmitJump(const Label_:TPACCAbstractSyntaxTreeNodeLabel);
+       procedure EmitPhi(const Type_:TPACCIntermediateRepresentationCodeType;
+                         const To_:TPACCIntermediateRepresentationCodeOperand;
+                         const Operands:array of TPACCIntermediateRepresentationCodeOperand;
+                         const Blocks:array of TPACCIntermediateRepresentationCodeBlock;
+                         const SourceLocation:TPACCSourceLocation);
        procedure CreateNewBlockIfNeeded;
        function CreateTemporary(const Type_:TPACCIntermediateRepresentationCodeType):TPACCInt32;
        function CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
@@ -777,6 +782,42 @@ begin
  CurrentBlock.Jump.Kind:=pircjkJMP;
  CurrentBlock.Successors[0]:=Block;
  CloseBlock;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.EmitPhi(const Type_:TPACCIntermediateRepresentationCodeType;
+                                                              const To_:TPACCIntermediateRepresentationCodeOperand;
+                                                              const Operands:array of TPACCIntermediateRepresentationCodeOperand;
+                                                              const Blocks:array of TPACCIntermediateRepresentationCodeBlock;
+                                                              const SourceLocation:TPACCSourceLocation);
+var Index:TPACCInt32;
+    Phi:PPACCIntermediateRepresentationCodePhi;
+begin
+ if assigned(CurrentBlock) then begin
+  if assigned(CurrentBlock.Phi) then begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-59-0001',nil,true);
+  end else if length(Operands)=0 then begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-11-01-0000',nil,true);
+  end else if length(Operands)<>length(Blocks) then begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-11-01-0001',nil,true);
+  end else begin
+   GetMem(Phi,SizeOf(TPACCIntermediateRepresentationCodePhi));
+   FillChar(Phi^,SizeOf(TPACCIntermediateRepresentationCodePhi),#0);
+   CurrentBlock.Phi:=Phi;
+   Phi.Type_:=Type_;
+   Phi.To_:=To_;
+   Phi.CountOperands:=length(Operands);
+   SetLength(Phi.Operands,Phi.CountOperands);
+   SetLength(Phi.Blocks,Phi.CountOperands);
+   for Index:=0 to Phi.CountOperands-1 do begin
+    Phi.Operands[Index]:=Operands[Index];
+    Phi.Blocks[Index]:=Blocks[Index];
+   end;
+   PhiLink^:=Phi;
+   PhiLink:=@Phi^.Link;
+  end;
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-59-0000',nil,true);
+ end;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.CreateNewBlockIfNeeded;
@@ -1684,11 +1725,11 @@ begin
 
  EmitLabel(l3);
  OutputTemporary:=CreateTemporary(pirctINT);
- EmitInstruction(pircoPHI,
-                 [CreateTemporaryOperand(OutputTemporary),
-                  CreateLabelOperand(l0),CreateIntegerValueOperand(1),
-                  CreateLabelOperand(l2),CreateIntegerValueOperand(0)],
-                 Node.SourceLocation);
+ EmitPhi(pirctINT,
+         CreateTemporaryOperand(OutputTemporary),
+         [CreateIntegerValueOperand(1),CreateIntegerValueOperand(0)],
+         [b0,b1],
+         Node.SourceLocation);
 
 end;
 
@@ -1735,12 +1776,12 @@ begin
 
  EmitLabel(l2);
  OutputTemporary:=CreateTemporary(pirctINT);
- EmitInstruction(pircoPHI,
-                 [CreateTemporaryOperand(OutputTemporary),
-                  CreateLabelOperand(l0),CreateIntegerValueOperand(1),
-                  CreateLabelOperand(l1),CreateIntegerValueOperand(0)],
-                 Node.SourceLocation);
-                 
+ EmitPhi(pirctINT,
+         CreateTemporaryOperand(OutputTemporary),
+         [CreateIntegerValueOperand(1),CreateIntegerValueOperand(0)],
+         [b0,b1],
+         Node.SourceLocation);
+
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitCONV(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
