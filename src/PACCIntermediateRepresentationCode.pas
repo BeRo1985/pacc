@@ -528,6 +528,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitLValueAssignSrc(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32);
        procedure EmitLValueDEREF(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32);
        procedure EmitLValue(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32);
+       procedure EmitFunctionCall(const Node:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration;var OutputTemporary:TPACCInt32);
        procedure EmitExpression(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32);
        procedure EmitFORStatement(const Node:TPACCAbstractSyntaxTreeNodeFORStatement);
        procedure EmitWHILEOrDOStatement(const Node:TPACCAbstractSyntaxTreeNodeWHILEOrDOStatement;const IsWHILE:boolean);
@@ -3055,6 +3056,25 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.EmitFunctionCall(const Node:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration;var OutputTemporary:TPACCInt32);
+var FunctionPointerTemporary:TPACCInt32;
+begin
+ FunctionPointerTemporary:=1;
+ if Node.Kind=astnkFUNCPTR_CALL then begin
+  if assigned(Node.FunctionPointer) then begin
+   EmitExpression(Node.FunctionPointer,FunctionPointerTemporary);
+  end else begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-21-15-0000',@Node.SourceLocation,true);
+  end;
+ end;
+ if assigned(Node.Type_^.ReturnType) and (Node.Type_^.ReturnType^.Kind<>tkVOID) then begin
+  OutputTemporary:=CreateTemporary(DataTypeToCodeType(Node.Type_^.ReturnType));
+ end else begin
+  OutputTemporary:=-1;
+ end;
+ 
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitExpression(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32);
 begin
  if assigned(Node) then begin
@@ -3084,9 +3104,11 @@ begin
    end;
 
    astnkFUNCCALL:begin
+    EmitFunctionCall(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node),OutputTemporary);
    end;
 
    astnkFUNCPTR_CALL:begin
+    EmitFunctionCall(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node),OutputTemporary);
    end;
 
    astnkFUNCDESG:begin
