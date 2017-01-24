@@ -583,6 +583,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        fFunctions:TPACCIntermediateRepresentationCodeFunctionList;
 
+       fExternalDeclarations:TPACCAbstractSyntaxTreeNodeList;
+
       public
 
        constructor Create(const AInstance:TObject); reintroduce;
@@ -593,6 +595,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Instance:TObject read fInstance;
 
        property Functions:TPACCIntermediateRepresentationCodeFunctionList read fFunctions;
+
+       property ExternalDeclarations:TPACCAbstractSyntaxTreeNodeList read fExternalDeclarations;
 
      end;
 
@@ -3767,6 +3771,11 @@ begin
    if assigned(Node) then begin
     case Node.Kind of
      astnkEXTERN_DECL:begin
+      if TPACCAbstractSyntaxTreeNodeDeclaration(Node).DeclarationVariable.Kind=astnkGVAR then begin
+       TPACCInstance(AInstance).IntermediateRepresentationCode.ExternalDeclarations.Add(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeDeclaration(Node).DeclarationVariable));
+      end else begin
+       TPACCInstance(AInstance).AddError('Internal error 2017-01-24-21-39-0000',@Node.SourceLocation,true);
+      end;
      end;
      astnkDECL:begin
      end;
@@ -3815,11 +3824,14 @@ begin
 
  fFunctions:=TPACCIntermediateRepresentationCodeFunctionList.Create;
 
+ fExternalDeclarations:=TPACCAbstractSyntaxTreeNodeList.Create;
+
 end;
 
 destructor TPACCIntermediateRepresentationCode.Destroy;
 begin
  fFunctions.Free;
+ fExternalDeclarations.Free;
  inherited Destroy;
 end;
 
