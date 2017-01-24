@@ -1447,6 +1447,7 @@ var CurrentState:TState;
   case CurrentState.Token^.TokenType of
    TOK_EQ:begin
     NextToken;
+    result:=BinaryOperation(astnkOP_EQ,TPACCInstance(Instance).TypeConversion(result),TPACCInstance(Instance).TypeConversion(ParseRelationalExpression));
    end;
    TOK_NE:begin
     NextToken;
