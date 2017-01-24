@@ -1090,7 +1090,7 @@ begin
    CombinedValueTemporary:=CreateTemporary(pirctINT);
    EmitInstruction(pircoANDI,[CreateTemporaryOperand(MaskedValueTemporary),CreateTemporaryOperand(ValueTemporary),CreateIntegerValueOperand(not (((TPACCInt64(1) shl Type_^.BitSize)-1) shl Type_^.BitOffset))],SourceLocation);
    EmitInstruction(pircoANDI,[CreateTemporaryOperand(MaskedInputValueTemporary),CreateTemporaryOperand(InputValueTemporary),CreateIntegerValueOperand((TPACCInt64(1) shl Type_^.BitSize)-1)],SourceLocation);
-   EmitInstruction(pircoSHRI,[CreateTemporaryOperand(ShiftedInputValueTemporary),CreateTemporaryOperand(MaskedInputValueTemporary),CreateIntegerValueOperand(Type_^.BitOffset)],SourceLocation);
+   EmitInstruction(pircoSHLI,[CreateTemporaryOperand(ShiftedInputValueTemporary),CreateTemporaryOperand(MaskedInputValueTemporary),CreateIntegerValueOperand(Type_^.BitOffset)],SourceLocation);
    EmitInstruction(pircoORI,[CreateTemporaryOperand(CombinedValueTemporary),CreateTemporaryOperand(MaskedValueTemporary),CreateTemporaryOperand(ShiftedInputValueTemporary)],SourceLocation);
   end else begin
    MaskedValueTemporary:=CreateTemporary(pirctLONG);
@@ -1099,7 +1099,7 @@ begin
    CombinedValueTemporary:=CreateTemporary(pirctLONG);
    EmitInstruction(pircoANDL,[CreateTemporaryOperand(MaskedValueTemporary),CreateTemporaryOperand(ValueTemporary),CreateIntegerValueOperand(not (((TPACCInt64(1) shl Type_^.BitSize)-1) shl Type_^.BitOffset))],SourceLocation);
    EmitInstruction(pircoANDL,[CreateTemporaryOperand(MaskedInputValueTemporary),CreateTemporaryOperand(InputValueTemporary),CreateIntegerValueOperand((TPACCInt64(1) shl Type_^.BitSize)-1)],SourceLocation);
-   EmitInstruction(pircoSHRL,[CreateTemporaryOperand(ShiftedInputValueTemporary),CreateTemporaryOperand(MaskedInputValueTemporary),CreateIntegerValueOperand(Type_^.BitOffset)],SourceLocation);
+   EmitInstruction(pircoSHLL,[CreateTemporaryOperand(ShiftedInputValueTemporary),CreateTemporaryOperand(MaskedInputValueTemporary),CreateIntegerValueOperand(Type_^.BitOffset)],SourceLocation);
    EmitInstruction(pircoORL,[CreateTemporaryOperand(CombinedValueTemporary),CreateTemporaryOperand(MaskedValueTemporary),CreateTemporaryOperand(ShiftedInputValueTemporary)],SourceLocation);
   end;
   ValueTemporary:=CombinedValueTemporary;
