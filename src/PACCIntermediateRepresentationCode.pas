@@ -510,6 +510,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitIntegerValue(const Node:TPACCAbstractSyntaxTreeNodeIntegerValue;var OutputTemporary:TPACCInt32);
        procedure EmitFloatValue(const Node:TPACCAbstractSyntaxTreeNodeFloatValue;var OutputTemporary:TPACCInt32);
        procedure EmitStoreToVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;const InputTemporary:TPACCInt32);
+       procedure EnsureLVarInit(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;const SourceLocation:TPACCSourceLocation);
        procedure EmitVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitComputedJump(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator);
        procedure EmitLogicalANDOR(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32;const IsAND:boolean);
@@ -522,7 +523,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitTERNARY(const Node:TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator;var OutputTemporary:TPACCInt32);
        procedure EmitSTRUCT_REF(const Node:TPACCAbstractSyntaxTreeNodeStructReference;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitCOMMA(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
-       procedure EmitInitializerList(const Node:TPACCAbstractSyntaxTreeNodeDeclaration;const Nodes:TPACCAbstractSyntaxTreeNodeList;const VariableTemporary:TPACCInt32;const Size,Offset:TPACCInt64);
+       procedure EmitInitializerList(const Node:TPACCAbstractSyntaxTreeNode;const Nodes:TPACCAbstractSyntaxTreeNodeList;const VariableTemporary:TPACCInt32;const Size,Offset:TPACCInt64);
        procedure EmitDECL(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
        procedure EmitExpression(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitFORStatement(const Node:TPACCAbstractSyntaxTreeNodeFORStatement);
@@ -1758,6 +1759,7 @@ begin
  TemporaryC:=-1;
  LValueTemporary:=-1;
  if LValueNode.Kind in [astnkLVAR,astnkGVAR] then begin
+  EnsureLVarInit(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(LValueNode),LValueNode.SourceLocation);
   if PostOp then begin
    EmitExpression(LValueNode,TemporaryA,[],pircvkRVALUE);
    if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
@@ -1860,12 +1862,27 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitAssign(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32);
-var AssignLValueTemporary:TPACCInt32;
+var AssignLValueTemporary,VariableTemporary:TPACCInt32;
 begin
  OutputTemporary:=-1;
  if Node.Left.Kind in [astnkLVAR,astnkGVAR] then begin
-  EmitExpression(Node.Right,OutputTemporary,[],pircvkRVALUE);
-  EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Left),OutputTemporary);
+  EnsureLVarInit(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Left),Node.Left.SourceLocation);
+  if Node.Right.Kind in [astnkLVAR,astnkGVAR] then begin
+   EnsureLVarInit(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Right),Node.Right.SourceLocation);
+  end;
+  if Node.Left.Type_^.Kind in [tkARRAY,tkSTRUCT] then begin
+   VariableTemporary:=0;
+   EmitExpression(Node.Left,AssignLValueTemporary,[],pircvkLVALUE);
+   EmitExpression(Node.Right,VariableTemporary,[],pircvkLVALUE);
+   if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+    EmitInstruction(pircoMEMCPYI,[CreateTemporaryOperand(AssignLValueTemporary),CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Node.Left.Type_^.Size)],Node.SourceLocation);
+   end else begin
+    EmitInstruction(pircoMEMCPYL,[CreateTemporaryOperand(AssignLValueTemporary),CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Node.Left.Type_^.Size)],Node.SourceLocation);
+   end;
+  end else begin
+   EmitExpression(Node.Right,OutputTemporary,[],pircvkRVALUE);
+   EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Left),OutputTemporary);
+  end;
  end else begin
   AssignLValueTemporary:=-1;
   EmitExpression(Node.Left,AssignLValueTemporary,[],pircvkLVALUE);
@@ -1972,8 +1989,22 @@ begin
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.EmitVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+procedure TPACCIntermediateRepresentationCodeFunction.EnsureLVarInit(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;const SourceLocation:TPACCSourceLocation);
+var VariableTemporary:TPACCInt32;
+    LocalVariableInitialization:TPACCAbstractSyntaxTreeNodeList;
 begin
+ if assigned(Node.LocalVariableInitialization) then begin
+  LocalVariableInitialization:=Node.LocalVariableInitialization;
+  Node.LocalVariableInitialization:=nil;
+  EmitExpression(Node,VariableTemporary,[],pircvkLVALUE);
+  EmitInitializerList(Node,LocalVariableInitialization,VariableTemporary,Node.Type_^.Size,0);
+ end;
+end;                                                                               
+
+procedure TPACCIntermediateRepresentationCodeFunction.EmitVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+var LValueTemporary,SrcTemporary:TPACCInt32;
+begin
+ EnsureLVarInit(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node),Node.SourceLocation);
  case ValueKind of
   pircvkLVALUE:begin
    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
@@ -2651,6 +2682,7 @@ begin
   if assigned(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand) then begin
    case TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Kind of
     astnkLVAR,astnkGVAR:begin 
+     EnsureLVarInit(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Operand),Node.SourceLocation);
      if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
       OutputTemporary:=CreateTemporary(pirctINT);
       EmitInstruction(pircoADDROFI,[CreateTemporaryOperand(OutputTemporary),CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand))],TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.SourceLocation);
@@ -2855,13 +2887,9 @@ begin
    end;
   end;
   pircvkRVALUE:begin
-   if Node.Type_^.Offset>0 then begin
-    StructTemporary:=-1;
-    EmitSTRUCT_REF(Node,StructTemporary,pircvkLVALUE);
-    EmitLoad(OutputTemporary,StructTemporary,Node.Type_,Node.SourceLocation);
-   end else begin
-    EmitExpression(Node.Struct,OutputTemporary,[],pircvkRVALUE);
-   end;
+   StructTemporary:=-1;
+   EmitSTRUCT_REF(Node,StructTemporary,pircvkLVALUE);
+   EmitLoad(OutputTemporary,StructTemporary,Node.Type_,Node.SourceLocation);
   end;
   else begin
    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-14-21-0000',nil,true);
@@ -2887,7 +2915,7 @@ begin
  result:=TPACCAbstractSyntaxTreeNodeInitializer(a).InitializionOffset-TPACCAbstractSyntaxTreeNodeInitializer(b).InitializionOffset;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.EmitInitializerList(const Node:TPACCAbstractSyntaxTreeNodeDeclaration;const Nodes:TPACCAbstractSyntaxTreeNodeList;const VariableTemporary:TPACCInt32;const Size,Offset:TPACCInt64);
+procedure TPACCIntermediateRepresentationCodeFunction.EmitInitializerList(const Node:TPACCAbstractSyntaxTreeNode;const Nodes:TPACCAbstractSyntaxTreeNodeList;const VariableTemporary:TPACCInt32;const Size,Offset:TPACCInt64);
 var Index,TargetTemporary,ValueTemporary:TPACCInt32;
     SubNode:TPACCAbstractSyntaxTreeNodeInitializer;
     TempNodes:TPACCAbstractSyntaxTreeNodeList;
@@ -2956,6 +2984,7 @@ begin
      (TPACCInstance(fInstance).IsArithmeticType(Node.DeclarationVariable.Type_) or
       (Node.DeclarationVariable.Type_^.Kind=tkPOINTER)) then begin
    if Node.DeclarationVariable.Kind in [astnkLVAR,astnkGVAR] then begin
+    EnsureLVarInit(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable),Node.SourceLocation);
     EmitExpression(TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[0]).InitializionValue,ValueTemporary,[],pircvkRVALUE);
     EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable),ValueTemporary);
    end else begin
