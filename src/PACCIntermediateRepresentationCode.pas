@@ -3068,7 +3068,38 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitSWITCHStatement(const Node:TPACCAbstractSyntaxTreeNodeSWITCHStatement);
+var Index:TPACCInt32;
+    SwitchBegin,SwitchEnd:TPACCInt64;
+    UseJumpTable:boolean;
+    StatementCase:PPACCAbstractSyntaxTreeNodeSWITCHStatementCase;
 begin
+
+ SwitchBegin:=High(TPACCInt64);
+ SwitchEnd:=Low(TPACCInt64);
+
+ for Index:=0 to length(Node.Cases)-1 do begin
+  StatementCase:=@Node.Cases[Index];
+  if Index=0 then begin
+   SwitchBegin:=StatementCase^.CaseBegin;
+   SwitchEnd:=StatementCase^.CaseEnd;
+  end else begin
+   SwitchBegin:=Min(SwitchBegin,StatementCase^.CaseBegin);
+   SwitchEnd:=Max(SwitchEnd,StatementCase^.CaseEnd);
+  end;
+ end;
+
+ if (length(Node.Cases)>=4) and ((SwitchEnd-SwitchBegin)<=1024) then begin
+
+  // Jump table approach
+
+ end else begin
+
+  // Multiple-branch-jumps approach
+
+  
+
+ end;
+
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitIFStatement(const Node:TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator);
