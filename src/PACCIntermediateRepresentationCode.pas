@@ -2412,9 +2412,6 @@ begin
     EmitCOMMA(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node),OutputTemporary,ValueKind);
    end;
 
-   astnkOP_ARROW:begin
-   end;
-
    astnkOP_ASSIGN:begin
     EmitAssign(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node),OutputTemporary);
    end;

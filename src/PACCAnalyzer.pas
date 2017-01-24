@@ -475,10 +475,6 @@ var FunctionUsedVariablesHashMap:TPACCPointerHashMap;
      Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
      Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
     end;
-    astnkOP_ARROW:begin
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left);
-     Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
-    end;
     astnkOP_ASSIGN:begin
      Scan(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right);
      if assigned(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) and

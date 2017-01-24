@@ -359,14 +359,6 @@ begin
      result:=false;
     end;
    end;
-   astnkOP_ARROW:begin
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=false;
-    end;
-    if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=false;
-    end;
-   end;
    astnkOP_ASSIGN:begin
     if not SafeForToDiscard(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
      result:=false;
@@ -1191,14 +1183,6 @@ begin
     end;
    end;
    astnkOP_COMMA:begin
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
-     result:=true;
-    end;
-    if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Right) then begin
-     result:=true;
-    end;
-   end;
-   astnkOP_ARROW:begin
     if OptimizeNode(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node).Left) then begin
      result:=true;
     end;

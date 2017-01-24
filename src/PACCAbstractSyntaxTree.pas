@@ -45,7 +45,6 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
       astnkBREAK,
       astnkCONTINUE,
       astnkOP_COMMA,
-      astnkOP_ARROW,
       astnkOP_ASSIGN,
       astnkOP_ASSIGN_OP,
       astnkOP_ASSIGN_SRC,
