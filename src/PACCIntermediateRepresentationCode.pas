@@ -511,6 +511,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitDEREF(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitRETURN(const Node:TPACCAbstractSyntaxTreeNodeRETURNStatement);
        procedure EmitTERNARY(const Node:TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator;var OutputTemporary:TPACCInt32);
+       procedure EmitSTRUCT_REF(const Node:TPACCAbstractSyntaxTreeNodeStructReference;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitCOMMA(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitExpression(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
@@ -2625,6 +2626,41 @@ begin
 
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.EmitSTRUCT_REF(const Node:TPACCAbstractSyntaxTreeNodeStructReference;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+var StructTemporary:TPACCInt32;
+begin
+ OutputTemporary:=-1;
+ case ValueKind of
+  pircvkLVALUE:begin
+   if Node.Type_^.Offset>0 then begin
+    StructTemporary:=-1;
+    EmitExpression(Node.Struct,StructTemporary,[],pircvkLVALUE);
+    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+     OutputTemporary:=CreateTemporary(pirctINT);
+     EmitInstruction(pircoADDI,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(StructTemporary),CreateIntegerValueOperand(Node.Type_^.Offset)],Node.SourceLocation);
+    end else begin
+     OutputTemporary:=CreateTemporary(pirctLONG);
+     EmitInstruction(pircoADDL,[CreateTemporaryOperand(OutputTemporary),CreateTemporaryOperand(StructTemporary),CreateIntegerValueOperand(Node.Type_^.Offset)],Node.SourceLocation);
+    end;
+   end else begin
+    EmitExpression(Node.Struct,OutputTemporary,[],pircvkLVALUE);
+   end;
+  end;
+  pircvkRVALUE:begin
+   if Node.Type_^.Offset>0 then begin
+    StructTemporary:=-1;
+    EmitSTRUCT_REF(Node,StructTemporary,pircvkLVALUE);
+    EmitLoad(OutputTemporary,StructTemporary,Node.Type_);
+   end else begin
+    EmitExpression(Node.Struct,OutputTemporary,[],pircvkRVALUE);
+   end;
+  end;
+  else begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-14-21-0000',nil,true);
+  end;
+ end;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitCOMMA(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
 var TemporaryA:TPACCInt32;
 begin
@@ -2717,6 +2753,7 @@ begin
    end;
 
    astnkSTRUCT_REF:begin
+    EmitSTRUCT_REF(TPACCAbstractSyntaxTreeNodeStructReference(Node),OutputTemporary,ValueKind);
    end;
 
    astnkOP_COMMA:begin
