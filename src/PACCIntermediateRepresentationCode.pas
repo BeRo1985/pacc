@@ -449,6 +449,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        AssignOpLValueTemporary:TPACCInt32;
 
+       function DataTypeToCodeType(const Type_:PPACCType):TPACCIntermediateRepresentationCodeType;
        function NewHiddenLabel:TPACCAbstractSyntaxTreeNodeLabel;
        procedure CloseBlock;
        function FindBlock(const Label_:TPACCAbstractSyntaxTreeNodeLabel):TPACCIntermediateRepresentationCodeBlock;
@@ -508,6 +509,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitADDR(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitDEREF(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitRETURN(const Node:TPACCAbstractSyntaxTreeNodeRETURNStatement);
+       procedure EmitTERNARY(const Node:TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator;var OutputTemporary:TPACCInt32);
        procedure EmitCOMMA(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitExpression(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
@@ -739,6 +741,26 @@ begin
  VariableTemporaryReferenceHashMap.Free;
  Temporaries:=nil;
  inherited Destroy;
+end;
+
+function TPACCIntermediateRepresentationCodeFunction.DataTypeToCodeType(const Type_:PPACCType):TPACCIntermediateRepresentationCodeType;
+begin
+ if (Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
+    ((Type_^.Kind=tkPOINTER) and
+     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
+  result:=pirctINT;
+ end else if (Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
+             ((Type_^.Kind=tkPOINTER) and
+              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
+  result:=pirctLONG;
+ end else if Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
+  result:=pirctFLOAT;
+ end else if Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
+  result:=pirctDOUBLE;
+ end else begin
+  result:=pirctNONE;
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-13-59-0000',nil,true);
+ end;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.NewHiddenLabel:TPACCAbstractSyntaxTreeNodeLabel;
@@ -2316,6 +2338,69 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.EmitTERNARY(const Node:TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator;var OutputTemporary:TPACCInt32);
+var l0,l1,l2:TPACCAbstractSyntaxTreeNodeLabel;
+    b0,b1,b2:TPACCIntermediateRepresentationCodeBlock;
+    ConditionTemporary,TrueTemporary,FalseTemporary:TPACCInt32;
+    Type_:TPACCIntermediateRepresentationCodeType;
+begin
+
+ l0:=NewHiddenLabel;
+ l1:=NewHiddenLabel;
+ l2:=NewHiddenLabel;
+ b0:=FindBlock(l0);
+ b1:=FindBlock(l1);
+ b2:=FindBlock(l2);
+
+ ConditionTemporary:=-1;
+ EmitExpression(Node.Condition,ConditionTemporary,[],pircvkRVALUE);
+ if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
+    ((Node.Condition.Type_^.Kind=tkPOINTER) and
+     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZI;
+ end else if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
+             ((Node.Condition.Type_^.Kind=tkPOINTER) and
+              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZL;
+ end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZF;
+ end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZD;
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-13-52-0000',@Node.SourceLocation,true);
+ end;
+ CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
+ CurrentBlock.Successors[0]:=b0;
+ CurrentBlock.Successors[1]:=b1;
+ CloseBlock;
+
+ EmitLabel(l0);
+ TrueTemporary:=-1;
+ if assigned(Node.Then_) then begin
+  EmitExpression(Node.Then_,TrueTemporary,[],pircvkRVALUE);
+ end else begin
+  ConditionTemporary:=TrueTemporary;
+ end;
+ EmitJump(l2);
+
+ EmitLabel(l1);
+ EmitExpression(Node.Else_,FalseTemporary,[],pircvkRVALUE);
+ EmitJump(l2);
+
+ EmitLabel(l2);
+
+ Type_:=DataTypeToCodeType(Node.Type_);
+ OutputTemporary:=CreateTemporary(Type_);
+ EmitPhi(Type_,
+         CreateTemporaryOperand(OutputTemporary),
+         [CreateTemporaryOperand(TrueTemporary),
+          CreateTemporaryOperand(FalseTemporary)],
+         [b0,
+          b1],
+         Node.SourceLocation);
+
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitCOMMA(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
 var TemporaryA:TPACCInt32;
 begin
@@ -2403,6 +2488,8 @@ begin
    end;
 
    astnkTERNARY:begin
+    EnsureRValue;
+    EmitTERNARY(TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator(Node),OutputTemporary);
    end;
 
    astnkSTRUCT_REF:begin
@@ -2601,6 +2688,10 @@ begin
    astnkOP_LE:begin
     EnsureRValue;
     EmitBinaryOp(Node,EmitBinaryOpLE,OutputTemporary);
+   end;
+
+   else begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-13-48-0000',@Node.SourceLocation,true);
    end;
 
   end;
