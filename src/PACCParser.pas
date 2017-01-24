@@ -1314,7 +1314,7 @@ var CurrentState:TState;
  function ParseCompoundLiteral(const Type_:PPACCType):TPACCAbstractSyntaxTreeNode;
  var Name:TPACCRawByteString;
  begin
-  Name:='@TEMP@'+IntToStr(TPasMPInterlocked.Increment(TempVariableCounter));
+  Name:='_$TEMP$'+IntToStr(TPasMPInterlocked.Increment(TempVariableCounter));
   result:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkLVAR,Type_,CurrentState.Token^.SourceLocation,Name,0);
   TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(result).LocalVariableInitialization:=ParseDeclarationInitializer(Type_);
   Assert(assigned(LocalScope));
