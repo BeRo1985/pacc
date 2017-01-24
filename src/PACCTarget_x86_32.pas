@@ -313,7 +313,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
       end else begin
        Value:=Node.InitializionValue;
        ToType:=Node.ToType;
-       Data:=Data or ((TPACCInstance(Instance).EvaluateIntegerExpression(Value,nil) and ((TPACCInt64(1) shl (ToType^.BitSize))-1)) shl ToType^.BitOffset);
+       Data:=Data or ((TPACCInstance(Instance).EvaluateIntegerExpression(Value,nil) and ((TPACCInt64(1) shl ToType^.BitSize)-1)) shl ToType^.BitOffset);
        inc(Index);
       end;
      end;
