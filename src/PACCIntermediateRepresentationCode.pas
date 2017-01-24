@@ -455,6 +455,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        function FindBlock(const Label_:TPACCAbstractSyntaxTreeNodeLabel):TPACCIntermediateRepresentationCodeBlock;
        procedure EmitLabel(const Label_:TPACCAbstractSyntaxTreeNodeLabel);
        procedure EmitJump(const Label_:TPACCAbstractSyntaxTreeNodeLabel);
+       procedure EmitJumpTable(const Operand:TPACCIntermediateRepresentationCodeOperand;
+                               const Blocks:array of TPACCIntermediateRepresentationCodeBlock);
        procedure EmitPhi(const Type_:TPACCIntermediateRepresentationCodeType;
                          const To_:TPACCIntermediateRepresentationCodeOperand;
                          const Operands:array of TPACCIntermediateRepresentationCodeOperand;
@@ -816,6 +818,11 @@ begin
  CurrentBlock.Jump.Kind:=pircjkJMP;
  CurrentBlock.Successors[0]:=Block;
  CloseBlock;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.EmitJumpTable(const Operand:TPACCIntermediateRepresentationCodeOperand;
+                                                                    const Blocks:array of TPACCIntermediateRepresentationCodeBlock);
+begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitPhi(const Type_:TPACCIntermediateRepresentationCodeType;
@@ -3068,52 +3075,149 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitSWITCHStatement(const Node:TPACCAbstractSyntaxTreeNodeSWITCHStatement);
-var Index:TPACCInt32;
+ procedure EmitJumpIfOp(const OpSI,OpUI,OpSL,OpUL:TPACCIntermediateRepresentationCodeOpcode;const ValueOperand:TPACCIntermediateRepresentationCodeOperand;const ComparsionValue:TPACCInt64;const TrueBlock,FalseBlock:TPACCIntermediateRepresentationCodeBlock);
+ var ConditionTemporary:TPACCInt32;
+     Opcode:TPACCIntermediateRepresentationCodeOpcode;
+     JumpKind:TPACCIntermediateRepresentationCodeJumpKind;
+ begin
+  ConditionTemporary:=-1;
+  case DataTypeToCodeType(Node.Value.Type_) of
+   pirctINT:begin
+    if tfUnsigned in Node.Value.Type_^.Flags then begin
+     Opcode:=OpUI;
+    end else begin
+     Opcode:=OpSI;
+    end;
+    JumpKind:=pircjkJNZI;
+   end;
+   pirctLONG:begin
+    if tfUnsigned in Node.Value.Type_^.Flags then begin
+     Opcode:=OpUL;
+    end else begin
+     Opcode:=OpSL;
+    end;
+    JumpKind:=pircjkJNZL;
+   end;
+   else begin
+    Opcode:=pircoNONE;
+    JumpKind:=pircjkNONE;
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-15-56-0000',@Node.SourceLocation,true);
+   end;
+  end;
+  EmitInstruction(Opcode,[CreateTemporaryOperand(ConditionTemporary),ValueOperand,CreateIntegerValueOperand(ComparsionValue)],Node.SourceLocation);
+  CurrentBlock.Jump.Kind:=JumpKind;
+  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
+  CurrentBlock.Successors[0]:=TrueBlock;
+  CurrentBlock.Successors[1]:=FalseBlock;
+  CloseBlock;
+ end;
+var Index,SubIndex,ValueTemporary,OffsetedValueTemporary,JumpTableOffsetValueTemporary:TPACCInt32;
     SwitchBegin,SwitchEnd:TPACCInt64;
     StatementCase:PPACCAbstractSyntaxTreeNodeSWITCHStatementCase;
-    SkipBodyLabel,BodyLabel:TPACCAbstractSyntaxTreeNodeLabel;
-    SkipBodyBlock,BodyBlock:TPACCIntermediateRepresentationCodeBlock;
+    SkipBodyLabel,BodyLabel,JumpTableLabel,DefaultOrSkipLabel,NextCheckLabel:TPACCAbstractSyntaxTreeNodeLabel;
+    SkipBodyBlock,BodyBlock,JumpTableBlock,DefaultOrSkipBlock,NextCheckBlock:TPACCIntermediateRepresentationCodeBlock;
+    JumpTableLabelBlocks:array of TPACCIntermediateRepresentationCodeBlock;
 begin
 
- SkipBodyLabel:=NewHiddenLabel;
- BodyLabel:=NewHiddenLabel;
- SkipBodyBlock:=FindBlock(SkipBodyLabel);
- BodyBlock:=FindBlock(BodyLabel);
+ JumpTableLabelBlocks:=nil;
+ try
 
- SwitchBegin:=High(TPACCInt64);
- SwitchEnd:=Low(TPACCInt64);
+  ValueTemporary:=-1;
+  EmitExpression(Node.Value,ValueTemporary,[],pircvkRVALUE);
 
- for Index:=0 to length(Node.Cases)-1 do begin
-  StatementCase:=@Node.Cases[Index];
-  if Index=0 then begin
-   SwitchBegin:=StatementCase^.CaseBegin;
-   SwitchEnd:=StatementCase^.CaseEnd;
-  end else begin
-   SwitchBegin:=Min(SwitchBegin,StatementCase^.CaseBegin);
-   SwitchEnd:=Max(SwitchEnd,StatementCase^.CaseEnd);
+  SkipBodyLabel:=NewHiddenLabel;
+  BodyLabel:=NewHiddenLabel;
+  SkipBodyBlock:=FindBlock(SkipBodyLabel);
+  BodyBlock:=FindBlock(BodyLabel);
+
+  SwitchBegin:=High(TPACCInt64);
+  SwitchEnd:=Low(TPACCInt64);
+
+  for Index:=0 to length(Node.Cases)-1 do begin
+   StatementCase:=@Node.Cases[Index];
+   if Index=0 then begin
+    SwitchBegin:=StatementCase^.CaseBegin;
+    SwitchEnd:=StatementCase^.CaseEnd;
+   end else begin
+    SwitchBegin:=Min(SwitchBegin,StatementCase^.CaseBegin);
+    SwitchEnd:=Max(SwitchEnd,StatementCase^.CaseEnd);
+   end;
   end;
- end;
 
- if (length(Node.Cases)>=4) and ((SwitchEnd-SwitchBegin)<=1024) then begin
+  if assigned(Node.DefaultCaseLabel) then begin
+   DefaultOrSkipLabel:=TPACCAbstractSyntaxTreeNodeLabel(Node.DefaultCaseLabel);
+   DefaultOrSkipBlock:=FindBlock(DefaultOrSkipLabel);
+  end else begin
+   DefaultOrSkipLabel:=SkipBodyLabel;
+   DefaultOrSkipBlock:=SkipBodyBlock;
+  end;
 
-  // Jump table approach
+  if (length(Node.Cases)>=4) and ((SwitchEnd-SwitchBegin)<=1024) then begin
 
- end else begin
+   JumpTableLabel:=NewHiddenLabel;
+   JumpTableBlock:=FindBlock(JumpTableLabel);
 
-  // Multiple-branch-jumps approach
+   NextCheckLabel:=NewHiddenLabel;
+   NextCheckBlock:=FindBlock(NextCheckLabel);
 
- end;
+   EmitJumpIfOp(pircoCMPSLTI,pircoCMPULTI,pircoCMPSLTL,pircoCMPULTL,CreateTemporaryOperand(ValueTemporary),SwitchBegin,DefaultOrSkipBlock,NextCheckBlock);
 
- if assigned(Node.DefaultCaseLabel) then begin
-  EmitJump(TPACCAbstractSyntaxTreeNodeLabel(Node.DefaultCaseLabel));
- end else begin
+   EmitLabel(NextCheckLabel);
+   EmitJumpIfOp(pircoCMPSGTI,pircoCMPUGTI,pircoCMPSGTL,pircoCMPUGTL,CreateTemporaryOperand(ValueTemporary),SwitchEnd,DefaultOrSkipBlock,JumpTableBlock);
+
+   // Jump table approach
+   SetLength(JumpTableLabelBlocks,SwitchEnd-SwitchBegin);
+
+   if assigned(Node.DefaultCaseLabel) then begin
+    for Index:=0 to length(JumpTableLabelBlocks)-1 do begin
+     JumpTableLabelBlocks[Index]:=DefaultOrSkipBlock;
+    end;
+   end;
+
+   for Index:=0 to length(Node.Cases)-1 do begin
+    StatementCase:=@Node.Cases[Index];
+    for SubIndex:=StatementCase^.CaseBegin-SwitchBegin to (StatementCase^.CaseEnd-SwitchBegin)-1 do begin
+     JumpTableLabelBlocks[SubIndex]:=FindBlock(TPACCAbstractSyntaxTreeNodeLabel(StatementCase^.CaseLabel));
+    end;
+   end;
+
+   case DataTypeToCodeType(Node.Value.Type_) of
+    pirctINT:begin
+     OffsetedValueTemporary:=CreateTemporary(pirctINT);
+     EmitInstruction(pircoSUBI,[CreateTemporaryOperand(OffsetedValueTemporary),CreateTemporaryOperand(ValueTemporary),CreateIntegerValueOperand(SwitchBegin)],Node.SourceLocation);
+     JumpTableOffsetValueTemporary:=OffsetedValueTemporary;
+    end;
+    pirctLONG:begin
+     OffsetedValueTemporary:=CreateTemporary(pirctLONG);
+     EmitInstruction(pircoSUBL,[CreateTemporaryOperand(OffsetedValueTemporary),CreateTemporaryOperand(ValueTemporary),CreateIntegerValueOperand(SwitchBegin)],Node.SourceLocation);
+     JumpTableOffsetValueTemporary:=CreateTemporary(pirctINT);
+     EmitInstruction(pircoTRLI,[CreateTemporaryOperand(JumpTableOffsetValueTemporary),CreateIntegerValueOperand(OffsetedValueTemporary)],Node.SourceLocation);
+    end;
+    else begin
+     JumpTableOffsetValueTemporary:=-1;
+     TPACCInstance(fInstance).AddError('Internal error 2017-01-24-15-48-0000',@Node.SourceLocation,true);
+    end;
+   end;
+
+   EmitLabel(JumpTableLabel);
+   EmitJumpTable(CreateTemporaryOperand(JumpTableOffsetValueTemporary),JumpTableLabelBlocks);
+
+  end else begin
+
+   // Multiple-branch-jumps approach
+
+   EmitJump(DefaultOrSkipLabel);
+
+  end;
+
+  EmitLabel(BodyLabel);
+  EmitStatement(Node.Body);
   EmitJump(SkipBodyLabel);
- end;
+  EmitLabel(SkipBodyLabel);
 
- EmitLabel(BodyLabel);
- EmitStatement(Node.Body);
- EmitJump(SkipBodyLabel); 
- EmitLabel(SkipBodyLabel);
+ finally
+  JumpTableLabelBlocks:=nil;
+ end;
 
 end;
 
