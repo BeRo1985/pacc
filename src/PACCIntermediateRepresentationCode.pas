@@ -2155,7 +2155,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.EmitExpression(const Node:
 begin
  if assigned(Node) then begin
 
-  writeln(TypInfo.GetEnumName(TypeInfo(TPACCAbstractSyntaxTreeNodeKind),TPACCInt32(Node.Kind)));
+//writeln(TypInfo.GetEnumName(TypeInfo(TPACCAbstractSyntaxTreeNodeKind),TPACCInt32(Node.Kind)));
 
   case Node.Kind of
 
