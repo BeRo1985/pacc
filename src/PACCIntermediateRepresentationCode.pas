@@ -1042,6 +1042,41 @@ end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitStore(const DestinationLValueTemporary,InputValueTemporary:TPACCInt32;const Type_:PPACCType;const SourceLocation:TPACCSourceLocation);
 begin
+ if (Type_^.BitSize>0) and
+    (Type_^.Kind in (PACCIntermediateRepresentationCodeINTTypeKinds+PACCIntermediateRepresentationCodeLONGTypeKinds)) then begin
+
+ end else begin
+  case Type_^.Kind of
+   tkBOOL,tkCHAR:begin
+    EmitInstruction(pircoSTIC,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+   end;
+   tkSHORT:begin
+    EmitInstruction(pircoSTIS,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+   end;
+   tkINT,tkENUM:begin
+    EmitInstruction(pircoSTII,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+   end;
+   tkLONG,tkLLONG:begin
+    EmitInstruction(pircoSTLL,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+   end;
+   tkFLOAT:begin
+    EmitInstruction(pircoSTF,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+   end;
+   tkDOUBLE,tkLDOUBLE:begin
+    EmitInstruction(pircoSTD,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+   end;
+   tkPOINTER:begin
+    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+     EmitInstruction(pircoSTII,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+    end else begin
+     EmitInstruction(pircoSTLL,[CreateTemporaryOperand(DestinationLValueTemporary),CreateTemporaryOperand(InputValueTemporary)],SourceLocation);
+    end;
+   end;
+   else begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-17-28-0000',@SourceLocation,true);
+   end;
+  end;
+ end;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitUnaryOpINC(var OutputTemporary:TPACCInt32;const InputTemporary:TPACCInt32;const Node:TPACCAbstractSyntaxTreeNode);
