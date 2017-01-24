@@ -3114,8 +3114,8 @@ procedure TPACCIntermediateRepresentationCodeFunction.EmitSWITCHStatement(const 
 var Index,SubIndex,ValueTemporary,OffsetedValueTemporary,JumpTableOffsetValueTemporary:TPACCInt32;
     SwitchBegin,SwitchEnd:TPACCInt64;
     StatementCase:PPACCAbstractSyntaxTreeNodeSWITCHStatementCase;
-    SkipBodyLabel,BodyLabel,JumpTableLabel,DefaultOrSkipLabel,NextCheckLabel:TPACCAbstractSyntaxTreeNodeLabel;
-    SkipBodyBlock,BodyBlock,JumpTableBlock,DefaultOrSkipBlock,NextCheckBlock:TPACCIntermediateRepresentationCodeBlock;
+    SkipBodyLabel,BodyLabel,JumpTableLabel,DefaultOrSkipLabel,NextCheckLabel,NextCaseLabel:TPACCAbstractSyntaxTreeNodeLabel;
+    SkipBodyBlock,BodyBlock,JumpTableBlock,DefaultOrSkipBlock,NextCheckBlock,NextCaseBlock:TPACCIntermediateRepresentationCodeBlock;
     JumpTableLabelBlocks:array of TPACCIntermediateRepresentationCodeBlock;
 begin
 
@@ -3205,6 +3205,28 @@ begin
   end else begin
 
    // Multiple-branch-jumps approach
+
+   for Index:=0 to length(Node.Cases)-1 do begin
+    StatementCase:=@Node.Cases[Index];
+    if StatementCase^.CaseBegin=StatementCase^.CaseEnd then begin
+     NextCaseLabel:=NewHiddenLabel;
+     NextCaseBlock:=FindBlock(NextCaseLabel);
+     EmitJumpIfOp(pircoCMPEQI,pircoCMPEQI,pircoCMPEQL,pircoCMPEQL,CreateTemporaryOperand(ValueTemporary),StatementCase^.CaseBegin,FindBlock(TPACCAbstractSyntaxTreeNodeLabel(StatementCase^.CaseLabel)),NextCaseBlock);
+     EmitLabel(NextCaseLabel);
+    end else begin
+     NextCaseLabel:=NewHiddenLabel;
+     NextCaseBlock:=FindBlock(NextCaseLabel);
+     NextCheckLabel:=NewHiddenLabel;
+     NextCheckBlock:=FindBlock(NextCheckLabel);
+     EmitJumpIfOp(pircoCMPSLTI,pircoCMPULTI,pircoCMPSLTL,pircoCMPULTL,CreateTemporaryOperand(ValueTemporary),StatementCase^.CaseBegin,NextCaseBlock,NextCheckBlock);
+     EmitLabel(NextCheckLabel);
+     EmitJumpIfOp(pircoCMPSGTI,pircoCMPUGTI,pircoCMPSGTL,pircoCMPUGTL,CreateTemporaryOperand(ValueTemporary),StatementCase^.CaseBegin,NextCaseBlock,FindBlock(TPACCAbstractSyntaxTreeNodeLabel(StatementCase^.CaseLabel)));
+     EmitLabel(NextCaseLabel);
+    end;
+    for SubIndex:=StatementCase^.CaseBegin-SwitchBegin to (StatementCase^.CaseEnd-SwitchBegin)-1 do begin
+     JumpTableLabelBlocks[SubIndex]:=FindBlock(TPACCAbstractSyntaxTreeNodeLabel(StatementCase^.CaseLabel));
+    end;
+   end;
 
    EmitJump(DefaultOrSkipLabel);
 
