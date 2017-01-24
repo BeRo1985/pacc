@@ -76,9 +76,11 @@ var FunctionUsedVariablesHashMap:TPACCPointerHashMap;
       FunctionUsedVariablesHashMap[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)]:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node);
       if (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).Index>=0) and
          (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).Index<length(FunctionInitializedVariables)) then begin
-       if not FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).Index] then begin
-        FunctionUninitializedAccessVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).Index]:=true;       
-       end;
+       if assigned(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).LocalVariableInitialization) then begin
+        FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).Index]:=true;
+       end else if not FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).Index] then begin
+        FunctionUninitializedAccessVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).Index]:=true;
+       end;     
       end;
      end;
     end;
@@ -280,6 +282,18 @@ var FunctionUsedVariablesHashMap:TPACCPointerHashMap;
          if (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).Index>=0) and
             (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).Index<length(FunctionInitializedVariables)) then begin
           FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).Index]:=true;
+         end;
+        end;
+       end;
+      end;
+      for Index:=0 to TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node).LocalVariables.Count-1 do begin
+       SubNode:=TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node).LocalVariables[Index];
+       if assigned(SubNode) and (SubNode.Kind=astnkLVAR) then begin
+        if assigned(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).LocalVariableInitialization) then begin
+         if (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).Index>=0) and
+            (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).Index<length(FunctionInitializedVariables)) then begin
+          FunctionInitializedVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).Index]:=true;
+          FunctionUsedVariablesHashMap[SubNode]:=SubNode;
          end;
         end;
        end;
