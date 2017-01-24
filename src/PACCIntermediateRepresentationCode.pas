@@ -492,7 +492,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitComputedJump(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator);
        procedure EmitLogicalANDOR(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32;const IsAND:boolean);
-       procedure EmitLogicalNOT(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32);
+       procedure EmitLogicalNOT(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32);
        procedure EmitCONV(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitADDR(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitDEREF(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
@@ -1689,11 +1689,58 @@ begin
                   CreateLabelOperand(l0),CreateIntegerValueOperand(1),
                   CreateLabelOperand(l2),CreateIntegerValueOperand(0)],
                  Node.SourceLocation);
-                 
+
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.EmitLogicalNOT(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32);
+procedure TPACCIntermediateRepresentationCodeFunction.EmitLogicalNOT(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32);
+var l0,l1,l2:TPACCAbstractSyntaxTreeNodeLabel;
+    b0,b1,b2:TPACCIntermediateRepresentationCodeBlock;
+    OperandTemporary:TPACCInt32;
 begin
+
+ l0:=NewHiddenLabel;
+ l1:=NewHiddenLabel;
+ l2:=NewHiddenLabel;
+ b0:=FindBlock(l0);
+ b1:=FindBlock(l1);
+ b2:=FindBlock(l2);
+
+ OperandTemporary:=-1;
+ EmitExpression(Node.Operand,OperandTemporary,[],pircvkRVALUE);
+ if (Node.Operand.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
+    ((Node.Operand.Type_^.Kind=tkPOINTER) and
+     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZI;
+ end else if (Node.Operand.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
+             ((Node.Operand.Type_^.Kind=tkPOINTER) and
+              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZL;
+ end else if Node.Operand.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZF;
+ end else if Node.Operand.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZD;
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-48-0000',@Node.SourceLocation,true);
+ end;
+ CurrentBlock.Jump.Operand:=CreateTemporaryOperand(OperandTemporary);
+ CurrentBlock.Successors[0]:=b0;
+ CurrentBlock.Successors[1]:=b1;
+ CloseBlock;
+
+ EmitLabel(l0);
+ EmitJump(l2);
+
+ EmitLabel(l1);
+ EmitJump(l2);
+
+ EmitLabel(l2);
+ OutputTemporary:=CreateTemporary(pirctINT);
+ EmitInstruction(pircoPHI,
+                 [CreateTemporaryOperand(OutputTemporary),
+                  CreateLabelOperand(l0),CreateIntegerValueOperand(1),
+                  CreateLabelOperand(l1),CreateIntegerValueOperand(0)],
+                 Node.SourceLocation);
+                 
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitCONV(const Node:TPACCAbstractSyntaxTreeNodeUnaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
@@ -2301,7 +2348,7 @@ begin
 
    astnkOP_LOG_NOT:begin
     EnsureRValue;
-    EmitLogicalNOT(TPACCAbstractSyntaxTreeNodeBinaryOperator(Node),OutputTemporary);
+    EmitLogicalNOT(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node),OutputTemporary);
    end;
 
    astnkOP_EQ:begin
