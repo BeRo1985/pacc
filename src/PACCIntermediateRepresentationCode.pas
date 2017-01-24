@@ -2918,19 +2918,19 @@ begin
      EmitInitializerList(Node,
                          TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).LocalVariableInitialization,
                          VariableTemporary,
-                         TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).Type_.Size,
+                         TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).Type_^.Size,
                          Offset+SubNode.InitializionOffset);
     end else begin
-     EmitExpression(SubNode,ValueTemporary,[],pircvkRVALUE);
+     EmitExpression(SubNode.InitializionValue,ValueTemporary,[],pircvkRVALUE);
      if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
       EmitInstruction(pircoADDI,[CreateTemporaryOperand(TargetTemporary),CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+SubNode.InitializionOffset)],SubNode.SourceLocation);
      end else begin
       EmitInstruction(pircoADDL,[CreateTemporaryOperand(TargetTemporary),CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+SubNode.InitializionOffset)],SubNode.SourceLocation);
      end;
-     EmitStore(TargetTemporary,ValueTemporary,SubNode.Type_,Node.SourceLocation);
+     EmitStore(TargetTemporary,ValueTemporary,SubNode.InitializionValue.Type_,Node.SourceLocation);
     end;
    end;
-   LastEnd:=SubNode.InitializionOffset+SubNode.Type_.Size;
+   LastEnd:=SubNode.InitializionOffset+SubNode.InitializionValue.Type_^.Size;
   end;
   if LastEnd<Size then begin
    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
