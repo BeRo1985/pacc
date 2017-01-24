@@ -3031,6 +3031,7 @@ begin
    end;
 
    astnkINIT:begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-17-51-0000',@Node.SourceLocation,true);
    end;
 
    astnkCONV:begin
