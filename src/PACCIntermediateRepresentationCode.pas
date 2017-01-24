@@ -2927,10 +2927,10 @@ begin
      end else begin
       EmitInstruction(pircoADDL,[CreateTemporaryOperand(TargetTemporary),CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+SubNode.InitializionOffset)],SubNode.SourceLocation);
      end;
-     EmitStore(TargetTemporary,ValueTemporary,SubNode.InitializionValue.Type_,Node.SourceLocation);
+     EmitStore(TargetTemporary,ValueTemporary,SubNode.ToType,Node.SourceLocation);
     end;
    end;
-   LastEnd:=SubNode.InitializionOffset+SubNode.InitializionValue.Type_^.Size;
+   LastEnd:=SubNode.InitializionOffset+SubNode.ToType^.Size;
   end;
   if LastEnd<Size then begin
    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
