@@ -3057,7 +3057,9 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunctionCall(const Node:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration;var OutputTemporary:TPACCInt32);
-var FunctionPointerTemporary:TPACCInt32;
+var Index:TPACCInt32;
+    FunctionPointerTemporary,ArgumentTemporary:TPACCInt32;
+    FunctionCallOperands:array of TPACCIntermediateRepresentationCodeOperand;
 begin
  FunctionPointerTemporary:=1;
  if Node.Kind=astnkFUNCPTR_CALL then begin
@@ -3072,7 +3074,32 @@ begin
  end else begin
   OutputTemporary:=-1;
  end;
- 
+ FunctionCallOperands:=nil;
+ try
+  if assigned(Node.Arguments) and (Node.Arguments.Count>0) then begin
+   SetLength(FunctionCallOperands,Node.Arguments.Count+2);
+   for Index:=0 to Node.Arguments.Count-1 do begin
+    ArgumentTemporary:=-1;
+    EmitExpression(Node.Arguments[Index],ArgumentTemporary);
+    FunctionCallOperands[Index+2]:=CreateTemporaryOperand(ArgumentTemporary);
+   end;
+  end else  begin
+   SetLength(FunctionCallOperands,2);
+  end;
+  if FunctionPointerTemporary>=0 then begin
+   FunctionCallOperands[0]:=CreateTemporaryOperand(FunctionPointerTemporary);
+  end else begin
+   FunctionCallOperands[0]:=CreateFunctionOperand(Node);
+  end;
+  if OutputTemporary>=0 then begin
+   FunctionCallOperands[1]:=CreateTemporaryOperand(OutputTemporary);
+  end else begin
+   FunctionCallOperands[1].Kind:=pircokNONE;
+  end;
+  EmitInstruction(pircoCALL,FunctionCallOperands,Node.SourceLocation);
+ finally
+  FunctionCallOperands:=nil;
+ end;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitExpression(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32);
