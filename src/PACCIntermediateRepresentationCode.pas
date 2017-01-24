@@ -514,6 +514,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitSTRUCT_REF(const Node:TPACCAbstractSyntaxTreeNodeStructReference;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitCOMMA(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitExpression(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+       procedure EmitFOR(const Node:TPACCAbstractSyntaxTreeNodeFORStatement);
        procedure EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
        procedure EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements);
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
@@ -2961,6 +2962,59 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.EmitFOR(const Node:TPACCAbstractSyntaxTreeNodeFORStatement);
+var ConditionLabel,BodyLabel,ContinueLabel,BreakLabel:TPACCAbstractSyntaxTreeNodeLabel;
+    ConditionBlock,BodyBlock,ContinueBlock,BreakBlock:TPACCIntermediateRepresentationCodeBlock;
+    IgnoredTemporary,ConditionTemporary:TPACCInt32;
+begin
+
+ IgnoredTemporary:=-1;
+ EmitExpression(Node.Initialization_,IgnoredTemporary,[],pircvkRVALUE);
+
+ ConditionLabel:=NewHiddenLabel;
+ BodyLabel:=NewHiddenLabel;
+ ContinueLabel:=TPACCAbstractSyntaxTreeNodeLabel(Node.ContinueLabel);
+ BreakLabel:=TPACCAbstractSyntaxTreeNodeLabel(Node.BreakLabel);
+ ConditionBlock:=FindBlock(ConditionLabel);
+ BodyBlock:=FindBlock(BodyLabel);
+ ContinueBlock:=FindBlock(ContinueLabel);
+ BreakBlock:=FindBlock(BreakLabel);
+
+ EmitLabel(ConditionLabel);
+ ConditionTemporary:=-1;
+ EmitExpression(Node.Condition,ConditionTemporary,[],pircvkRVALUE);
+ if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
+    ((Node.Condition.Type_^.Kind=tkPOINTER) and
+     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZI;
+ end else if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
+             ((Node.Condition.Type_^.Kind=tkPOINTER) and
+              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZL;
+ end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZF;
+ end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
+  CurrentBlock.Jump.Kind:=pircjkJNZD;
+ end else begin
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-14-39-0000',@Node.SourceLocation,true);
+ end;
+ CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
+ CurrentBlock.Successors[0]:=BodyBlock;
+ CurrentBlock.Successors[1]:=BreakBlock;
+ CloseBlock;
+
+ EmitLabel(BodyLabel);
+ EmitStatement(Node.Body);
+ EmitJump(ContinueLabel);
+
+ EmitLabel(ContinueLabel);
+ EmitExpression(Node.Step,IgnoredTemporary,[],pircvkRVALUE);
+ EmitJump(ConditionLabel);
+
+ EmitLabel(BreakLabel);
+
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
 var Index,TemporaryA:TPACCInt32;
 begin
@@ -2970,6 +3024,7 @@ begin
     EmitStatements(TPACCAbstractSyntaxTreeNodeStatements(Node));
    end;
    astnkFOR:begin
+    EmitFOR(TPACCAbstractSyntaxTreeNodeFORStatement(Node));
    end;
    astnkDO:begin
    end;
