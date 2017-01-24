@@ -2953,11 +2953,11 @@ begin
      (TPACCInstance(fInstance).IsArithmeticType(Node.DeclarationVariable.Type_) or
       (Node.DeclarationVariable.Type_^.Kind=tkPOINTER)) then begin
    if Node.DeclarationVariable.Kind in [astnkLVAR,astnkGVAR] then begin
-    EmitExpression(Node.DeclarationInitialization[0],ValueTemporary,[],pircvkRVALUE);
+    EmitExpression(TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[0]).InitializionValue,ValueTemporary,[],pircvkRVALUE);
     EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable),ValueTemporary);
    end else begin
     EmitExpression(Node.DeclarationVariable,VariableTemporary,[],pircvkLVALUE);
-    EmitExpression(Node.DeclarationInitialization[0],ValueTemporary,[],pircvkRVALUE);
+    EmitExpression(TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[0]).InitializionValue,ValueTemporary,[],pircvkRVALUE);
     EmitStore(VariableTemporary,ValueTemporary,Node.DeclarationVariable.Type_,Node.SourceLocation);
    end;
   end else begin
