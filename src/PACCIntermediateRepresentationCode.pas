@@ -3718,8 +3718,6 @@ begin
 
  FunctionName:=AFunctionNode.FunctionName;
 
- TPACCInstance(fInstance).IntermediateRepresentationCode.Functions.Add(self);
-
  CurrentBlock:=nil;
  BlockLink:=@StartBlock;
  PhiLink:=nil;
@@ -3774,6 +3772,7 @@ begin
      end;
      astnkFUNC:begin
       Function_:=TPACCIntermediateRepresentationCodeFunction.Create(AInstance);
+      TPACCInstance(AInstance).IntermediateRepresentationCode.Functions.Add(Function_);
       Function_.EmitFunction(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node));
      end;
      else begin
