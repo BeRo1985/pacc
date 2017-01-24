@@ -43,6 +43,12 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        pircoASM,
 
+       pircoMEMCPYI, // Memory copy int
+       pircoMEMCPYL, // Memory copy long
+
+       pircoZEROMEMI, // Zero memory int
+       pircoZEROMEML, // Zero memory long
+
        pircoSETI, // Set int
        pircoSETL, // Set long
        pircoSETF, // Set float
@@ -516,6 +522,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitTERNARY(const Node:TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator;var OutputTemporary:TPACCInt32);
        procedure EmitSTRUCT_REF(const Node:TPACCAbstractSyntaxTreeNodeStructReference;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitCOMMA(const Node:TPACCAbstractSyntaxTreeNodeBinaryOperator;var OutputTemporary:TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
+       procedure EmitDECL(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
        procedure EmitExpression(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
        procedure EmitFORStatement(const Node:TPACCAbstractSyntaxTreeNodeFORStatement);
        procedure EmitWHILEOrDOStatement(const Node:TPACCAbstractSyntaxTreeNodeWHILEOrDOStatement;const IsWHILE:boolean);
@@ -2701,11 +2708,35 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.EmitDECL(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
+var Index,VariableTemporary,ValueTemporary:TPACCInt32;
+begin
+ if assigned(Node.DeclarationInitialization) then begin
+  VariableTemporary:=-1;
+  ValueTemporary:=-1;
+  if (Node.DeclarationInitialization.Count=1) and
+     (TPACCInstance(fInstance).IsArithmeticType(Node.DeclarationVariable.Type_) or
+      (Node.DeclarationVariable.Type_^.Kind=tkPOINTER)) then begin
+   if Node.DeclarationVariable.Kind in [astnkLVAR,astnkGVAR] then begin
+    EmitExpression(Node.DeclarationInitialization[0],ValueTemporary,[],pircvkRVALUE);
+    EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable),ValueTemporary);
+   end else begin
+    EmitExpression(Node.DeclarationVariable,VariableTemporary,[],pircvkLVALUE);
+    EmitExpression(Node.DeclarationInitialization[0],ValueTemporary,[],pircvkRVALUE);
+    EmitStore(VariableTemporary,ValueTemporary,Node.DeclarationVariable.Type_);
+   end;
+  end else begin
+   for Index:=0 to Node.DeclarationInitialization.Count-1 do begin
+   end;
+  end;
+ end;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitExpression(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32;const InputTemporaries:array of TPACCInt32;const ValueKind:TPACCIntermediateRepresentationCodeValueKind);
  procedure EnsureRValue;
  begin
   if ValueKind<>pircvkRVALUE then begin
-   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-09-41-0000',nil,true);
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-09-41-0000',@Node.SourceLocation,true);
   end;
  end;
 begin
@@ -2724,7 +2755,7 @@ begin
    end;
 
    astnkSTRING:begin
-    TPACCInstance(fInstance).AddError('Internal error 2017-01-21-14-56-0000',nil,true);
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-21-14-56-0000',@Node.SourceLocation,true);
    end;
 
    astnkLVAR,
@@ -2751,12 +2782,15 @@ begin
    end;
 
    astnkFUNC:begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-16-23-0000',@Node.SourceLocation,true);
    end;
 
    astnkEXTERN_DECL:begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-16-23-0001',@Node.SourceLocation,true);
    end;
 
    astnkDECL:begin
+    EmitDECL(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
    end;
 
    astnkINIT:begin
