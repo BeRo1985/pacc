@@ -3052,15 +3052,7 @@ begin
     EmitVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node),OutputTemporary);
    end;
 
-   astnkTYPEDEF:begin
-    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-17-05-0000',@Node.SourceLocation,true);
-   end;
-
    astnkASSEMBLER:begin
-   end;
-
-   astnkASSEMBLER_OPERAND:begin
-    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-17-05-0001',@Node.SourceLocation,true);
    end;
 
    astnkFUNCCALL:begin
@@ -3072,20 +3064,8 @@ begin
    astnkFUNCDESG:begin
    end;
 
-   astnkFUNC:begin
-    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-16-23-0000',@Node.SourceLocation,true);
-   end;
-
-   astnkEXTERN_DECL:begin
-    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-16-23-0001',@Node.SourceLocation,true);
-   end;
-
    astnkDECL:begin
     EmitDECL(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
-   end;
-
-   astnkINIT:begin
-    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-17-51-0000',@Node.SourceLocation,true);
    end;
 
    astnkCONV:begin
