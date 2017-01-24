@@ -1119,7 +1119,7 @@ var CurrentState:TState;
   procedure ParseInitializerElement(const List:TPACCAbstractSyntaxTreeNodeList;const Type_:PPACCType;const Offset:TPACCInt;Designated:boolean);
   var Expression:TPACCAbstractSyntaxTreeNode;
   begin
-   if Designated then begin
+   if CurrentState.Token^.TokenType=TOK_ASSIGN then begin
     Expect(TOK_ASSIGN);
    end;
    if Type_^.Kind in [tkARRAY,tkSTRUCT] then begin
@@ -1249,7 +1249,7 @@ var CurrentState:TState;
         break;
        end;
       end;
-      ParseInitializerElement(List,Type_^.ChildType,Offset+FieldType^.Offset,Designated);
+      ParseInitializerElement(List,FieldType,Offset+FieldType^.Offset,Designated);
       if CurrentState.Token^.TokenType=TOK_COMMA then begin
        NextToken;
       end;
