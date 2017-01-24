@@ -1119,7 +1119,9 @@ var CurrentState:TState;
   procedure ParseInitializerElement(const List:TPACCAbstractSyntaxTreeNodeList;const Type_:PPACCType;const Offset:TPACCInt;Designated:boolean);
   var Expression:TPACCAbstractSyntaxTreeNode;
   begin
-   Expect(TOK_ASSIGN);
+   if Designated then begin
+    Expect(TOK_ASSIGN);
+   end;
    if Type_^.Kind in [tkARRAY,tkSTRUCT] then begin
     ParseInitializerList(List,Type_,Offset,Designated);
    end else if CurrentState.Token^.TokenType=TOK_LBRA Then begin
