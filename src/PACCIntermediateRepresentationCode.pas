@@ -2720,19 +2720,14 @@ procedure TPACCIntermediateRepresentationCodeFunction.EmitDECL(const Node:TPACCA
      TempNodes:TPACCAbstractSyntaxTreeNodeList;
      LastEnd:TPACCInt64;
  begin
-
   TempNodes:=TPACCAbstractSyntaxTreeNodeList.Create;
   try
-
    for Index:=0 to Nodes.Count-1 do begin
     SubNode:=TPACCAbstractSyntaxTreeNodeInitializer(Nodes[Index]);
     TempNodes.Add(SubNode);
    end;
-
    TempNodes.Sort(TPACCIntermediateRepresentationCodeFunctionEmitDECLCompareInitializers);
-
    TargetTemporary:=-1;
-
    LastEnd:=0;
    for Index:=0 to TempNodes.Count-1 do begin
     SubNode:=TPACCAbstractSyntaxTreeNodeInitializer(TempNodes[Index]);
@@ -2772,7 +2767,6 @@ procedure TPACCIntermediateRepresentationCodeFunction.EmitDECL(const Node:TPACCA
      EmitInstruction(pircoZEROMEML,[CreateTemporaryOperand(TargetTemporary),CreateIntegerValueOperand(Size-LastEnd)],Node.SourceLocation);
     end;
    end;
-
   finally
    TempNodes.Free;
   end;
@@ -2832,12 +2826,14 @@ begin
    end;
 
    astnkTYPEDEF:begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-17-05-0000',@Node.SourceLocation,true);
    end;
 
    astnkASSEMBLER:begin
    end;
 
    astnkASSEMBLER_OPERAND:begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-17-05-0001',@Node.SourceLocation,true);
    end;
 
    astnkFUNCCALL:begin
