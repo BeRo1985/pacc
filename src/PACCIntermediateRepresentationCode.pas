@@ -3070,9 +3070,15 @@ end;
 procedure TPACCIntermediateRepresentationCodeFunction.EmitSWITCHStatement(const Node:TPACCAbstractSyntaxTreeNodeSWITCHStatement);
 var Index:TPACCInt32;
     SwitchBegin,SwitchEnd:TPACCInt64;
-    UseJumpTable:boolean;
     StatementCase:PPACCAbstractSyntaxTreeNodeSWITCHStatementCase;
+    SkipBodyLabel,BodyLabel:TPACCAbstractSyntaxTreeNodeLabel;
+    SkipBodyBlock,BodyBlock:TPACCIntermediateRepresentationCodeBlock;
 begin
+
+ SkipBodyLabel:=NewHiddenLabel;
+ BodyLabel:=NewHiddenLabel;
+ SkipBodyBlock:=FindBlock(SkipBodyLabel);
+ BodyBlock:=FindBlock(BodyLabel);
 
  SwitchBegin:=High(TPACCInt64);
  SwitchEnd:=Low(TPACCInt64);
@@ -3096,9 +3102,18 @@ begin
 
   // Multiple-branch-jumps approach
 
-  
-
  end;
+
+ if assigned(Node.DefaultCaseLabel) then begin
+  EmitJump(TPACCAbstractSyntaxTreeNodeLabel(Node.DefaultCaseLabel));
+ end else begin
+  EmitJump(SkipBodyLabel);
+ end;
+
+ EmitLabel(BodyLabel);
+ EmitStatement(Node.Body);
+ EmitJump(SkipBodyLabel); 
+ EmitLabel(SkipBodyLabel);
 
 end;
 
