@@ -4640,7 +4640,28 @@ begin
       inc(nlv[k],m[k]);
      end;
     end;
-
+    if i.To_.Kind<>pircokNONE then begin
+     if i.To_.Kind=pircokTEMPORARY then begin
+      t:=i.To_.Temporary;
+      if b.In_.GetBit(t) then begin
+       dec(nlv[CodeTypeBaseClass[Temporaries[t].Type_]]);
+      end;
+      b.Gen_.SetBit(t,true);
+      b.In_.SetBit(t,false);
+      Phis[PhiTmp(t)]:=0;
+     end else begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-25-17-34-0000',nil,true);
+     end;
+    end;
+    for k:=0 to length(i.Operands)-1 do begin
+     case i.Operands[k].Kind of
+      pircokNONE:begin
+      end;
+      else begin
+       BSet(i.Operands[k],b);
+      end;
+     end;
+    end;
    end;
 
    if Changed then begin
