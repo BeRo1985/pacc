@@ -505,8 +505,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Dominance:TPACCIntermediateRepresentationCodeBlock;
        DominanceLink:TPACCIntermediateRepresentationCodeBlock;
 
-       Fronts:TPACCIntermediateRepresentationCodeBlocks;
-       CountFronts:TPACCInt32;
+       Frontiers:TPACCIntermediateRepresentationCodeBlockList;
 
        Predecessors:TPACCIntermediateRepresentationCodeBlocks;
        CountPredecessors:TPACCInt32;
@@ -641,6 +640,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure FillRPO;
        procedure FillPredecessors;
        procedure FillUse;
+       function CompareSDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
+       function CompareDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
        procedure SSA;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
@@ -998,8 +999,7 @@ begin
  Dominance:=nil;
  DominanceLink:=nil;
 
- Fronts:=nil;
- CountFronts:=0;
+ Frontiers:=TPACCIntermediateRepresentationCodeBlockList.Create;
 
  Predecessors:=nil;
  CountPredecessors:=0;
@@ -1023,8 +1023,7 @@ begin
 
  FreeAndNil(Successors);
 
- Fronts:=nil;
- CountFronts:=0;
+ FreeAndNil(Frontiers);
 
  Predecessors:=nil;
  CountPredecessors:=0;
@@ -4367,6 +4366,28 @@ begin
 
 end;
 
+function TPACCIntermediateRepresentationCodeFunction.CompareSDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
+begin
+ if assigned(a) and assigned(b) then begin
+  if a=b then begin
+   result:=false;
+  end else begin
+   while a.ID<b.ID do begin
+    b:=b.InterDominance;
+   end;
+   result:=a=b;
+  end;
+ end else begin
+  result:=false;
+  TPACCInstance(fInstance).AddError('Internal error 2017-01-25-15-31-0000',nil,true);
+ end;
+end;
+
+function TPACCIntermediateRepresentationCodeFunction.CompareDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
+begin
+ result:=(a=b) or CompareSDominance(a,b);
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.SSA;
  procedure FillDominators;
   function FindInterDominance(b1,b2:TPACCIntermediateRepresentationCodeBlock):TPACCIntermediateRepresentationCodeBlock;
@@ -4432,6 +4453,16 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
   end;
  end;
  procedure FillDominanceFrontier;
+  procedure AddFrontier(const a,b:TPACCIntermediateRepresentationCodeBlock);
+  var Index:TPACCInt32;
+  begin
+   for Index:=0 to a.Frontiers.Count-1 do begin
+    if a.Frontiers[Index]=b then begin
+     exit;
+    end;
+   end;
+   a.Frontiers.Add(b);
+  end;
  var Index:TPACCInt32;
      a,b,s:TPACCIntermediateRepresentationCodeBlock;
  begin
@@ -4440,7 +4471,11 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
    for Index:=0 to b.Successors.Count-1 do begin
     s:=b.Successors[Index];
     if assigned(s) then begin
-
+     a:=b;
+     while not CompareSDominance(a,s) do begin
+      AddFrontier(a,s);
+      a:=a.InterDominance;
+     end;
     end;
    end;
    b:=b.Link;
