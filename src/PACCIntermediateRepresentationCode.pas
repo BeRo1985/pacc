@@ -539,6 +539,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements);
        procedure DeleteBlock(const b:TPACCIntermediateRepresentationCodeBlock);
        procedure FillRPO;
+       procedure FillPredecessors;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -3984,9 +3985,78 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.FillPredecessors;
+var Index:TPACCInt32;
+    b,s:TPACCIntermediateRepresentationCodeBlock;
+    AlreadySeenHashMap:TPACCPointerHashMap;
+begin
+
+ b:=StartBlock;
+ while assigned(b) do begin
+  b.Predecessors:=nil;
+  b.CountPredecessors:=0;
+  b:=b.Link;
+ end;
+
+ b:=StartBlock;
+ while assigned(b) do begin
+  AlreadySeenHashMap:=TPACCPointerHashMap.Create;
+  try
+   for Index:=0 to length(b.Successors)-1 do begin
+    s:=b.Successors[Index];
+    if assigned(s) and not assigned(AlreadySeenHashMap[s]) then begin
+     AlreadySeenHashMap[s]:=s;
+     inc(s.CountPredecessors);
+    end;
+   end;
+  finally
+   AlreadySeenHashMap.Free;
+  end;
+  b:=b.Link;
+ end;
+
+ b:=StartBlock;
+ while assigned(b) do begin
+  SetLength(b.Predecessors,b.CountPredecessors);
+  b.CountPredecessors:=0;
+  b.Visit:=0;
+  b:=b.Link;
+ end;
+
+ b:=StartBlock;
+ while assigned(b) do begin
+  AlreadySeenHashMap:=TPACCPointerHashMap.Create;
+  try
+   for Index:=0 to length(b.Successors)-1 do begin
+    s:=b.Successors[Index];
+    if assigned(s) and not assigned(AlreadySeenHashMap[s]) then begin
+     AlreadySeenHashMap[s]:=s;
+     s.CountPredecessors:=Max(s.CountPredecessors,s.Visit+1);
+     if length(s.Predecessors)<=s.CountPredecessors then begin
+      SetLength(s.Predecessors,s.CountPredecessors*2);
+     end;
+     s.Predecessors[s.Visit]:=b;
+     inc(s.Visit);
+    end;
+   end;
+  finally
+   AlreadySeenHashMap.Free;
+  end;
+  b:=b.Link;
+ end;
+
+ b:=StartBlock;
+ while assigned(b) do begin
+  SetLength(b.Predecessors,b.CountPredecessors);
+  b:=b.Link;
+ end;
+
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
 begin
  FillRPO;
+ FillPredecessors;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
