@@ -477,6 +477,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Bits[const AIndex:TPACCInt32]:boolean read GetBit write SetBit; default;
      end;
 
+     TPACCIntermediateRepresentationCodeBlockList=class;
+     
      TPACCIntermediateRepresentationCodeBlock=class
       private
        fInstance:TObject;
@@ -492,7 +494,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        Jump:TPACCIntermediateRepresentationCodeJump;
 
-       Successors:TPACCIntermediateRepresentationCodeBlocks;
+       Successors:TPACCIntermediateRepresentationCodeBlockList;
 
        Link:TPACCIntermediateRepresentationCodeBlock;
 
@@ -985,7 +987,7 @@ begin
 
  Jump.Kind:=pircjkNONE;
 
- Successors:=nil;
+ Successors:=TPACCIntermediateRepresentationCodeBlockList.Create;
 
  Link:=nil;
 
@@ -1019,7 +1021,7 @@ begin
 
  FreeAndNil(Instructions);
 
- Successors:=nil;
+ FreeAndNil(Successors);
 
  Fronts:=nil;
  CountFronts:=0;
@@ -1145,8 +1147,8 @@ begin
  if assigned(CurrentBlock) and (CurrentBlock.Jump.Kind=pircjkNONE) then begin
   CloseBlock;
   CurrentBlock.Jump.Kind:=pircjkJMP;
-  SetLength(CurrentBlock.Successors,1);
-  CurrentBlock.Successors[0]:=Block;
+  CurrentBlock.Successors.Clear;
+  CurrentBlock.Successors.Add(Block);
  end;
  if Block.Jump.Kind<>pircjkNONE then begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-20-14-42-0000',nil,true);
@@ -1162,8 +1164,8 @@ var Block:TPACCIntermediateRepresentationCodeBlock;
 begin
  Block:=FindBlock(Label_);
  CurrentBlock.Jump.Kind:=pircjkJMP;
- SetLength(CurrentBlock.Successors,1);
- CurrentBlock.Successors[0]:=Block;
+  CurrentBlock.Successors.Clear;
+  CurrentBlock.Successors.Add(Block);
  CloseBlock;
 end;
 
@@ -1173,9 +1175,9 @@ var Index:TPACCInt32;
 begin
  CurrentBlock.Jump.Kind:=pircjkJMPT;
  CurrentBlock.Jump.Operand:=Operand;
- SetLength(CurrentBlock.Successors,length(Blocks));
+ CurrentBlock.Successors.Clear;
  for Index:=0 to length(Blocks)-1 do begin
-  CurrentBlock.Successors[Index]:=Blocks[Index];
+  CurrentBlock.Successors.Add(Blocks[Index]);
  end;
  CloseBlock;
 end;
@@ -2449,13 +2451,13 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-28-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(LeftTemporary);
- SetLength(CurrentBlock.Successors,2);
+ CurrentBlock.Successors.Clear;
  if IsAND then begin
-  CurrentBlock.Successors[0]:=b0;
-  CurrentBlock.Successors[1]:=b2;
+  CurrentBlock.Successors.Add(b0);
+  CurrentBlock.Successors.Add(b2);
  end else begin
-  CurrentBlock.Successors[0]:=b1;
-  CurrentBlock.Successors[1]:=b0;
+  CurrentBlock.Successors.Add(b1);
+  CurrentBlock.Successors.Add(b0);
  end;
  CloseBlock;
 
@@ -2478,9 +2480,9 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-29-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(RightTemporary);
- SetLength(CurrentBlock.Successors,2);
- CurrentBlock.Successors[0]:=b1;
- CurrentBlock.Successors[1]:=b2;
+ CurrentBlock.Successors.Clear;
+ CurrentBlock.Successors.Add(b1);
+ CurrentBlock.Successors.Add(b2);
  CloseBlock;
 
  EmitLabel(l1);
@@ -2530,9 +2532,9 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-48-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(OperandTemporary);
- SetLength(CurrentBlock.Successors,2);
- CurrentBlock.Successors[0]:=b0;
- CurrentBlock.Successors[1]:=b1;
+ CurrentBlock.Successors.Clear;
+ CurrentBlock.Successors.Add(b0);
+ CurrentBlock.Successors.Add(b1);
  CloseBlock;
 
  EmitLabel(l0);
@@ -3166,9 +3168,9 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-13-52-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
- SetLength(CurrentBlock.Successors,2);
- CurrentBlock.Successors[0]:=b0;
- CurrentBlock.Successors[1]:=b1;
+ CurrentBlock.Successors.Clear;
+ CurrentBlock.Successors.Add(b0);
+ CurrentBlock.Successors.Add(b1);
  CloseBlock;
 
  EmitLabel(l0);
@@ -3723,9 +3725,9 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-14-39-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
- SetLength(CurrentBlock.Successors,2);
- CurrentBlock.Successors[0]:=BodyBlock;
- CurrentBlock.Successors[1]:=BreakBlock;
+ CurrentBlock.Successors.Clear;
+ CurrentBlock.Successors.Add(BodyBlock);
+ CurrentBlock.Successors.Add(BreakBlock);
  CloseBlock;
 
  EmitLabel(BodyLabel);
@@ -3781,9 +3783,9 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-14-39-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
- SetLength(CurrentBlock.Successors,2);
- CurrentBlock.Successors[0]:=BodyBlock;
- CurrentBlock.Successors[1]:=BreakBlock;
+ CurrentBlock.Successors.Clear;
+ CurrentBlock.Successors.Add(BodyBlock);
+ CurrentBlock.Successors.Add(BreakBlock);
  CloseBlock;
 
  EmitLabel(BreakLabel);
@@ -3827,9 +3829,9 @@ procedure TPACCIntermediateRepresentationCodeFunction.EmitSWITCHStatement(const 
   EmitInstruction(Opcode,CodeType,CreateTemporaryOperand(ConditionTemporary),[ValueOperand,CreateIntegerValueOperand(ComparsionValue)],Node.SourceLocation);
   CurrentBlock.Jump.Kind:=JumpKind;
   CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
-  SetLength(CurrentBlock.Successors,2);
-  CurrentBlock.Successors[0]:=TrueBlock;
-  CurrentBlock.Successors[1]:=FalseBlock;
+  CurrentBlock.Successors.Clear;
+  CurrentBlock.Successors.Add(TrueBlock);
+  CurrentBlock.Successors.Add(FalseBlock);
   CloseBlock;
  end;
 var Index,SubIndex,ValueTemporary,OffsetedValueTemporary,JumpTableOffsetValueTemporary:TPACCInt32;
@@ -3995,9 +3997,9 @@ begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-13-52-0000',@Node.SourceLocation,true);
  end;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
- SetLength(CurrentBlock.Successors,2);
- CurrentBlock.Successors[0]:=b0;
- CurrentBlock.Successors[1]:=b1;
+ CurrentBlock.Successors.Clear;
+ CurrentBlock.Successors.Add(b0);
+ CurrentBlock.Successors.Add(b1);
  CloseBlock;
 
  EmitLabel(l0);
@@ -4061,14 +4063,16 @@ var Index,SubIndex,SubSubIndex:TPACCInt32;
     s:TPACCIntermediateRepresentationCodeBlock;
     p:TPACCIntermediateRepresentationCodePhi;
     AlreadySeenHashMap:TPACCPointerHashMap;
-    Successors:TPACCIntermediateRepresentationCodeBlocks;
+    Successors:TPACCIntermediateRepresentationCodeBlockList;
 begin
- Successors:=nil;
+ Successors:=TPACCIntermediateRepresentationCodeBlockList.Create;
  try
-  Successors:=copy(b.Successors);
+  for Index:=0 to b.Successors.Count-1 do begin
+   Successors.Add(b.Successors[Index]);
+  end;
   AlreadySeenHashMap:=TPACCPointerHashMap.Create;
   try
-   for Index:=0 to length(Successors)-1 do begin
+   for Index:=0 to Successors.Count-1 do begin
     s:=Successors[Index];
     if assigned(s) and not assigned(AlreadySeenHashMap[s]) then begin
      AlreadySeenHashMap[s]:=s;
@@ -4105,11 +4109,11 @@ begin
    AlreadySeenHashMap.Free;
   end;
  finally
-  Successors:=nil;
+  Successors.Free;
  end;
 end;
 
-function CompareTPACCIntermediateRepresentationCodeFunctionFillRPORPORecSuccessors(const a,b:pointer):TPACCInt32;
+function CompareTPACCIntermediateRepresentationCodeFunctionFillRPORPORecSuccessors(a,b:pointer):TPACCInt32;
 begin
  if assigned(a) and assigned(b) then begin
   result:=TPACCIntermediateRepresentationCodeBlock(a).Loop-TPACCIntermediateRepresentationCodeBlock(b).Loop;
@@ -4125,12 +4129,12 @@ end;
 procedure TPACCIntermediateRepresentationCodeFunction.FillRPO;
  function RPORec(const b:TPACCIntermediateRepresentationCodeBlock;const x:TPACCInt32):TPACCInt32;
  var Index:TPACCInt32;
-     Successors:TPACCIntermediateRepresentationCodeBlocks;
+     Successors:TPACCIntermediateRepresentationCodeBlockList;
  begin
   result:=x;
   if assigned(b) and (b.ID<0) then begin
    b.ID:=1;
-   case length(b.Successors) of
+   case b.Successors.Count of
     1:begin
      if assigned(b.Successors[0]) then begin
       result:=RPORec(b.Successors[0],result);
@@ -4152,16 +4156,19 @@ procedure TPACCIntermediateRepresentationCodeFunction.FillRPO;
      end;
     end;
     4..$7fffffff:begin
-     Successors:=copy(b.Successors);
+     Successors:=TPACCIntermediateRepresentationCodeBlockList.Create;
      try
-      IndirectIntroSort(@Successors[0],0,length(Successors)-1,CompareTPACCIntermediateRepresentationCodeFunctionFillRPORPORecSuccessors);
-      for Index:=0 to length(Successors)-1 do begin
+      for Index:=0 to b.Successors.Count-1 do begin
+       Successors.Add(b.Successors[Index]);
+      end;
+      Successors.Sort(CompareTPACCIntermediateRepresentationCodeFunctionFillRPORPORecSuccessors);
+      for Index:=0 to Successors.Count-1 do begin
        if assigned(Successors[Index]) then begin
         result:=RPORec(Successors[Index],result);
        end;
       end;
      finally
-      Successors:=nil;
+      Successors.Free;
      end;
     end;
    end;
@@ -4225,7 +4232,7 @@ begin
  while assigned(b) do begin
   AlreadySeenHashMap:=TPACCPointerHashMap.Create;
   try
-   for Index:=0 to length(b.Successors)-1 do begin
+   for Index:=0 to b.Successors.Count-1 do begin
     s:=b.Successors[Index];
     if assigned(s) and not assigned(AlreadySeenHashMap[s]) then begin
      AlreadySeenHashMap[s]:=s;
@@ -4250,7 +4257,7 @@ begin
  while assigned(b) do begin
   AlreadySeenHashMap:=TPACCPointerHashMap.Create;
   try
-   for Index:=0 to length(b.Successors)-1 do begin
+   for Index:=0 to b.Successors.Count-1 do begin
     s:=b.Successors[Index];
     if assigned(s) and not assigned(AlreadySeenHashMap[s]) then begin
      AlreadySeenHashMap[s]:=s;
@@ -4424,8 +4431,24 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
    b:=b.Link;
   end;
  end;
+ procedure FillDominanceFrontier;
+ var Index:TPACCInt32;
+     a,b,s:TPACCIntermediateRepresentationCodeBlock;
+ begin
+  b:=StartBlock;
+  while assigned(b) do begin
+   for Index:=0 to b.Successors.Count-1 do begin
+    s:=b.Successors[Index];
+    if assigned(s) then begin
+
+    end;
+   end;
+   b:=b.Link;
+  end;
+ end;
 begin
  FillDominators;
+ FillDominanceFrontier;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
