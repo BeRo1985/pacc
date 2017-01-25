@@ -507,8 +507,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        Frontiers:TPACCIntermediateRepresentationCodeBlockList;
 
-       Predecessors:TPACCIntermediateRepresentationCodeBlocks;
-       CountPredecessors:TPACCInt32;
+       Predecessors:TPACCIntermediateRepresentationCodeBlockList;
 
        In_:TPACCIntermediateRepresentationCodeBitSet;
        Out_:TPACCIntermediateRepresentationCodeBitSet;
@@ -1001,8 +1000,7 @@ begin
 
  Frontiers:=TPACCIntermediateRepresentationCodeBlockList.Create;
 
- Predecessors:=nil;
- CountPredecessors:=0;
+ Predecessors:=TPACCIntermediateRepresentationCodeBlockList.Create;
 
  In_.Clear;
  Out_.Clear;
@@ -1025,8 +1023,7 @@ begin
 
  FreeAndNil(Frontiers);
 
- Predecessors:=nil;
- CountPredecessors:=0;
+ FreeAndNil(Predecessors);
 
  In_.Clear;
  Out_.Clear;
@@ -4091,14 +4088,10 @@ begin
       end;
       p:=p.Link;
      end;
-     if s.CountPredecessors<>0 then begin
-      for SubIndex:=0 to s.CountPredecessors-1 do begin
+     if s.Predecessors.Count>0 then begin
+      for SubIndex:=0 to s.Predecessors.Count-1 do begin
        if s.Predecessors[SubIndex]=b then begin
-        for SubSubIndex:=SubIndex+1 to s.CountPredecessors-1 do begin
-         s.Predecessors[SubSubIndex-1]:=s.Predecessors[SubSubIndex];
-        end;
-        dec(s.CountPredecessors);
-        SetLength(s.Predecessors,s.CountPredecessors);
+        s.Predecessors.Delete(SubIndex);
        end;
       end;
      end;
@@ -4222,32 +4215,7 @@ begin
 
  b:=StartBlock;
  while assigned(b) do begin
-  b.Predecessors:=nil;
-  b.CountPredecessors:=0;
-  b:=b.Link;
- end;
-
- b:=StartBlock;
- while assigned(b) do begin
-  AlreadySeenHashMap:=TPACCPointerHashMap.Create;
-  try
-   for Index:=0 to b.Successors.Count-1 do begin
-    s:=b.Successors[Index];
-    if assigned(s) and not assigned(AlreadySeenHashMap[s]) then begin
-     AlreadySeenHashMap[s]:=s;
-     inc(s.CountPredecessors);
-    end;
-   end;
-  finally
-   AlreadySeenHashMap.Free;
-  end;
-  b:=b.Link;
- end;
-
- b:=StartBlock;
- while assigned(b) do begin
-  SetLength(b.Predecessors,b.CountPredecessors);
-  b.CountPredecessors:=0;
+  b.Predecessors.Clear;
   b.Visit:=0;
   b:=b.Link;
  end;
@@ -4260,12 +4228,7 @@ begin
     s:=b.Successors[Index];
     if assigned(s) and not assigned(AlreadySeenHashMap[s]) then begin
      AlreadySeenHashMap[s]:=s;
-     s.CountPredecessors:=Max(s.CountPredecessors,s.Visit+1);
-     if length(s.Predecessors)<=s.CountPredecessors then begin
-      SetLength(s.Predecessors,s.CountPredecessors*2);
-     end;
-     s.Predecessors[s.Visit]:=b;
-     inc(s.Visit);
+     s.Predecessors.Add(nil);
     end;
    end;
   finally
@@ -4276,7 +4239,19 @@ begin
 
  b:=StartBlock;
  while assigned(b) do begin
-  SetLength(b.Predecessors,b.CountPredecessors);
+  AlreadySeenHashMap:=TPACCPointerHashMap.Create;
+  try
+   for Index:=0 to b.Successors.Count-1 do begin
+    s:=b.Successors[Index];
+    if assigned(s) and not assigned(AlreadySeenHashMap[s]) then begin
+     AlreadySeenHashMap[s]:=s;
+     s.Predecessors[s.Visit]:=b;
+     inc(s.Visit);
+    end;
+   end;
+  finally
+   AlreadySeenHashMap.Free;
+  end;
   b:=b.Link;
  end;
 
@@ -4427,7 +4402,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
    for Index:=1 to CountBlocks-1 do begin
     b:=RPO[Index];
     d:=nil;
-    for SubIndex:=0 to b.CountPredecessors-1 do begin
+    for SubIndex:=0 to b.Predecessors.Count-1 do begin
      if assigned(b.Predecessors[SubIndex].InterDominance) or (b.Predecessors[SubIndex]=StartBlock) then begin
       d:=FindInterDominance(d,b.Predecessors[SubIndex]);
      end;
