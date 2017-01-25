@@ -4798,10 +4798,15 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
    b:=b.Link;
   end;
  end;
+ procedure PhiInstruction;
+ begin
+  
+ end;
 begin
  FillDominators;
  FillDominanceFrontier;
  FillLive;
+ PhiInstruction;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
