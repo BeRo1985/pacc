@@ -650,7 +650,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure FillPredecessors;
        procedure FillUse;
        procedure LiveOn(var v:TPACCIntermediateRepresentationCodeBitSet;const b,s:TPACCIntermediateRepresentationCodeBlock);
-       function ReturnRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;const CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
+       function ReturnRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;var CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
        procedure FillLive;
        function CompareSDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
        function CompareDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
@@ -4494,14 +4494,14 @@ begin
 
 end;
 
-function TPACCIntermediateRepresentationCodeFunction.ReturnRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;const CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
+function TPACCIntermediateRepresentationCodeFunction.ReturnRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;var CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
 begin
  result.Clear;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.FillLive;
 var Phis:array of TPACCInt32;
-    nlv:array[0..1] of TPACCInt32;
+    nlv,m:array[0..1] of TPACCInt32;
  function PhiTmp(const t:TPACCInt32):TPACCInt32;
  begin
   result:=Temporaries[t].Phi;
@@ -4601,6 +4601,29 @@ begin
 
    b.CountLive[0]:=nlv[0];
    b.CountLive[1]:=nlv[1];
+
+   for Index:=b.Instructions.Count-1 downto 0 do begin
+    i:=b.Instructions[Index];
+    if (i.Opcode=pircoCALL) and (length(i.Operands)>0) and (i.Operands[0].Kind=pircokCALL) then begin
+     m[0]:=0;
+     m[1]:=0;
+     b.In_.Subtraction(ReturnRegisters(b.Jump.Operand,m[0],m[1]));
+     for k:=0 to 1 do begin
+      dec(nlv[k],m[k]);
+     end;
+     if (nlv[0]+IntegerRegisterToSave(b.Jump.Operand))>b.CountLive[0] then begin
+      b.CountLive[0]:=nlv[0]+IntegerRegisterToSave(b.Jump.Operand);
+     end;
+     if (nlv[1]+FloatRegisterToSave(b.Jump.Operand))>b.CountLive[1] then begin
+      b.CountLive[1]:=nlv[1]+FloatRegisterToSave(b.Jump.Operand);
+     end;
+     b.In_.Union(ArgumentRegisters(b.Jump.Operand,m[0],m[1]));
+     for k:=0 to 1 do begin
+      inc(nlv[k],m[k]);
+     end;
+    end;
+
+   end;
 
    if Changed then begin
     Changed:=false;
