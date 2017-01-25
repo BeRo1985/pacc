@@ -278,6 +278,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      TPACCIntermediateRepresentationCodeTemporary=record
       Index:TPACCInt32;
       Type_:TPACCIntermediateRepresentationCodeType;
+      MappedTo:array[0..1] of TPACCInt32;
      end;
 
      TPACCIntermediateRepresentationCodeTemporaries=array of TPACCIntermediateRepresentationCodeTemporary;
@@ -1009,6 +1010,8 @@ begin
  Temporary:=@Temporaries[result];
  Temporary^.Index:=result;
  Temporary^.Type_:=Type_;
+ Temporary^.MappedTo[0]:=-1;
+ Temporary^.MappedTo[1]:=-1;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
