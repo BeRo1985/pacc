@@ -623,6 +623,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        fSize:TPACCInt64;
 
+       fAlignment:TPACCInt32;
+
        function NewHiddenLabel:TPACCAbstractSyntaxTreeNodeLabel;
 
        procedure EmitUI8(const Value:TPACCUInt8;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
@@ -654,6 +656,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable read fVariable write fVariable;
 
        property Size:TPACCInt64 read fSize write fSize;
+
+       property Alignment:TPACCInt32 read fAlignment write fAlignment;
 
      end;
 
@@ -3889,6 +3893,8 @@ begin
 
  fSize:=0;
 
+ fAlignment:=1;
+
  DataItems:=nil;
  CountDataItems:=0;
 
@@ -4042,6 +4048,7 @@ begin
     StringDeclaration:=TPACCIntermediateRepresentationCodeDeclaration.Create(fInstance);
     TPACCInstance(fInstance).IntermediateRepresentationCode.Declarations.Add(StringDeclaration);
     StringDeclaration.Label_:=NewHiddenLabel;
+    StringDeclaration.Alignment:=4;
     StringDeclaration.EmitStringData(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand));
     if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
      EmitUI32(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(StringDeclaration.Label_)),1);
@@ -4153,6 +4160,7 @@ begin
      SubDeclaration:=TPACCIntermediateRepresentationCodeDeclaration.Create(fInstance);
      TPACCInstance(fInstance).IntermediateRepresentationCode.Declarations.Add(SubDeclaration);
      SubDeclaration.Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand);
+     SubDeclaration.Alignment:=Max(1,SubDeclaration.Variable.Type_^.Alignment);
      SubDeclaration.EmitInitializerList(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).LocalVariableInitialization,
                                         TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).Type_.Size,
                                         0);
@@ -4270,6 +4278,7 @@ begin
      astnkDECL:begin
       Declaration:=TPACCIntermediateRepresentationCodeDeclaration.Create(AInstance);
       TPACCInstance(AInstance).IntermediateRepresentationCode.Declarations.Add(Declaration);
+      Declaration.Alignment:=Max(1,TPACCAbstractSyntaxTreeNodeDeclaration(Node).DeclarationVariable.Type_^.Alignment);
       Declaration.EmitDeclaration(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
      end;
      astnkFUNC:begin
