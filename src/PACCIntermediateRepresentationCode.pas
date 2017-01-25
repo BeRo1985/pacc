@@ -3,7 +3,7 @@ unit PACCIntermediateRepresentationCode;
 
 interface
 
-uses TypInfo,SysUtils,Classes,Math,PUCU,PACCTypes,PACCGlobals,PACCPointerHashMap,PACCAbstractSyntaxTree;
+uses TypInfo,SysUtils,Classes,Math,PUCU,PasMP,PACCTypes,PACCGlobals,PACCPointerHashMap,PACCAbstractSyntaxTree;
 
 // A intermediate representation instruction set for 32-bit and 64-bit targets (sorry not for 8-bit and 16-bit targets, at least not yet,
 // at least that would be a task of somebody else then, to write a corresponding patch for it and submit it, because I myself as
@@ -334,6 +334,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       (
        pircokNONE,
        pircokTEMPORARY,
+       pircokCALL,
        pircokINTEGER,
        pircokFLOAT,
        pircokVARIABLE,
@@ -480,6 +481,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure Intersection(const With_:TPACCIntermediateRepresentationCodeBitSet);
        procedure Subtraction(const With_:TPACCIntermediateRepresentationCodeBitSet);
        function EqualsTo(const With_:TPACCIntermediateRepresentationCodeBitSet):boolean;
+       function Count:TPACCInt32;
+       function IterateToNextBit(var BitIndex:TPACCInt32):boolean;
        property BitmapSize:TPACCInt32 read fBitmapSize write SetBitmapSize;
        property Bits[const AIndex:TPACCInt32]:boolean read GetBit write SetBit; default;
      end;
@@ -647,6 +650,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure FillPredecessors;
        procedure FillUse;
        procedure LiveOn(var v:TPACCIntermediateRepresentationCodeBitSet;const b,s:TPACCIntermediateRepresentationCodeBlock);
+       function ReturnRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;const CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
        procedure FillLive;
        function CompareSDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
        function CompareDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
@@ -824,7 +828,11 @@ const EmptyOperand:TPACCIntermediateRepresentationCodeOperand=
         Flags:[];
         Kind:pircokNONE;
        );
-       
+
+      CodeTypeBaseClass:array[TPACCIntermediateRepresentationCodeType] of TPACCInt32=(0,0,0,1,1);
+
+      CodeTypeBaseWidth:array[TPACCIntermediateRepresentationCodeType] of TPACCInt32=(0,0,1,0,1);
+
 procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
 
 implementation
@@ -950,7 +958,7 @@ end;
 procedure TPACCIntermediateRepresentationCodeBitSet.SetBitmapSize(const ABitmapSize:TPACCInt32);
 var OldSize:TPACCInt32;
 begin
- fBitmapSize:=(ABitmapSize+31) shr 3;
+ fBitmapSize:=(ABitmapSize+31) shr 5;
  OldSize:=length(fBitmap);
  if OldSize<fBitmapSize then begin
   SetLength(fBitmap,fBitmapSize*2);
@@ -960,16 +968,16 @@ end;
 
 function TPACCIntermediateRepresentationCodeBitSet.GetBit(const AIndex:TPACCInt32):boolean;
 begin
- result:=((AIndex>=0) and (AIndex<(fBitmapSize shl 3))) and
-         ((fBitmap[AIndex shr 3] and (TPACCUInt32(1) shl (AIndex and 31)))<>0);
+ result:=((AIndex>=0) and (AIndex<(fBitmapSize shl 5))) and
+         ((fBitmap[AIndex shr 5] and (TPACCUInt32(1) shl (AIndex and 31)))<>0);
 end;
 
 procedure TPACCIntermediateRepresentationCodeBitSet.SetBit(const AIndex:TPACCInt32;const ABit:boolean);
 var OldSize,Index:TPACCInt32;
 begin
  if AIndex>=0 then begin
-  if (fBitmapSize shl 3)<=AIndex then begin
-   fBitmapSize:=(AIndex+31) shr 3;
+  if (fBitmapSize shl 5)<=AIndex then begin
+   fBitmapSize:=(AIndex+31) shr 5;
    OldSize:=length(fBitmap);
    if OldSize<fBitmapSize then begin
     SetLength(fBitmap,fBitmapSize*2);
@@ -977,9 +985,9 @@ begin
    end;
   end;
   if ABit then begin
-   fBitmap[AIndex shr 3]:=fBitmap[AIndex shr 3] or (TPACCUInt32(1) shl (AIndex and 31));
+   fBitmap[AIndex shr 5]:=fBitmap[AIndex shr 5] or (TPACCUInt32(1) shl (AIndex and 31));
   end else begin
-   fBitmap[AIndex shr 3]:=fBitmap[AIndex shr 3] and not (TPACCUInt32(1) shl (AIndex and 31));
+   fBitmap[AIndex shr 5]:=fBitmap[AIndex shr 5] and not (TPACCUInt32(1) shl (AIndex and 31));
   end;
  end;
 end;
@@ -1049,6 +1057,40 @@ begin
     result:=false;
     exit;
    end;
+  end;
+ end;
+end;
+
+function TPACCIntermediateRepresentationCodeBitSet.Count:TPACCInt32;
+var Index:TPACCInt32;
+begin
+ result:=0;
+ for Index:=0 to length(fBitmap)-1 do begin
+  inc(result,TPasMPMath.PopulationCount32(fBitmap[Index]));
+ end;
+end;
+
+function TPACCIntermediateRepresentationCodeBitSet.IterateToNextBit(var BitIndex:TPACCInt32):boolean;
+var BitmapBitIndex,BitmapIndex:TPACCInt32;
+    BitmapValue:TPACCUInt32;
+begin
+ result:=false;
+ if BitIndex>=-1 then begin
+  inc(BitIndex);
+  BitmapBitIndex:=BitIndex and 31;
+  BitmapIndex:=BitIndex shr 5;
+  if (BitmapIndex>=0) and (BitmapIndex<fBitmapSize) then begin
+   BitmapValue:=fBitmap[BitmapIndex] and not ((TPACCUInt32(1) shl (BitmapBitIndex and 31))-1);
+   while BitmapValue=0 do begin
+    inc(BitmapIndex);
+    if BitmapIndex<fBitmapSize then begin
+     BitmapValue:=fBitmap[BitmapIndex];
+    end else begin
+     exit;
+    end;
+   end;
+   BitIndex:=(BitmapIndex shl 5) or TPasMPMath.FindFirstSetBit32(BitmapValue);
+   result:=true;
   end;
  end;
 end;
@@ -4452,7 +4494,48 @@ begin
 
 end;
 
+function TPACCIntermediateRepresentationCodeFunction.ReturnRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;const CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
+begin
+ result.Clear;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.FillLive;
+var Phis:array of TPACCInt32;
+    nlv:array[0..1] of TPACCInt32;
+ function PhiTmp(const t:TPACCInt32):TPACCInt32;
+ begin
+  result:=Temporaries[t].Phi;
+  if result=0 then begin
+   result:=t;
+  end;
+ end;
+ procedure PhiFix(const t1:TPACCInt32);
+ var t,t2:TPACCInt32;
+ begin
+  t:=PhiTmp(t1);
+  t2:=Phis[t];
+  if (t2<>0) and (t1<>t2) then begin
+   if t<>t1 then begin
+    Temporaries[t1].Phi:=t1;
+    t:=t1;
+   end else begin
+    Temporaries[t2].Phi:=t2;
+    Phis[t2]:=t2;
+   end;
+  end;
+  Phis[t]:=t1;
+ end;
+ procedure BSet(const Operand:TPACCIntermediateRepresentationCodeOperand;b:TPACCIntermediateRepresentationCodeBlock);
+ begin
+  if Operand.Kind=pircokTEMPORARY then begin
+   b.Gen_.SetBit(Operand.Temporary,true);
+   PhiFix(Operand.Temporary);
+   if not b.In_.GetBit(Operand.Temporary) then begin
+    inc(nlv[CodeTypeBaseClass[Temporaries[Operand.Temporary].Type_]]);
+    b.In_.SetBit(Operand.Temporary,true);
+   end;
+  end;
+ end;
 var Index,SubIndex,k,t:TPACCInt32;
     b,s:TPACCIntermediateRepresentationCodeBlock;
     i:TPACCIntermediateRepresentationCodeInstruction;
@@ -4460,6 +4543,7 @@ var Index,SubIndex,k,t:TPACCInt32;
     Changed:boolean;
 begin
 
+ Phis:=nil;
  try
   u.BitmapSize:=Temporaries.Count;
   v.BitmapSize:=Temporaries.Count;
@@ -4477,8 +4561,11 @@ begin
    b:=b.Link;
   end;
 
+  SetLength(Phis,Temporaries.Count);
+
   Changed:=true;
   repeat
+
    for Index:=CountBlocks-1 downto 0 do begin
     b:=RPO[Index];
     u.Assign(b.Out_);
@@ -4490,7 +4577,31 @@ begin
      end;
     end;
    end;
-   Changed:=Changed or not b.Out_.EqualsTo(u); 
+
+   Changed:=Changed or not b.Out_.EqualsTo(u);
+
+   FillChar(Phis[0],length(Phis)*SizeOf(TPACCInt32),#0);
+   FillChar(nlv[0],length(nlv)*SizeOf(TPACCInt32),#0);
+   B.In_.Assign(b.Out_);
+   Index:=-1;
+   while B.In_.IterateToNextBit(Index) do begin
+    PhiFix(Index);
+    inc(nlv[CodeTypeBaseClass[Temporaries[Index].Type_]]);
+   end;
+
+   if b.Jump.Operand.Kind=pircokCALL then begin
+    if (b.In_.Count=0) and (nlv[0]=0) and (nlv[1]=0) then begin
+     b.In_.Union(ReturnRegisters(b.Jump.Operand,nlv[0],nlv[1]));
+    end else begin
+     TPACCInstance(fInstance).AddError('Internal error 2017-01-25-16-45-0000',nil,true);
+    end;
+   end else begin
+    BSet(b.Jump.Operand,b);
+   end;
+
+   b.CountLive[0]:=nlv[0];
+   b.CountLive[1]:=nlv[1];
+
    if Changed then begin
     Changed:=false;
     continue;
@@ -4502,6 +4613,7 @@ begin
  finally
   u.Clear;
   v.Clear;
+  Phis:=nil;
  end;
 
 end;
