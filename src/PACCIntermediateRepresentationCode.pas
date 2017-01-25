@@ -634,6 +634,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitStringData(const Node:TPACCAbstractSyntaxTreeNodeStringValue);
        procedure EmitPrimitiveTypeData(const Type_:PPACCType;const Node:TPACCAbstractSyntaxTreeNode);
        procedure EmitInitializerList(const Nodes:TPACCAbstractSyntaxTreeNodeList;Size,Offset:TPACCInt64);
+       procedure Finish;
 
       public
 
@@ -4050,6 +4051,7 @@ begin
     StringDeclaration.Label_:=NewHiddenLabel;
     StringDeclaration.Alignment:=4;
     StringDeclaration.EmitStringData(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand));
+    StringDeclaration.Finish;
     if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
      EmitUI32(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(StringDeclaration.Label_)),1);
     end else begin
@@ -4164,6 +4166,7 @@ begin
      SubDeclaration.EmitInitializerList(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).LocalVariableInitialization,
                                         TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).Type_.Size,
                                         0);
+     SubDeclaration.Finish;
      if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
       EmitUI32(0,TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand))),1);
      end else begin
@@ -4208,6 +4211,11 @@ begin
  EmitInitializerList(Node.DeclarationInitialization,
                      Node.DeclarationVariable.Type_^.Size,
                      0);
+end;
+
+procedure TPACCIntermediateRepresentationCodeDeclaration.Finish;
+begin
+ SetLength(DataItems,CountDataItems);
 end;
 
 constructor TPACCIntermediateRepresentationCodeDeclarationList.Create;
@@ -4280,6 +4288,7 @@ begin
       TPACCInstance(AInstance).IntermediateRepresentationCode.Declarations.Add(Declaration);
       Declaration.Alignment:=Max(1,TPACCAbstractSyntaxTreeNodeDeclaration(Node).DeclarationVariable.Type_^.Alignment);
       Declaration.EmitDeclaration(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
+      Declaration.Finish;
      end;
      astnkFUNC:begin
       Function_:=TPACCIntermediateRepresentationCodeFunction.Create(AInstance);
