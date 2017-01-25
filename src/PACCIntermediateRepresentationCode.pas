@@ -310,17 +310,31 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        By:TPACCIntermediateRepresentationCodeUseBy;
      end;
 
+     TPACCIntermediateRepresentationCodeUseList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeUse;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeUse);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeUse read GetItem write SetItem; default;
+     end;
+
      PPACCIntermediateRepresentationCodeTemporary=^TPACCIntermediateRepresentationCodeTemporary;
-     TPACCIntermediateRepresentationCodeTemporary=record
-      Index:TPACCInt32;
-      Type_:TPACCIntermediateRepresentationCodeType;
-      CountDefinitions:TPACCUInt32;
-      CountUse:TPACCUInt32;
-      Cost:TPACCUInt32;
-      Slot:TPACCInt32;
-      Phi:TPACCInt32;
-      Visit:TPACCInt32;
-      MappedTo:array[0..1] of TPACCInt32;
+     TPACCIntermediateRepresentationCodeTemporary=class
+      public
+       Index:TPACCInt32;
+       Name:TPACCRawByteString;
+       Type_:TPACCIntermediateRepresentationCodeType;
+       Uses_:TPACCIntermediateRepresentationCodeUseList;
+       CountDefinitions:TPACCUInt32;
+       Cost:TPACCUInt32;
+       Slot:TPACCInt32;
+       Phi:TPACCInt32;
+       Visit:TPACCInt32;
+       MappedTo:array[0..1] of TPACCInt32;
+       constructor Create;
+       destructor Destroy; override;
      end;
 
      TPACCIntermediateRepresentationCodeTemporaries=array of TPACCIntermediateRepresentationCodeTemporary;
@@ -378,7 +392,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      TPACCIntermediateRepresentationCodeOperands=array of TPACCIntermediateRepresentationCodeOperand;
 
      PPACCIntermediateRepresentationCodeInstruction=^TPACCIntermediateRepresentationCodeInstruction;
-     
+
      TPACCIntermediateRepresentationCodeInstruction=class
       public
        Opcode:TPACCIntermediateRepresentationCodeOpcode;
@@ -768,6 +782,48 @@ implementation
 
 uses PACCInstance,PACCSort;
 
+constructor TPACCIntermediateRepresentationCodeUseList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCIntermediateRepresentationCodeUseList.Destroy;
+begin
+ inherited Destroy;
+end;
+
+function TPACCIntermediateRepresentationCodeUseList.GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeUse;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCIntermediateRepresentationCodeUseList.SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeUse);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
+constructor TPACCIntermediateRepresentationCodeTemporary.Create;
+begin
+ inherited Create;
+ Index:=0;
+ Name:='';
+ Type_:=pirctNONE;
+ Uses_:=TPACCIntermediateRepresentationCodeUseList.Create;
+ CountDefinitions:=0;
+ Cost:=0;
+ Slot:=0;
+ Phi:=0;
+ Visit:=0;
+ MappedTo[0]:=-1;
+ MappedTo[1]:=-1;
+end;
+
+destructor TPACCIntermediateRepresentationCodeTemporary.Destroy;
+begin
+ FreeAndNil(Uses_);
+ inherited Destroy;
+end;
+
 constructor TPACCIntermediateRepresentationCodeInstructionList.Create;
 begin
  inherited Create;
@@ -1095,18 +1151,20 @@ begin
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateTemporary(const Type_:TPACCIntermediateRepresentationCodeType):TPACCInt32;
-var Temporary:PPACCIntermediateRepresentationCodeTemporary;
+var Temporary:TPACCIntermediateRepresentationCodeTemporary;
 begin
  result:=CountTemporaries;
  inc(CountTemporaries);
  if length(Temporaries)<CountTemporaries then begin
   SetLength(Temporaries,CountTemporaries*2);
  end;
- Temporary:=@Temporaries[result];
- Temporary^.Index:=result;
- Temporary^.Type_:=Type_;
- Temporary^.MappedTo[0]:=-1;
- Temporary^.MappedTo[1]:=-1;
+ Temporary:=TPACCIntermediateRepresentationCodeTemporary.Create;
+ TPACCInstance(fInstance).AllocatedObjects.Add(Temporary);
+ Temporary.Index:=result;
+ Temporary.Type_:=Type_;
+ Temporary.MappedTo[0]:=-1;
+ Temporary.MappedTo[1]:=-1;
+ Temporaries[result]:=Temporary;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
