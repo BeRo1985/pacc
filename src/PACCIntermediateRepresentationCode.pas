@@ -3243,9 +3243,11 @@ begin
    SubNode:=TPACCAbstractSyntaxTreeNodeInitializer(TempNodes[Index]);
    if LastEnd<SubNode.InitializionOffset then begin
     if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+     TargetTemporary:=CreateTemporary(pirctINT);
      EmitInstruction(pircoADDI,pirctINT,CreateTemporaryOperand(TargetTemporary),[CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+SubNode.InitializionOffset)],SubNode.SourceLocation);
      EmitInstruction(pircoZEROMEMI,pirctNONE,EmptyOperand,[CreateTemporaryOperand(TargetTemporary),CreateIntegerValueOperand(SubNode.Type_.Size)],SubNode.SourceLocation);
     end else begin
+     TargetTemporary:=CreateTemporary(pirctLONG);
      EmitInstruction(pircoADDL,pirctLONG,CreateTemporaryOperand(TargetTemporary),[CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+SubNode.InitializionOffset)],SubNode.SourceLocation);
      EmitInstruction(pircoZEROMEML,pirctNONE,EmptyOperand,[CreateTemporaryOperand(TargetTemporary),CreateIntegerValueOperand(SubNode.Type_.Size)],SubNode.SourceLocation);
     end;
@@ -3260,8 +3262,10 @@ begin
     end else begin
      EmitExpression(SubNode.InitializionValue,ValueTemporary);
      if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+      TargetTemporary:=CreateTemporary(pirctINT);
       EmitInstruction(pircoADDI,pirctINT,CreateTemporaryOperand(TargetTemporary),[CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+SubNode.InitializionOffset)],SubNode.SourceLocation);
      end else begin
+      TargetTemporary:=CreateTemporary(pirctLONG);
       EmitInstruction(pircoADDL,pirctLONG,CreateTemporaryOperand(TargetTemporary),[CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+SubNode.InitializionOffset)],SubNode.SourceLocation);
      end;
      EmitStore(TargetTemporary,ValueTemporary,SubNode.ToType,Node.SourceLocation);
@@ -3271,9 +3275,11 @@ begin
   end;
   if LastEnd<Size then begin
    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+    TargetTemporary:=CreateTemporary(pirctINT);
     EmitInstruction(pircoADDI,pirctINT,CreateTemporaryOperand(TargetTemporary),[CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+LastEnd)],Node.SourceLocation);
     EmitInstruction(pircoZEROMEMI,pirctNONE,EmptyOperand,[CreateTemporaryOperand(TargetTemporary),CreateIntegerValueOperand(Size-LastEnd)],Node.SourceLocation);
    end else begin
+    TargetTemporary:=CreateTemporary(pirctLONG);
     EmitInstruction(pircoADDL,pirctLONG,CreateTemporaryOperand(TargetTemporary),[CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Offset+LastEnd)],Node.SourceLocation);
     EmitInstruction(pircoZEROMEML,pirctNONE,EmptyOperand,[CreateTemporaryOperand(TargetTemporary),CreateIntegerValueOperand(Size-LastEnd)],Node.SourceLocation);
    end;
