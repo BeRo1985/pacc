@@ -337,7 +337,15 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        destructor Destroy; override;
      end;
 
-     TPACCIntermediateRepresentationCodeTemporaries=array of TPACCIntermediateRepresentationCodeTemporary;
+     TPACCIntermediateRepresentationCodeTemporaryList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeTemporary;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeTemporary);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeTemporary read GetItem write SetItem; default;
+     end;
 
      PPACCIntermediateRepresentationCodeOperandFlag=^TPACCIntermediateRepresentationCodeOperandFlag;
      TPACCIntermediateRepresentationCodeOperandFlag=
@@ -626,8 +634,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        RPO:TPACCIntermediateRepresentationCodeBlocks;
 
-       Temporaries:TPACCIntermediateRepresentationCodeTemporaries;
-       CountTemporaries:TPACCInt32;
+       Temporaries:TPACCIntermediateRepresentationCodeTemporaryList;
 
        TemporaryReferenceCounter:TPACCUInt32;
 
@@ -824,6 +831,26 @@ begin
  inherited Destroy;
 end;
 
+constructor TPACCIntermediateRepresentationCodeTemporaryList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCIntermediateRepresentationCodeTemporaryList.Destroy;
+begin
+ inherited Destroy;
+end;
+
+function TPACCIntermediateRepresentationCodeTemporaryList.GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeTemporary;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCIntermediateRepresentationCodeTemporaryList.SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeTemporary);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
 constructor TPACCIntermediateRepresentationCodeInstructionList.Create;
 begin
  inherited Create;
@@ -1003,8 +1030,7 @@ begin
 
  RPO:=nil;
 
- Temporaries:=nil;
- CountTemporaries:=0;
+ Temporaries:=TPACCIntermediateRepresentationCodeTemporaryList.Create;
 
  TemporaryReferenceCounter:=0;
 
@@ -1017,7 +1043,7 @@ begin
  Blocks.Free;
  BlockLabelHashMap.Free;
  VariableTemporaryReferenceHashMap.Free;
- Temporaries:=nil;
+ Temporaries.Free;
  RPO:=nil;
  inherited Destroy;
 end;
@@ -1153,18 +1179,11 @@ end;
 function TPACCIntermediateRepresentationCodeFunction.CreateTemporary(const Type_:TPACCIntermediateRepresentationCodeType):TPACCInt32;
 var Temporary:TPACCIntermediateRepresentationCodeTemporary;
 begin
- result:=CountTemporaries;
- inc(CountTemporaries);
- if length(Temporaries)<CountTemporaries then begin
-  SetLength(Temporaries,CountTemporaries*2);
- end;
  Temporary:=TPACCIntermediateRepresentationCodeTemporary.Create;
  TPACCInstance(fInstance).AllocatedObjects.Add(Temporary);
+ result:=Temporaries.Add(Temporary);
  Temporary.Index:=result;
  Temporary.Type_:=Type_;
- Temporary.MappedTo[0]:=-1;
- Temporary.MappedTo[1]:=-1;
- Temporaries[result]:=Temporary;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
