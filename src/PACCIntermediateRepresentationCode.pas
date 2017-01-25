@@ -320,33 +320,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeUse read GetItem write SetItem; default;
      end;
 
-     PPACCIntermediateRepresentationCodeTemporary=^TPACCIntermediateRepresentationCodeTemporary;
-     TPACCIntermediateRepresentationCodeTemporary=class
-      public
-       Index:TPACCInt32;
-       Name:TPACCRawByteString;
-       Type_:TPACCIntermediateRepresentationCodeType;
-       Uses_:TPACCIntermediateRepresentationCodeUseList;
-       CountDefinitions:TPACCUInt32;
-       Cost:TPACCUInt32;
-       Slot:TPACCInt32;
-       Phi:TPACCInt32;
-       Visit:TPACCInt32;
-       MappedTo:array[0..1] of TPACCInt32;
-       constructor Create;
-       destructor Destroy; override;
-     end;
-
-     TPACCIntermediateRepresentationCodeTemporaryList=class(TList)
-      private
-       function GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeTemporary;
-       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeTemporary);
-      public
-       constructor Create;
-       destructor Destroy; override;
-       property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeTemporary read GetItem write SetItem; default;
-     end;
-
      PPACCIntermediateRepresentationCodeOperandFlag=^TPACCIntermediateRepresentationCodeOperandFlag;
      TPACCIntermediateRepresentationCodeOperandFlag=
       (
@@ -398,6 +371,56 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      end;
 
      TPACCIntermediateRepresentationCodeOperands=array of TPACCIntermediateRepresentationCodeOperand;
+
+     PPACCIntermediateRepresentationCodeAliasKind=^TPACCIntermediateRepresentationCodeAliasKind;
+     TPACCIntermediateRepresentationCodeAliasKind=
+      (
+       pircakBOTTOM,
+       pircakSTACKLOCAL,
+       pircakCONSTANT,
+       pircakSTACKESCAPE,
+       pircakSYMBOL,
+       pircakUNKNOWN
+      );
+
+     PPACCIntermediateRepresentationCodeAlias=^TPACCIntermediateRepresentationCodeAlias;
+     TPACCIntermediateRepresentationCodeAlias=class
+      public
+       Kind:TPACCIntermediateRepresentationCodeAliasKind;
+       Base:TPACCIntermediateRepresentationCodeOperand;
+       Label_:TPACCAbstractSyntaxTreeNodeLabel;
+       Offset:TPACCInt64;
+       constructor Create;
+       destructor Destroy; override;
+     end;
+
+     PPACCIntermediateRepresentationCodeTemporary=^TPACCIntermediateRepresentationCodeTemporary;
+     TPACCIntermediateRepresentationCodeTemporary=class
+      public
+       Index:TPACCInt32;
+       Name:TPACCRawByteString;
+       Type_:TPACCIntermediateRepresentationCodeType;
+       Uses_:TPACCIntermediateRepresentationCodeUseList;
+       CountDefinitions:TPACCUInt32;
+       Cost:TPACCUInt32;
+       Slot:TPACCInt32;
+       Phi:TPACCInt32;
+       Visit:TPACCInt32;
+       Alias:TPACCIntermediateRepresentationCodeAlias;
+       MappedTo:array[0..1] of TPACCInt32;
+       constructor Create;
+       destructor Destroy; override;
+     end;
+
+     TPACCIntermediateRepresentationCodeTemporaryList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeTemporary;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeTemporary);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeTemporary read GetItem write SetItem; default;
+     end;
 
      PPACCIntermediateRepresentationCodeInstruction=^TPACCIntermediateRepresentationCodeInstruction;
 
@@ -809,6 +832,20 @@ begin
  inherited Items[AIndex]:=pointer(AItem);
 end;
 
+constructor TPACCIntermediateRepresentationCodeAlias.Create;
+begin
+ inherited Create;
+ Kind:=pircakUNKNOWN;
+ Base.Kind:=pircokNONE;
+ Label_:=nil;
+ Offset:=0;
+end;
+
+destructor TPACCIntermediateRepresentationCodeAlias.Destroy;
+begin
+ inherited Destroy;
+end;
+
 constructor TPACCIntermediateRepresentationCodeTemporary.Create;
 begin
  inherited Create;
@@ -823,11 +860,13 @@ begin
  Visit:=0;
  MappedTo[0]:=-1;
  MappedTo[1]:=-1;
+ Alias:=TPACCIntermediateRepresentationCodeAlias.Create;
 end;
 
 destructor TPACCIntermediateRepresentationCodeTemporary.Destroy;
 begin
  FreeAndNil(Uses_);
+ FreeAndNil(Alias);
  inherited Destroy;
 end;
 
