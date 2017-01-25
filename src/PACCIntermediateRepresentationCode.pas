@@ -274,10 +274,45 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pirctDOUBLE
       );
 
+     PPACCIntermediateRepresentationCodeUseKind=^TPACCIntermediateRepresentationCodeUseKind;
+     TPACCIntermediateRepresentationCodeUseKind=
+      (
+       pircukNONE,
+       pircukPHI,
+       pircukINS,
+       pircukJMP
+      );
+
+     PPPACCIntermediateRepresentationCodePhi=^PPACCIntermediateRepresentationCodePhi;
+     PPACCIntermediateRepresentationCodePhi=^TPACCIntermediateRepresentationCodePhi;
+
+     TPACCIntermediateRepresentationCodeInstruction=class;
+
+     PPACCIntermediateRepresentationCodeUse=^TPACCIntermediateRepresentationCodeUse;
+     TPACCIntermediateRepresentationCodeUse=record
+      BlockID:TPACCInt32;
+      case Kind:TPACCIntermediateRepresentationCodeUseKind of
+       pircukPHI:(
+        Phi:PPACCIntermediateRepresentationCodePhi;
+       );
+       pircukINS:(
+        Instruction:TPACCIntermediateRepresentationCodeInstruction;
+       );
+       pircukJMP:(
+       );
+     end;
+
      PPACCIntermediateRepresentationCodeTemporary=^TPACCIntermediateRepresentationCodeTemporary;
      TPACCIntermediateRepresentationCodeTemporary=record
       Index:TPACCInt32;
       Type_:TPACCIntermediateRepresentationCodeType;
+      CountDefinitions:TPACCUInt32;
+      CountUse:TPACCUInt32;
+      Cost:TPACCUInt32;
+      Slot:TPACCInt32;
+      Phi:TPACCInt32;
+      Visit:TPACCInt32;
+
       MappedTo:array[0..1] of TPACCInt32;
      end;
 
@@ -336,14 +371,23 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      TPACCIntermediateRepresentationCodeOperands=array of TPACCIntermediateRepresentationCodeOperand;
 
      PPACCIntermediateRepresentationCodeInstruction=^TPACCIntermediateRepresentationCodeInstruction;
-     TPACCIntermediateRepresentationCodeInstruction={$ifdef HAS_ADVANCED_RECORDS}record{$else}object{$endif}
+     
+     TPACCIntermediateRepresentationCodeInstruction=class
       public
        Opcode:TPACCIntermediateRepresentationCodeOpcode;
        To_:TPACCIntermediateRepresentationCodeOperand;
        Operands:TPACCIntermediateRepresentationCodeOperands;
      end;
 
-     TPACCIntermediateRepresentationCodeInstructions=array of TPACCIntermediateRepresentationCodeInstruction;
+     TPACCIntermediateRepresentationCodeInstructionList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeInstruction;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeInstruction);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeInstruction read GetItem write SetItem; default;
+     end;
 
      PPACCIntermediateRepresentationCodeJump=^TPACCIntermediateRepresentationCodeJump;
      TPACCIntermediateRepresentationCodeJump=record
@@ -356,8 +400,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
      TPACCIntermediateRepresentationCodeBlocks=array of TPACCIntermediateRepresentationCodeBlock;
 
-     PPPACCIntermediateRepresentationCodePhi=^PPACCIntermediateRepresentationCodePhi;
-     PPACCIntermediateRepresentationCodePhi=^TPACCIntermediateRepresentationCodePhi;
      TPACCIntermediateRepresentationCodePhi=record
       To_:TPACCIntermediateRepresentationCodeOperand;
       Operands:array of TPACCIntermediateRepresentationCodeOperand;
@@ -390,8 +432,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        Phi:PPACCIntermediateRepresentationCodePhi;
 
-       Instructions:TPACCIntermediateRepresentationCodeInstructions;
-       CountInstructions:TPACCInt32;
+       Instructions:TPACCIntermediateRepresentationCodeInstructionList;
 
        Jump:TPACCIntermediateRepresentationCodeJump;
 
@@ -541,6 +582,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure DeleteBlock(const b:TPACCIntermediateRepresentationCodeBlock);
        procedure FillRPO;
        procedure FillPredecessors;
+       procedure FillUse;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -716,6 +758,26 @@ implementation
 
 uses PACCInstance,PACCSort;
 
+constructor TPACCIntermediateRepresentationCodeInstructionList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCIntermediateRepresentationCodeInstructionList.Destroy;
+begin
+ inherited Destroy;
+end;
+
+function TPACCIntermediateRepresentationCodeInstructionList.GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeInstruction;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCIntermediateRepresentationCodeInstructionList.SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeInstruction);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
+end;
+
 function TPACCIntermediateRepresentationCodeBitSet.GetBit(const AIndex:TPACCInt32):boolean;
 begin
  result:=((AIndex>=0) and (AIndex<(fBitmapSize shl 3))) and
@@ -761,8 +823,7 @@ begin
 
  Phi:=nil;
 
- Instructions:=nil;
- CountInstructions:=0;
+ Instructions:=TPACCIntermediateRepresentationCodeInstructionList.Create;
 
  Jump.Kind:=pircjkNONE;
 
@@ -802,7 +863,7 @@ begin
   Phi:=nil;
  end;
 
- Instructions:=nil;
+ Instructions.Free;
 
  Successors:=nil;
 
@@ -821,12 +882,7 @@ end;
 
 function TPACCIntermediateRepresentationCodeBlock.AddInstruction(const AInstruction:TPACCIntermediateRepresentationCodeInstruction):TPACCInt32;
 begin
- result:=CountInstructions;
- inc(CountInstructions);
- if length(Instructions)<CountInstructions then begin
-  SetLength(Instructions,CountInstructions*2);
- end;
- Instructions[result]:=AInstruction;
+ result:=Instructions.Add(AInstruction);
 end;
 
 constructor TPACCIntermediateRepresentationCodeBlockList.Create;
@@ -1081,6 +1137,8 @@ procedure TPACCIntermediateRepresentationCodeFunction.EmitInstruction(const AOpc
 var Index:TPACCInt32;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
 begin
+ Instruction:=TPACCIntermediateRepresentationCodeInstruction.Create;
+ TPACCInstance(fInstance).AllocatedObjects.Add(Instruction);
  Instruction.Opcode:=AOpcode;
  Instruction.To_:=ATo_;
  Instruction.Operands:=nil;
@@ -4056,10 +4114,19 @@ begin
 
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.FillUse;
+var b:TPACCIntermediateRepresentationCodeBlock;
+    p:PPACCIntermediateRepresentationCodePhi;
+begin
+
+ 
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
 begin
  FillRPO;
  FillPredecessors;
+ FillUse;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
