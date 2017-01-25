@@ -289,10 +289,9 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
      TPACCIntermediateRepresentationCodeInstruction=class;
 
-     PPACCIntermediateRepresentationCodeUse=^TPACCIntermediateRepresentationCodeUse;
-     TPACCIntermediateRepresentationCodeUse=record
-      BlockID:TPACCInt32;
-      case Kind:TPACCIntermediateRepresentationCodeUseKind of
+     PPACCIntermediateRepresentationCodeUseBy=^TPACCIntermediateRepresentationCodeUseBy;
+     TPACCIntermediateRepresentationCodeUseBy=record
+      case TPACCIntermediateRepresentationCodeUseKind of
        pircukPHI:(
         Phi:TPACCIntermediateRepresentationCodePhi;
        );
@@ -301,6 +300,14 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        );
        pircukJMP:(
        );
+     end;
+
+     PPACCIntermediateRepresentationCodeUse=^TPACCIntermediateRepresentationCodeUse;
+     TPACCIntermediateRepresentationCodeUse=class
+      public
+       Kind:TPACCIntermediateRepresentationCodeUseKind;
+       BlockID:TPACCInt32;
+       By:TPACCIntermediateRepresentationCodeUseBy;
      end;
 
      PPACCIntermediateRepresentationCodeTemporary=^TPACCIntermediateRepresentationCodeTemporary;
@@ -313,7 +320,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       Slot:TPACCInt32;
       Phi:TPACCInt32;
       Visit:TPACCInt32;
-
       MappedTo:array[0..1] of TPACCInt32;
      end;
 
