@@ -285,6 +285,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
      PPPACCIntermediateRepresentationCodePhi=^PPACCIntermediateRepresentationCodePhi;
      PPACCIntermediateRepresentationCodePhi=^TPACCIntermediateRepresentationCodePhi;
+     TPACCIntermediateRepresentationCodePhi=class;
 
      TPACCIntermediateRepresentationCodeInstruction=class;
 
@@ -293,7 +294,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       BlockID:TPACCInt32;
       case Kind:TPACCIntermediateRepresentationCodeUseKind of
        pircukPHI:(
-        Phi:PPACCIntermediateRepresentationCodePhi;
+        Phi:TPACCIntermediateRepresentationCodePhi;
        );
        pircukINS:(
         Instruction:TPACCIntermediateRepresentationCodeInstruction;
@@ -400,13 +401,16 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
      TPACCIntermediateRepresentationCodeBlocks=array of TPACCIntermediateRepresentationCodeBlock;
 
-     TPACCIntermediateRepresentationCodePhi=record
-      To_:TPACCIntermediateRepresentationCodeOperand;
-      Operands:array of TPACCIntermediateRepresentationCodeOperand;
-      Blocks:array of TPACCIntermediateRepresentationCodeBlock;
-      CountOperands:TPACCInt32;
-      Type_:TPACCIntermediateRepresentationCodeType;
-      Link:PPACCIntermediateRepresentationCodePhi;
+     TPACCIntermediateRepresentationCodePhi=class
+      public
+       To_:TPACCIntermediateRepresentationCodeOperand;
+       Operands:array of TPACCIntermediateRepresentationCodeOperand;
+       Blocks:array of TPACCIntermediateRepresentationCodeBlock;
+       CountOperands:TPACCInt32;
+       Type_:TPACCIntermediateRepresentationCodeType;
+       Link:TPACCIntermediateRepresentationCodePhi;
+       constructor Create; reintroduce;
+       destructor Destroy; override;
      end;
 
      TPACCIntermediateRepresentationCodeBitSet={$ifdef HAVE_ADVANCED_RECORDS}record{$else}object{$endif}
@@ -430,7 +434,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        Label_:TPACCAbstractSyntaxTreeNodeLabel;
 
-       Phi:PPACCIntermediateRepresentationCodePhi;
+       Phi:TPACCIntermediateRepresentationCodePhi;
 
        Instructions:TPACCIntermediateRepresentationCodeInstructionList;
 
@@ -490,7 +494,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        CurrentBlock:TPACCIntermediateRepresentationCodeBlock;
        BlockLink:PPACCIntermediateRepresentationCodeBlock;
-       PhiLink:PPPACCIntermediateRepresentationCodePhi;
+       PhiLink:PPACCIntermediateRepresentationCodePhi;
        NeedNewBlock:boolean;
 
        AssignOpLValueTemporary:TPACCInt32;
@@ -778,6 +782,24 @@ begin
  inherited Items[AIndex]:=pointer(AItem);
 end;
 
+constructor TPACCIntermediateRepresentationCodePhi.Create;
+begin
+ inherited Create;
+ To_.Kind:=pircokNONE;
+ Operands:=nil;
+ Blocks:=nil;
+ CountOperands:=0;
+ Type_:=pirctNONE;
+ Link:=nil;
+end;
+
+destructor TPACCIntermediateRepresentationCodePhi.Destroy;
+begin
+ Operands:=nil;
+ Blocks:=nil;
+ inherited Destroy;
+end;
+
 function TPACCIntermediateRepresentationCodeBitSet.GetBit(const AIndex:TPACCInt32):boolean;
 begin
  result:=((AIndex>=0) and (AIndex<(fBitmapSize shl 3))) and
@@ -857,13 +879,9 @@ end;
 destructor TPACCIntermediateRepresentationCodeBlock.Destroy;
 begin
 
- if assigned(Phi) then begin
-  Finalize(Phi^);
-  FreeMem(Phi);
-  Phi:=nil;
- end;
+ FreeAndNil(Phi);
 
- Instructions.Free;
+ FreeAndNil(Instructions);
 
  Successors:=nil;
 
@@ -1033,7 +1051,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.EmitPhi(const Type_:TPACCI
                                                               const Blocks:array of TPACCIntermediateRepresentationCodeBlock;
                                                               const SourceLocation:TPACCSourceLocation);
 var Index:TPACCInt32;
-    Phi:PPACCIntermediateRepresentationCodePhi;
+    Phi:TPACCIntermediateRepresentationCodePhi;
 begin
  if assigned(CurrentBlock) then begin
   if assigned(CurrentBlock.Phi) then begin
@@ -1043,8 +1061,8 @@ begin
   end else if length(Operands)<>length(Blocks) then begin
    TPACCInstance(fInstance).AddError('Internal error 2017-01-24-11-01-0001',nil,true);
   end else begin
-   GetMem(Phi,SizeOf(TPACCIntermediateRepresentationCodePhi));
-   FillChar(Phi^,SizeOf(TPACCIntermediateRepresentationCodePhi),#0);
+   Phi:=TPACCIntermediateRepresentationCodePhi.Create;
+   TPACCInstance(fInstance).AllocatedObjects.Add(Phi);
    CurrentBlock.Phi:=Phi;
    Phi.Type_:=Type_;
    Phi.To_:=To_;
@@ -1056,7 +1074,7 @@ begin
     Phi.Blocks[Index]:=Blocks[Index];
    end;
    PhiLink^:=Phi;
-   PhiLink:=@Phi^.Link;
+   PhiLink:=@Phi.Link;
   end;
  end else begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-59-0000',nil,true);
@@ -3897,7 +3915,7 @@ end;
 procedure TPACCIntermediateRepresentationCodeFunction.DeleteBlock(const b:TPACCIntermediateRepresentationCodeBlock);
 var Index,SubIndex,SubSubIndex:TPACCInt32;
     s:TPACCIntermediateRepresentationCodeBlock;
-    p:PPACCIntermediateRepresentationCodePhi;
+    p:TPACCIntermediateRepresentationCodePhi;
     AlreadySeenHashMap:TPACCPointerHashMap;
     Successors:TPACCIntermediateRepresentationCodeBlocks;
 begin
@@ -3912,19 +3930,19 @@ begin
      AlreadySeenHashMap[s]:=s;
      p:=s.Phi;
      while assigned(p) do begin
-      for SubIndex:=0 to p^.CountOperands-1 do begin
-       if p^.Blocks[SubIndex]=b then begin
-        for SubSubIndex:=SubIndex+1 to p^.CountOperands-1 do begin
-         p^.Operands[SubSubIndex-1]:=p^.Operands[SubSubIndex];
-         p^.Blocks[SubSubIndex-1]:=p^.Blocks[SubSubIndex];
+      for SubIndex:=0 to p.CountOperands-1 do begin
+       if p.Blocks[SubIndex]=b then begin
+        for SubSubIndex:=SubIndex+1 to p.CountOperands-1 do begin
+         p.Operands[SubSubIndex-1]:=p.Operands[SubSubIndex];
+         p.Blocks[SubSubIndex-1]:=p.Blocks[SubSubIndex];
         end;
-        dec(p^.CountOperands);
-        SetLength(p^.Operands,p^.CountOperands);
-        SetLength(p^.Blocks,p^.CountOperands);
+        dec(p.CountOperands);
+        SetLength(p.Operands,p.CountOperands);
+        SetLength(p.Blocks,p.CountOperands);
         break;
        end;
       end;
-      p:=p^.Link;
+      p:=p.Link;
      end;
      if s.CountPredecessors<>0 then begin
       for SubIndex:=0 to s.CountPredecessors-1 do begin
