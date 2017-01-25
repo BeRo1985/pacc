@@ -651,6 +651,9 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure FillUse;
        procedure LiveOn(var v:TPACCIntermediateRepresentationCodeBitSet;const b,s:TPACCIntermediateRepresentationCodeBlock);
        function ReturnRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;var CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
+       function ArgumentRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;var CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
+       function IntegerRegisterToSave(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCInt32;
+       function FloatRegisterToSave(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCInt32;
        procedure FillLive;
        function CompareSDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
        function CompareDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
@@ -4497,6 +4500,21 @@ end;
 function TPACCIntermediateRepresentationCodeFunction.ReturnRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;var CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
 begin
  result.Clear;
+end;
+
+function TPACCIntermediateRepresentationCodeFunction.ArgumentRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;var CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
+begin
+ result.Clear;
+end;
+
+function TPACCIntermediateRepresentationCodeFunction.IntegerRegisterToSave(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCInt32;
+begin
+ result:=0;
+end;
+
+function TPACCIntermediateRepresentationCodeFunction.FloatRegisterToSave(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCInt32;
+begin
+ result:=0;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.FillLive;
