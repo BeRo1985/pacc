@@ -469,11 +469,13 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       private
        fBitmap:array of TPACCUInt32;
        fBitmapSize:TPACCInt32;
+       procedure SetBitmapSize(const ABitmapSize:TPACCInt32);
        function GetBit(const AIndex:TPACCInt32):boolean;
        procedure SetBit(const AIndex:TPACCInt32;const ABit:boolean);
       public
        procedure Clear;
-       property BitmapSize:TPACCInt32 read fBitmapSize;
+       procedure ClearBits;
+       property BitmapSize:TPACCInt32 read fBitmapSize write SetBitmapSize;
        property Bits[const AIndex:TPACCInt32]:boolean read GetBit write SetBit; default;
      end;
 
@@ -639,6 +641,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure FillRPO;
        procedure FillPredecessors;
        procedure FillUse;
+       procedure FillLive;
        function CompareSDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
        function CompareDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
        procedure SSA;
@@ -938,6 +941,17 @@ begin
  inherited Destroy;
 end;
 
+procedure TPACCIntermediateRepresentationCodeBitSet.SetBitmapSize(const ABitmapSize:TPACCInt32);
+var OldSize:TPACCInt32;
+begin
+ fBitmapSize:=(ABitmapSize+31) shr 3;
+ OldSize:=length(fBitmap);
+ if OldSize<fBitmapSize then begin
+  SetLength(fBitmap,fBitmapSize*2);
+  FillChar(fBitmap[OldSize],(length(fBitmap)-OldSize)*SizeOf(TPACCUInt32),#0);
+ end;
+end;
+
 function TPACCIntermediateRepresentationCodeBitSet.GetBit(const AIndex:TPACCInt32):boolean;
 begin
  result:=((AIndex>=0) and (AIndex<(fBitmapSize shl 3))) and
@@ -968,6 +982,13 @@ procedure TPACCIntermediateRepresentationCodeBitSet.Clear;
 begin
  fBitmap:=nil;
  fBitmapSize:=0;
+end;
+
+procedure TPACCIntermediateRepresentationCodeBitSet.ClearBits;
+begin
+ if length(fBitmap)>0 then begin
+  FillChar(fBitmap[0],length(fBitmap)*SizeOf(TPACCUInt32),#0);
+ end;
 end;
 
 constructor TPACCIntermediateRepresentationCodeBlock.Create(const AInstance:TObject);
@@ -4341,6 +4362,24 @@ begin
 
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.FillLive;
+var k,t:TPACCInt32;
+    b:TPACCIntermediateRepresentationCodeBlock;
+    i:TPACCIntermediateRepresentationCodeInstruction;
+begin
+ b:=StartBlock;
+ while assigned(b) do begin
+  b.In_.BitmapSize:=Temporaries.Count;
+  b.Out_.BitmapSize:=Temporaries.Count;
+  b.Gen_.BitmapSize:=Temporaries.Count;
+  b.In_.ClearBits;
+  b.Out_.ClearBits;
+  b.Gen_.ClearBits;
+  b:=b.Link;
+ end;
+ 
+end;
+
 function TPACCIntermediateRepresentationCodeFunction.CompareSDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
 begin
  if assigned(a) and assigned(b) then begin
@@ -4459,6 +4498,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
 begin
  FillDominators;
  FillDominanceFrontier;
+ FillLive;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
