@@ -499,7 +499,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        ID:TPACCInt32;
        Visit:TPACCInt32;
 
-       InverseDominance:TPACCIntermediateRepresentationCodeBlock;
+       InterDominance:TPACCIntermediateRepresentationCodeBlock;
        Dominance:TPACCIntermediateRepresentationCodeBlock;
        DominanceLink:TPACCIntermediateRepresentationCodeBlock;
 
@@ -639,6 +639,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure FillRPO;
        procedure FillPredecessors;
        procedure FillUse;
+       procedure SSA;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -991,7 +992,7 @@ begin
  ID:=0;
  Visit:=0;
 
- InverseDominance:=nil;
+ InterDominance:=nil;
  Dominance:=nil;
  DominanceLink:=nil;
 
@@ -4359,11 +4360,80 @@ begin
 
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.SSA;
+ procedure FillDominators;
+  function FindInterDominance(b1,b2:TPACCIntermediateRepresentationCodeBlock):TPACCIntermediateRepresentationCodeBlock;
+  var bt:TPACCIntermediateRepresentationCodeBlock;
+  begin
+   if assigned(b1) then begin
+    while b1<>b2 do begin
+     if b1.ID<b2.ID then begin
+      bt:=b1;
+      b1:=b2;
+      b2:=bt;
+     end;
+     while b1.ID>b2.ID do begin
+      b1:=b1.InterDominance;
+      if not assigned(b1) then begin
+       TPACCInstance(fInstance).AddError('Internal error 2017-01-25-15-06-0000',nil,true);
+      end;
+     end;
+    end;
+    result:=b1;
+   end else begin
+    result:=b2;
+   end;
+  end;
+ var ch,Index,SubIndex:TPACCInt32;
+     b,d:TPACCIntermediateRepresentationCodeBlock;
+ begin
+  b:=StartBlock;
+  while assigned(b) do begin
+   b.InterDominance:=nil;
+   b.Dominance:=nil;
+   b.DominanceLink:=nil;
+   b:=b.Link;
+  end;
+  repeat
+   ch:=0;
+   for Index:=1 to CountBlocks-1 do begin
+    b:=RPO[Index];
+    d:=nil;
+    for SubIndex:=0 to b.CountPredecessors-1 do begin
+     if assigned(b.Predecessors[SubIndex].InterDominance) or (b.Predecessors[SubIndex]=StartBlock) then begin
+      d:=FindInterDominance(d,b.Predecessors[SubIndex]);
+     end;
+    end;
+    if b.InterDominance<>d then begin
+     b.InterDominance:=d;
+     inc(ch);
+    end;
+   end;
+  until ch=0;
+  b:=StartBlock;
+  while assigned(b) do begin
+   d:=b.InterDominance;
+   if assigned(d) then begin
+    if d=b then begin
+     TPACCInstance(fInstance).AddError('Internal error 2017-01-25-15-14-0000',nil,true);
+    end else begin
+     b.DominanceLink:=d.Dominance;
+     d.Dominance:=b;
+    end;
+   end;
+   b:=b.Link;
+  end;
+ end;
+begin
+ FillDominators;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
 begin
  FillRPO;
  FillPredecessors;
  FillUse;
+ SSA;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
