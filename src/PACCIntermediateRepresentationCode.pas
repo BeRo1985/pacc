@@ -4662,6 +4662,9 @@ begin
       end;
      end;
     end;
+    for k:=0 to 1 do begin
+     b.CountLive[k]:=max(b.CountLive[k],nlv[k]);
+    end;
    end;
 
    if Changed then begin
