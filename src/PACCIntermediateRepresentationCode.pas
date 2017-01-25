@@ -475,6 +475,10 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       public
        procedure Clear;
        procedure ClearBits;
+       procedure Assign(const From:TPACCIntermediateRepresentationCodeBitSet);
+       procedure Union(const With_:TPACCIntermediateRepresentationCodeBitSet);
+       procedure Intersection(const With_:TPACCIntermediateRepresentationCodeBitSet);
+       procedure Subtraction(const With_:TPACCIntermediateRepresentationCodeBitSet);
        property BitmapSize:TPACCInt32 read fBitmapSize write SetBitmapSize;
        property Bits[const AIndex:TPACCInt32]:boolean read GetBit write SetBit; default;
      end;
@@ -641,6 +645,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure FillRPO;
        procedure FillPredecessors;
        procedure FillUse;
+       procedure LiveOn(var v:TPACCIntermediateRepresentationCodeBitSet;const b,s:TPACCIntermediateRepresentationCodeBlock);
        procedure FillLive;
        function CompareSDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
        function CompareDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
@@ -988,6 +993,48 @@ procedure TPACCIntermediateRepresentationCodeBitSet.ClearBits;
 begin
  if length(fBitmap)>0 then begin
   FillChar(fBitmap[0],length(fBitmap)*SizeOf(TPACCUInt32),#0);
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeBitSet.Assign(const From:TPACCIntermediateRepresentationCodeBitSet);
+begin
+ fBitmap:=copy(From.fBitmap);
+ fBitmapSize:=From.fBitmapSize;
+end;
+
+procedure TPACCIntermediateRepresentationCodeBitSet.Union(const With_:TPACCIntermediateRepresentationCodeBitSet);
+var Index:TPACCInt32;
+begin
+ if (fBitmapSize=With_.fBitmapSize) and (length(fBitmap)=length(With_.fBitmap)) then begin
+  for Index:=0 to length(fBitmap)-1 do begin
+   fBitmap[Index]:=fBitmap[Index] or With_.fBitmap[Index];
+  end;
+ end else begin
+  raise Exception.Create('TPACCIntermediateRepresentationCodeBitSet.Union');
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeBitSet.Intersection(const With_:TPACCIntermediateRepresentationCodeBitSet);
+var Index:TPACCInt32;
+begin
+ if (fBitmapSize=With_.fBitmapSize) and (length(fBitmap)=length(With_.fBitmap)) then begin
+  for Index:=0 to length(fBitmap)-1 do begin
+   fBitmap[Index]:=fBitmap[Index] and With_.fBitmap[Index];
+  end;
+ end else begin
+  raise Exception.Create('TPACCIntermediateRepresentationCodeBitSet.Intersection');
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeBitSet.Subtraction(const With_:TPACCIntermediateRepresentationCodeBitSet);
+var Index:TPACCInt32;
+begin
+ if (fBitmapSize=With_.fBitmapSize) and (length(fBitmap)=length(With_.fBitmap)) then begin
+  for Index:=0 to length(fBitmap)-1 do begin
+   fBitmap[Index]:=fBitmap[Index] and not With_.fBitmap[Index];
+  end;
+ end else begin
+  raise Exception.Create('TPACCIntermediateRepresentationCodeBitSet.Subtraction');
  end;
 end;
 
@@ -4362,10 +4409,19 @@ begin
 
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.LiveOn(var v:TPACCIntermediateRepresentationCodeBitSet;const b,s:TPACCIntermediateRepresentationCodeBlock);
+var p:TPACCIntermediateRepresentationCodePhi;
+begin
+ v.Assign(s.In_);
+ 
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.FillLive;
-var k,t:TPACCInt32;
-    b:TPACCIntermediateRepresentationCodeBlock;
+var Index,SubIndex,k,t:TPACCInt32;
+    b,s:TPACCIntermediateRepresentationCodeBlock;
     i:TPACCIntermediateRepresentationCodeInstruction;
+    u:TPACCIntermediateRepresentationCodeBitSet;
+    Changed:boolean;
 begin
  b:=StartBlock;
  while assigned(b) do begin
@@ -4377,7 +4433,27 @@ begin
   b.Gen_.ClearBits;
   b:=b.Link;
  end;
- 
+ Changed:=true;
+ repeat
+  for Index:=CountBlocks-1 downto 0 do begin
+   b:=RPO[Index];
+   u.Assign(b.Out_);
+   for SubIndex:=0 to b.Successors.Count-1 do begin
+    s:=b.Successors[SubIndex];
+    if assigned(s) then begin
+
+    end;
+   end;
+  end;
+  if Changed then begin
+   Changed:=false;
+   continue;
+  end else begin
+   break;
+  end;
+ until false;
+
+
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CompareSDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
