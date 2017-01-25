@@ -479,6 +479,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure Union(const With_:TPACCIntermediateRepresentationCodeBitSet);
        procedure Intersection(const With_:TPACCIntermediateRepresentationCodeBitSet);
        procedure Subtraction(const With_:TPACCIntermediateRepresentationCodeBitSet);
+       function EqualsTo(const With_:TPACCIntermediateRepresentationCodeBitSet):boolean;
        property BitmapSize:TPACCInt32 read fBitmapSize write SetBitmapSize;
        property Bits[const AIndex:TPACCInt32]:boolean read GetBit write SetBit; default;
      end;
@@ -1035,6 +1036,20 @@ begin
   end;
  end else begin
   raise Exception.Create('TPACCIntermediateRepresentationCodeBitSet.Subtraction');
+ end;
+end;
+
+function TPACCIntermediateRepresentationCodeBitSet.EqualsTo(const With_:TPACCIntermediateRepresentationCodeBitSet):boolean;
+var Index:TPACCInt32;
+begin
+ result:=(fBitmapSize=With_.fBitmapSize) and (length(fBitmap)=length(With_.fBitmap));
+ if result then begin
+  for Index:=0 to length(fBitmap)-1 do begin
+   if fBitmap[Index]<>With_.fBitmap[Index] then begin
+    result:=false;
+    exit;
+   end;
+  end;
  end;
 end;
 
@@ -4410,49 +4425,84 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.LiveOn(var v:TPACCIntermediateRepresentationCodeBitSet;const b,s:TPACCIntermediateRepresentationCodeBlock);
-var p:TPACCIntermediateRepresentationCodePhi;
+var Index:TPACCInt32;
+    p:TPACCIntermediateRepresentationCodePhi;
 begin
+
  v.Assign(s.In_);
- 
+
+ p:=s.Phi;
+ while assigned(p) do begin
+  if p.To_.Kind=pircokTEMPORARY then begin
+   v.SetBit(p.To_.Temporary,false);
+  end;
+  p:=p.Link;
+ end;
+
+ p:=s.Phi;
+ while assigned(p) do begin
+  for Index:=0 to p.CountOperands-1 do begin
+   if (p.Blocks[Index]=b) and (p.Operands[Index].Kind=pircokTEMPORARY) then begin
+    v.SetBit(p.Operands[Index].Temporary,true);
+    b.Gen_.SetBit(p.Operands[Index].Temporary,true);
+   end;
+  end;
+  p:=p.Link;
+ end;
+
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.FillLive;
 var Index,SubIndex,k,t:TPACCInt32;
     b,s:TPACCIntermediateRepresentationCodeBlock;
     i:TPACCIntermediateRepresentationCodeInstruction;
-    u:TPACCIntermediateRepresentationCodeBitSet;
+    u,v:TPACCIntermediateRepresentationCodeBitSet;
     Changed:boolean;
 begin
- b:=StartBlock;
- while assigned(b) do begin
-  b.In_.BitmapSize:=Temporaries.Count;
-  b.Out_.BitmapSize:=Temporaries.Count;
-  b.Gen_.BitmapSize:=Temporaries.Count;
-  b.In_.ClearBits;
-  b.Out_.ClearBits;
-  b.Gen_.ClearBits;
-  b:=b.Link;
- end;
- Changed:=true;
- repeat
-  for Index:=CountBlocks-1 downto 0 do begin
-   b:=RPO[Index];
-   u.Assign(b.Out_);
-   for SubIndex:=0 to b.Successors.Count-1 do begin
-    s:=b.Successors[SubIndex];
-    if assigned(s) then begin
 
+ try
+  u.BitmapSize:=Temporaries.Count;
+  v.BitmapSize:=Temporaries.Count;
+  u.ClearBits;
+  v.ClearBits;
+
+  b:=StartBlock;
+  while assigned(b) do begin
+   b.In_.BitmapSize:=Temporaries.Count;
+   b.Out_.BitmapSize:=Temporaries.Count;
+   b.Gen_.BitmapSize:=Temporaries.Count;
+   b.In_.ClearBits;
+   b.Out_.ClearBits;
+   b.Gen_.ClearBits;
+   b:=b.Link;
+  end;
+
+  Changed:=true;
+  repeat
+   for Index:=CountBlocks-1 downto 0 do begin
+    b:=RPO[Index];
+    u.Assign(b.Out_);
+    for SubIndex:=0 to b.Successors.Count-1 do begin
+     s:=b.Successors[SubIndex];
+     if assigned(s) then begin
+      LiveOn(v,b,s);
+      b.Out_.Union(v);
+     end;
     end;
    end;
-  end;
-  if Changed then begin
-   Changed:=false;
-   continue;
-  end else begin
-   break;
-  end;
- until false;
+   Changed:=Changed or not b.Out_.EqualsTo(u); 
+   if Changed then begin
+    Changed:=false;
+    continue;
+   end else begin
+    break;
+   end;
+  until false;
 
+ finally
+  u.Clear;
+  v.Clear;
+ end;
 
 end;
 
