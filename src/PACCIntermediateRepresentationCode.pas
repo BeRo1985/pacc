@@ -394,7 +394,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        Jump:TPACCIntermediateRepresentationCodeJump;
 
-       Successors:array of TPACCIntermediateRepresentationCodeBlock;
+       Successors:TPACCIntermediateRepresentationCodeBlocks;
 
        Link:TPACCIntermediateRepresentationCodeBlock;
 
@@ -537,6 +537,9 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitIFStatement(const Node:TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator);
        procedure EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
        procedure EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements);
+       procedure DeleteBlock(const b:TPACCIntermediateRepresentationCodeBlock);
+       procedure FillRPO;
+       procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
       public
@@ -550,6 +553,10 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        BlockLabelHashMap:TPACCPointerHashMap;
 
        StartBlock:TPACCIntermediateRepresentationCodeBlock;
+
+       CountBlocks:TPACCInt32;
+
+       RPO:TPACCIntermediateRepresentationCodeBlocks;
 
        Temporaries:TPACCIntermediateRepresentationCodeTemporaries;
        CountTemporaries:TPACCInt32;
@@ -854,6 +861,10 @@ begin
 
  StartBlock:=nil;
 
+ CountBlocks:=0;
+
+ RPO:=nil;
+
  Temporaries:=nil;
  CountTemporaries:=0;
 
@@ -869,6 +880,7 @@ begin
  BlockLabelHashMap.Free;
  VariableTemporaryReferenceHashMap.Free;
  Temporaries:=nil;
+ RPO:=nil;
  inherited Destroy;
 end;
 
@@ -911,6 +923,7 @@ begin
   result.Index:=Blocks.Add(result);
   result.Label_:=Label_;
   BlockLabelHashMap[Label_]:=result;
+  inc(CountBlocks);
  end;
 end;
 
@@ -3819,6 +3832,163 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.DeleteBlock(const b:TPACCIntermediateRepresentationCodeBlock);
+var Index,SubIndex,SubSubIndex:TPACCInt32;
+    s:TPACCIntermediateRepresentationCodeBlock;
+    p:PPACCIntermediateRepresentationCodePhi;
+    AlreadySeenHashMap:TPACCPointerHashMap;
+    Successors:TPACCIntermediateRepresentationCodeBlocks;
+begin
+ Successors:=nil;
+ try
+  Successors:=copy(b.Successors);
+  AlreadySeenHashMap:=TPACCPointerHashMap.Create;
+  try
+   for Index:=0 to length(Successors)-1 do begin
+    s:=Successors[Index];
+    if assigned(s) and not assigned(AlreadySeenHashMap[s]) then begin
+     AlreadySeenHashMap[s]:=s;
+     p:=s.Phi;
+     while assigned(p) do begin
+      for SubIndex:=0 to p^.CountOperands-1 do begin
+       if p^.Blocks[SubIndex]=b then begin
+        for SubSubIndex:=SubIndex+1 to p^.CountOperands-1 do begin
+         p^.Operands[SubSubIndex-1]:=p^.Operands[SubSubIndex];
+         p^.Blocks[SubSubIndex-1]:=p^.Blocks[SubSubIndex];
+        end;
+        dec(p^.CountOperands);
+        SetLength(p^.Operands,p^.CountOperands);
+        SetLength(p^.Blocks,p^.CountOperands);
+        break;
+       end;
+      end;
+      p:=p^.Link;
+     end;
+     if s.CountPredecessors<>0 then begin
+      for SubIndex:=0 to s.CountPredecessors-1 do begin
+       if s.Predecessors[SubIndex]=b then begin
+        for SubSubIndex:=SubIndex+1 to s.CountPredecessors-1 do begin
+         s.Predecessors[SubSubIndex-1]:=s.Predecessors[SubSubIndex];
+        end;
+        dec(s.CountPredecessors);
+        SetLength(s.Predecessors,s.CountPredecessors);
+       end;
+      end;
+     end;
+    end;
+   end;
+  finally
+   AlreadySeenHashMap.Free;
+  end;
+ finally
+  Successors:=nil;
+ end;
+end;
+
+function CompareTPACCIntermediateRepresentationCodeFunctionFillRPORPORecSuccessors(const a,b:pointer):TPACCInt32;
+begin
+ if assigned(a) and assigned(b) then begin
+  result:=TPACCIntermediateRepresentationCodeBlock(a).Loop-TPACCIntermediateRepresentationCodeBlock(b).Loop;
+ end else if assigned(a) then begin
+  result:=-1;
+ end else if assigned(b) then begin
+  result:=1;
+ end else begin
+  result:=0;
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.FillRPO;
+ function RPORec(const b:TPACCIntermediateRepresentationCodeBlock;const x:TPACCInt32):TPACCInt32;
+ var Index:TPACCInt32;
+     Successors:TPACCIntermediateRepresentationCodeBlocks;
+ begin
+  result:=x;
+  if assigned(b) and (b.ID<0) then begin
+   b.ID:=1;
+   case length(b.Successors) of
+    1:begin
+     if assigned(b.Successors[0]) then begin
+      result:=RPORec(b.Successors[0],result);
+     end;
+    end;
+    2:begin
+     if assigned(b.Successors[0]) and assigned(b.Successors[1]) then begin
+      if b.Successors[0].Loop>b.Successors[1].Loop then begin
+       result:=RPORec(b.Successors[1],result);
+       result:=RPORec(b.Successors[0],result);
+      end else begin
+       result:=RPORec(b.Successors[0],result);
+       result:=RPORec(b.Successors[1],result);
+      end;
+     end else if assigned(b.Successors[0]) then begin
+      result:=RPORec(b.Successors[0],result);
+     end else if assigned(b.Successors[1]) then begin
+      result:=RPORec(b.Successors[1],result);
+     end;
+    end;
+    4..$7fffffff:begin
+     Successors:=copy(b.Successors);
+     try
+      IndirectIntroSort(@Successors[0],0,length(Successors)-1,CompareTPACCIntermediateRepresentationCodeFunctionFillRPORPORecSuccessors);
+      for Index:=0 to length(Successors)-1 do begin
+       if assigned(Successors[Index]) then begin
+        result:=RPORec(Successors[Index],result);
+       end;
+      end;
+     finally
+      Successors:=nil;
+     end;
+    end;
+   end;
+   b.ID:=result;
+   Assert(result>=0);
+   dec(result);
+  end;
+ end;
+var n,CountRPO:TPACCInt32;
+    b:TPACCIntermediateRepresentationCodeBlock;
+    p:PPACCIntermediateRepresentationCodeBlock;
+begin
+ b:=StartBlock;
+ while assigned(b) do begin
+  b.ID:=-1;
+  b:=b.Link;
+ end;
+ n:=1+RPORec(StartBlock,CountBlocks-1);
+ dec(CountBlocks,n);
+ p:=@StartBlock;
+ CountRPO:=0;
+ try
+  repeat
+   b:=p^;
+   if assigned(b) then begin
+    if b.ID<0 then begin
+     DeleteBlock(b);
+     p^:=b.Link;
+    end else begin
+     dec(b.ID,n);
+     CountRPO:=Max(CountRPO,b.ID+1);
+     if length(RPO)<=b.ID then begin
+      SetLength(RPO,(b.ID+1)*2);
+     end;
+     RPO[b.ID]:=b;
+     p:=@b.link;
+    end;
+   end else begin
+    break;
+   end;
+  until false;
+ finally
+  SetLength(RPO,CountRPO);
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
+begin
+ FillRPO;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 begin
 
@@ -3857,6 +4027,8 @@ begin
  if CurrentBlock.Jump.Kind=pircjkNONE then begin
   CurrentBlock.Jump.Kind:=pircjkRET;
  end;
+
+ PostProcess;
 
 end;
 
