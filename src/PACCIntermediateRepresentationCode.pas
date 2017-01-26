@@ -4828,7 +4828,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
    b:=b.Link;
   end;
  end;
- procedure PhiInstruction;
+ procedure FillMissingPhiInstructions;
  var TemporaryIndex,InstructionIndex,InstructionOperandIndex,Index:TPACCInt32;
      u,Defs:TPACCIntermediateRepresentationCodeBitSet;
      BlockStack:TPACCIntermediateRepresentationCodeBlockList;
@@ -4942,7 +4942,7 @@ begin
  FillDominators;
  FillDominanceFrontier;
  FillLive;
- PhiInstruction;
+ FillMissingPhiInstructions;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
