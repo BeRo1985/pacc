@@ -396,9 +396,20 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        destructor Destroy; override;
      end;
 
+     PPACCIntermediateRepresentationCodeTemporaryKind=^TPACCIntermediateRepresentationCodeTemporaryKind;
+     TPACCIntermediateRepresentationCodeTemporaryKind=
+      (
+       pirctkNONE,
+       pirctkNORMAL,
+       pirctkVARIABLE,
+       pirctkLINK,
+       pirctkCOUNT
+      );
+
      PPACCIntermediateRepresentationCodeTemporary=^TPACCIntermediateRepresentationCodeTemporary;
      TPACCIntermediateRepresentationCodeTemporary=class
       public
+       Kind:TPACCIntermediateRepresentationCodeTemporaryKind;
        Index:TPACCInt32;
        Link:TPACCIntermediateRepresentationCodeTemporary;
        Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
@@ -579,8 +590,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
                          const SourceLocation:TPACCSourceLocation);
        procedure CreateNewBlockIfNeeded;
        function CreateTemporary(const Type_:TPACCIntermediateRepresentationCodeType):TPACCInt32;
-       function CreateLinkTemporary(const ToTemporaryIndex:TPACCInt32):TPACCInt32;
        function CreateVariableTemporary(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCInt32;
+       function CreateLinkTemporary(const ToTemporaryIndex:TPACCInt32):TPACCInt32;
        function CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
        function CreateIntegerValueOperand(const Value:TPACCInt64):TPACCIntermediateRepresentationCodeOperand;
        function CreateFloatValueOperand(const Value:TPACCDouble):TPACCIntermediateRepresentationCodeOperand;
@@ -885,6 +896,7 @@ end;
 constructor TPACCIntermediateRepresentationCodeTemporary.Create;
 begin
  inherited Create;
+ Kind:=pirctkNONE;
  Index:=0;
  Link:=nil;
  Variable:=nil;
@@ -1365,21 +1377,10 @@ begin
  Temporary:=TPACCIntermediateRepresentationCodeTemporary.Create;
  TPACCInstance(fInstance).AllocatedObjects.Add(Temporary);
  result:=Temporaries.Add(Temporary);
+ Temporary.Kind:=pirctkNORMAL;
  Temporary.Index:=result;
  Temporary.Link:=nil;
  Temporary.Type_:=Type_;
-end;
-
-function TPACCIntermediateRepresentationCodeFunction.CreateLinkTemporary(const ToTemporaryIndex:TPACCInt32):TPACCInt32;
-var Temporary,ToTemporary:TPACCIntermediateRepresentationCodeTemporary;
-begin
- ToTemporary:=Temporaries[ToTemporaryIndex];
- Temporary:=TPACCIntermediateRepresentationCodeTemporary.Create;
- TPACCInstance(fInstance).AllocatedObjects.Add(Temporary);
- result:=Temporaries.Add(Temporary);
- Temporary.Index:=result;
- Temporary.Link:=ToTemporary;
- Temporary.Type_:=ToTemporary.Type_;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateVariableTemporary(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCInt32;
@@ -1392,11 +1393,25 @@ begin
   Temporary:=TPACCIntermediateRepresentationCodeTemporary.Create;
   TPACCInstance(fInstance).AllocatedObjects.Add(Temporary);
   result:=Temporaries.Add(Temporary);
+  Temporary.Kind:=pirctkVARIABLE;
   Temporary.Index:=result;
   Temporary.Type_:=pirctTOP;
   Temporary.Variable:=Variable;
   VariableTemporaryHashMap[Variable]:=Temporary;
  end;
+end;
+
+function TPACCIntermediateRepresentationCodeFunction.CreateLinkTemporary(const ToTemporaryIndex:TPACCInt32):TPACCInt32;
+var Temporary,ToTemporary:TPACCIntermediateRepresentationCodeTemporary;
+begin
+ ToTemporary:=Temporaries[ToTemporaryIndex];
+ Temporary:=TPACCIntermediateRepresentationCodeTemporary.Create;
+ TPACCInstance(fInstance).AllocatedObjects.Add(Temporary);
+ result:=Temporaries.Add(Temporary);
+ Temporary.Kind:=pirctkLINK;
+ Temporary.Index:=result;
+ Temporary.Link:=ToTemporary;
+ Temporary.Type_:=ToTemporary.Type_;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
