@@ -268,6 +268,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      TPACCIntermediateRepresentationCodeType=
       (
        pirctNONE,
+       pirctTOP,
        pirctINT,
        pirctLONG,
        pirctFLOAT,
@@ -657,6 +658,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure FillLive;
        function CompareSDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
        function CompareDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
+       function CodeTypeMerge(var ResultType_:TPACCIntermediateRepresentationCodeType;const Type_:TPACCIntermediateRepresentationCodeType):boolean;
        procedure SSA;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
@@ -832,9 +834,9 @@ const EmptyOperand:TPACCIntermediateRepresentationCodeOperand=
         Kind:pircokNONE;
        );
 
-      CodeTypeBaseClass:array[TPACCIntermediateRepresentationCodeType] of TPACCInt32=(0,0,0,1,1);
+      CodeTypeBaseClass:array[TPACCIntermediateRepresentationCodeType] of TPACCInt32=(0,0,0,0,1,1);
 
-      CodeTypeBaseWidth:array[TPACCIntermediateRepresentationCodeType] of TPACCInt32=(0,0,1,0,1);
+      CodeTypeBaseWidth:array[TPACCIntermediateRepresentationCodeType] of TPACCInt32=(0,0,0,1,0,1);
 
 procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
 
@@ -1686,7 +1688,7 @@ begin
   EmitInstruction(pircoADDI,pirctINT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(InputLeftTemporary),CreateTemporaryOperand(InputRightTemporary)],Node.SourceLocation);
  end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
   OutputTemporary:=CreateTemporary(pirctLONG);
-  EmitInstruction(pircoADDL,pirctLONg,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(InputLeftTemporary),CreateTemporaryOperand(InputRightTemporary)],Node.SourceLocation);
+  EmitInstruction(pircoADDL,pirctLONG,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(InputLeftTemporary),CreateTemporaryOperand(InputRightTemporary)],Node.SourceLocation);
  end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
   OutputTemporary:=CreateTemporary(pirctFLOAT);
   EmitInstruction(pircoADDF,pirctFLOAT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(InputLeftTemporary),CreateTemporaryOperand(InputRightTemporary)],Node.SourceLocation);
@@ -4705,6 +4707,19 @@ begin
  result:=(a=b) or CompareSDominance(a,b);
 end;
 
+function TPACCIntermediateRepresentationCodeFunction.CodeTypeMerge(var ResultType_:TPACCIntermediateRepresentationCodeType;const Type_:TPACCIntermediateRepresentationCodeType):boolean;
+begin
+ if ResultType_ in [pirctNONE,pirctTOP] then begin
+  ResultType_:=Type_;
+  result:=false;
+ end else if ((ResultType_=pirctINT) and (Type_=pirctLONG)) or ((ResultType_=pirctLONG) and (Type_=pirctINT)) then begin
+  ResultType_:=pirctINT;
+  result:=false;
+ end else begin
+  result:=ResultType_<>Type_;
+ end;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.SSA;
  procedure FillDominators;
   function FindInterDominance(b1,b2:TPACCIntermediateRepresentationCodeBlock):TPACCIntermediateRepresentationCodeBlock;
@@ -4799,8 +4814,114 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
   end;
  end;
  procedure PhiInstruction;
+ var TemporaryIndex,InstructionIndex,InstructionOperandIndex,Index:TPACCInt32;
+     u,Defs:TPACCIntermediateRepresentationCodeBitSet;
+     BlockStack:TPACCIntermediateRepresentationCodeBlockList;
+     Block,Frontier:TPACCIntermediateRepresentationCodeBlock;
+     Temporary:TPACCIntermediateRepresentationCodeTemporary;
+     Operand:TPACCIntermediateRepresentationCodeOperand;
+     Instruction:TPACCIntermediateRepresentationCodeInstruction;
+     CodeType:TPACCIntermediateRepresentationCodeType;
+     Phi:TPACCIntermediateRepresentationCodePhi;
  begin
-  
+
+  u.BitmapSize:=CountBlocks;
+  Defs.BitmapSize:=CountBlocks;
+  u.ClearBits;
+  Defs.ClearBits;
+  BlockStack:=TPACCIntermediateRepresentationCodeBlockList.Create;
+  try
+
+   for TemporaryIndex:=0 to Temporaries.Count-1 do begin
+
+    Temporary:=Temporaries[TemporaryIndex];
+
+    Temporary.Visit:=0;
+
+    if Temporary.Phi=0 then begin
+
+     u.ClearBits;
+     CodeType:=pirctNONE;
+
+     Block:=StartBlock;
+     while assigned(Block) do begin
+      Block.Visit:=0;
+      Operand:=EmptyOperand;
+      for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+       Instruction:=Block.Instructions[InstructionIndex];
+       if Operand.Kind<>pircokNONE then begin
+        for InstructionOperandIndex:=0 to length(Instruction.Operands)-1 do begin
+         if (Instruction.Operands[InstructionOperandIndex].Kind=pircokTEMPORARY) and
+            (Instruction.Operands[InstructionOperandIndex].Temporary=TemporaryIndex) then begin
+          Instruction.Operands[InstructionOperandIndex]:=Operand;
+         end;
+        end;
+       end;
+       if (Instruction.To_.Kind=pircokTEMPORARY) and (Instruction.To_.Temporary=TemporaryIndex) then begin
+        if Block.Out_.GetBit(TemporaryIndex) then begin
+         if Temporary.CountDefinitions=1 then begin
+          Operand.Kind:=pircokTEMPORARY;
+          Operand.Temporary:=TemporaryIndex;
+         end else begin
+         end;
+         Instruction.To_:=Operand;
+        end else begin
+         if not u.GetBit(Block.ID) then begin
+          u.SetBit(Block.ID,true);
+          BlockStack.Add(Block);
+         end;
+         if CodeTypeMerge(CodeType,Instruction.Type_) then begin
+          TPACCInstance(fInstance).AddError('Internal error 2017-01-26-11-40-0000',nil,true);
+         end;
+        end;
+       end;
+      end;
+      if (Operand.Kind<>pircokNONE) and (Block.Jump.Operand.Kind=pircokTEMPORARY) and (Block.Jump.Operand.Temporary=TemporaryIndex) then begin
+       Block.Jump.Operand:=Operand;
+      end;
+      Block:=Block.Link;
+     end;
+
+     Defs.Assign(u);
+
+     while BlockStack.Count>0 do begin
+      Block:=BlockStack[BlockStack.Count-1];
+      BlockStack.Delete(BlockStack.Count-1);
+      Temporary.Visit:=TemporaryIndex;
+      u.SetBit(Block.ID,false);
+      for Index:=0 to Block.Frontiers.Count-1 do begin
+       Frontier:=Block.Frontiers[Index];
+       if Frontier.Visit=0 then begin
+        inc(Frontier.Visit);
+        if Frontier.In_.GetBit(TemporaryIndex) then begin
+         Phi:=TPACCIntermediateRepresentationCodePhi.Create;
+         TPACCInstance(fInstance).AllocatedObjects.Add(Phi);
+         Phi.Type_:=CodeType;
+         Phi.To_:=CreateTemporaryOperand(TemporaryIndex);
+         Phi.Link:=Frontier.Phi;
+         Frontier.Phi:=Phi;
+         if not (Defs.GetBit(Frontier.ID) or u.GetBit(Frontier.ID)) then begin
+          u.SetBit(Frontier.ID,true);
+          BlockStack.Add(Frontier);
+         end;
+        end;
+       end else begin
+        inc(Frontier.Visit);
+       end;
+      end;
+     end;
+
+    end;
+
+   end;
+
+
+  finally
+   u.Clear;
+   Defs.Clear;
+   BlockStack.Free;
+  end;
+
  end;
 begin
  FillDominators;
