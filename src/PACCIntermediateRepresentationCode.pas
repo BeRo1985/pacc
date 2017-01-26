@@ -400,6 +400,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      TPACCIntermediateRepresentationCodeTemporary=class
       public
        Index:TPACCInt32;
+       Link:TPACCIntermediateRepresentationCodeTemporary;
        Name:TPACCRawByteString;
        Type_:TPACCIntermediateRepresentationCodeType;
        Uses_:TPACCIntermediateRepresentationCodeUseList;
@@ -577,6 +578,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
                          const SourceLocation:TPACCSourceLocation);
        procedure CreateNewBlockIfNeeded;
        function CreateTemporary(const Type_:TPACCIntermediateRepresentationCodeType):TPACCInt32;
+       function CreateLinkTemporary(const ToTemporaryIndex:TPACCInt32):TPACCInt32;
        function CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
        function CreateIntegerValueOperand(const Value:TPACCInt64):TPACCIntermediateRepresentationCodeOperand;
        function CreateFloatValueOperand(const Value:TPACCDouble):TPACCIntermediateRepresentationCodeOperand;
@@ -1358,7 +1360,20 @@ begin
  TPACCInstance(fInstance).AllocatedObjects.Add(Temporary);
  result:=Temporaries.Add(Temporary);
  Temporary.Index:=result;
+ Temporary.Link:=nil;
  Temporary.Type_:=Type_;
+end;
+
+function TPACCIntermediateRepresentationCodeFunction.CreateLinkTemporary(const ToTemporaryIndex:TPACCInt32):TPACCInt32;
+var Temporary,ToTemporary:TPACCIntermediateRepresentationCodeTemporary;
+begin
+ ToTemporary:=Temporaries[ToTemporaryIndex];
+ Temporary:=TPACCIntermediateRepresentationCodeTemporary.Create;
+ TPACCInstance(fInstance).AllocatedObjects.Add(Temporary);
+ result:=Temporaries.Add(Temporary);
+ Temporary.Index:=result;
+ Temporary.Link:=ToTemporary;
+ Temporary.Type_:=ToTemporary.Type_;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
@@ -4859,13 +4874,6 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
        end;
        if (Instruction.To_.Kind=pircokTEMPORARY) and (Instruction.To_.Temporary=TemporaryIndex) then begin
         if Block.Out_.GetBit(TemporaryIndex) then begin
-         if Temporary.CountDefinitions=1 then begin
-          Operand.Kind:=pircokTEMPORARY;
-          Operand.Temporary:=TemporaryIndex;
-         end else begin
-         end;
-         Instruction.To_:=Operand;
-        end else begin
          if not u.GetBit(Block.ID) then begin
           u.SetBit(Block.ID,true);
           BlockStack.Add(Block);
@@ -4873,6 +4881,13 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
          if CodeTypeMerge(CodeType,Instruction.Type_) then begin
           TPACCInstance(fInstance).AddError('Internal error 2017-01-26-11-40-0000',nil,true);
          end;
+        end else begin
+         if Temporary.CountDefinitions=1 then begin
+          Operand:=CreateTemporaryOperand(TemporaryIndex);
+         end else begin
+          Operand:=CreateTemporaryOperand(CreateLinkTemporary(TemporaryIndex));
+         end;
+         Instruction.To_:=Operand;
         end;
        end;
       end;
