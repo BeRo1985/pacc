@@ -401,6 +401,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       public
        Index:TPACCInt32;
        Link:TPACCIntermediateRepresentationCodeTemporary;
+       Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
        Name:TPACCRawByteString;
        Type_:TPACCIntermediateRepresentationCodeType;
        Uses_:TPACCIntermediateRepresentationCodeUseList;
@@ -579,6 +580,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure CreateNewBlockIfNeeded;
        function CreateTemporary(const Type_:TPACCIntermediateRepresentationCodeType):TPACCInt32;
        function CreateLinkTemporary(const ToTemporaryIndex:TPACCInt32):TPACCInt32;
+       function CreateVariableTemporary(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCInt32;
        function CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
        function CreateIntegerValueOperand(const Value:TPACCInt64):TPACCIntermediateRepresentationCodeOperand;
        function CreateFloatValueOperand(const Value:TPACCDouble):TPACCIntermediateRepresentationCodeOperand;
@@ -685,7 +687,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        TemporaryReferenceCounter:TPACCUInt32;
 
-       VariableTemporaryReferenceHashMap:TPACCPointerHashMap;
+       VariableTemporaryHashMap:TPACCPointerHashMap;
 
        constructor Create(const AInstance:TObject); reintroduce;
        destructor Destroy; override;
@@ -884,6 +886,8 @@ constructor TPACCIntermediateRepresentationCodeTemporary.Create;
 begin
  inherited Create;
  Index:=0;
+ Link:=nil;
+ Variable:=nil;
  Name:='';
  Type_:=pirctNONE;
  Uses_:=TPACCIntermediateRepresentationCodeUseList.Create;
@@ -1197,6 +1201,8 @@ begin
 
  TPACCInstance(fInstance).AllocatedObjects.Add(self);
 
+ CurrentBlock:=nil;
+
  Blocks:=TPACCIntermediateRepresentationCodeBlockList.Create;
 
  BlockLabelHashMap:=TPACCPointerHashMap.Create;
@@ -1211,7 +1217,7 @@ begin
 
  TemporaryReferenceCounter:=0;
 
- VariableTemporaryReferenceHashMap:=TPACCPointerHashMap.Create;
+ VariableTemporaryHashMap:=TPACCPointerHashMap.Create;
 
 end;
 
@@ -1219,7 +1225,7 @@ destructor TPACCIntermediateRepresentationCodeFunction.Destroy;
 begin
  Blocks.Free;
  BlockLabelHashMap.Free;
- VariableTemporaryReferenceHashMap.Free;
+ VariableTemporaryHashMap.Free;
  Temporaries.Free;
  RPO:=nil;
  inherited Destroy;
@@ -1376,6 +1382,23 @@ begin
  Temporary.Type_:=ToTemporary.Type_;
 end;
 
+function TPACCIntermediateRepresentationCodeFunction.CreateVariableTemporary(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCInt32;
+var Temporary:TPACCIntermediateRepresentationCodeTemporary;
+begin
+ Temporary:=VariableTemporaryHashMap[Variable];
+ if assigned(Temporary) then begin
+  result:=Temporary.Index;
+ end else begin
+  Temporary:=TPACCIntermediateRepresentationCodeTemporary.Create;
+  TPACCInstance(fInstance).AllocatedObjects.Add(Temporary);
+  result:=Temporaries.Add(Temporary);
+  Temporary.Index:=result;
+  Temporary.Type_:=pirctTOP;
+  Temporary.Variable:=Variable;
+  VariableTemporaryHashMap[Variable]:=Temporary;
+ end;
+end;
+
 function TPACCIntermediateRepresentationCodeFunction.CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
 begin
  result.Flags:=[];
@@ -1399,9 +1422,15 @@ end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateVariableOperand(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeOperand;
 begin
- result.Flags:=[];
- result.Kind:=pircokVARIABLE;
- result.Variable:=Variable;
+ if Variable.Kind=astnkLVAR then begin
+  // Local variable, so convert into a temporary
+  result:=CreateTemporaryOperand(CreateVariableTemporary(Variable));
+ end else begin
+  // Global variable
+  result.Flags:=[];
+  result.Kind:=pircokVARIABLE;
+  result.Variable:=Variable;
+ end;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateLabelOperand(const Label_:TPACCAbstractSyntaxTreeNodeLabel):TPACCIntermediateRepresentationCodeOperand;
