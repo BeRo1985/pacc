@@ -648,18 +648,18 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitIFStatement(const Node:TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator);
        procedure EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
        procedure EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements);
-       procedure DeleteBlock(const b:TPACCIntermediateRepresentationCodeBlock);
+       procedure DeleteBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
        procedure FillRPO;
        procedure FillPredecessors;
        procedure FillUse;
-       procedure LiveOn(var v:TPACCIntermediateRepresentationCodeBitSet;const b,s:TPACCIntermediateRepresentationCodeBlock);
+       procedure LiveOn(var BitSet:TPACCIntermediateRepresentationCodeBitSet;const Block,Successor:TPACCIntermediateRepresentationCodeBlock);
        function ReturnRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;var CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
        function ArgumentRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;var CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
        function IntegerRegisterToSave(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCInt32;
        function FloatRegisterToSave(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCInt32;
        procedure FillLive;
-       function CompareSDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
-       function CompareDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
+       function CompareSDominance(Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock):boolean;
+       function CompareDominance(Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock):boolean;
        function CodeTypeMerge(var ResultType_:TPACCIntermediateRepresentationCodeType;const Type_:TPACCIntermediateRepresentationCodeType):boolean;
        procedure SSA;
        procedure PostProcess;
@@ -4199,44 +4199,43 @@ begin
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.DeleteBlock(const b:TPACCIntermediateRepresentationCodeBlock);
+procedure TPACCIntermediateRepresentationCodeFunction.DeleteBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
 var Index,SubIndex,SubSubIndex:TPACCInt32;
-    s:TPACCIntermediateRepresentationCodeBlock;
-    p:TPACCIntermediateRepresentationCodePhi;
+    Successor:TPACCIntermediateRepresentationCodeBlock;
+    Phi:TPACCIntermediateRepresentationCodePhi;
     AlreadySeenHashMap:TPACCPointerHashMap;
     Successors:TPACCIntermediateRepresentationCodeBlockList;
 begin
  Successors:=TPACCIntermediateRepresentationCodeBlockList.Create;
  try
-  for Index:=0 to b.Successors.Count-1 do begin
-   Successors.Add(b.Successors[Index]);
+  for Index:=0 to Block.Successors.Count-1 do begin
+   Successors.Add(Block.Successors[Index]);
   end;
   AlreadySeenHashMap:=TPACCPointerHashMap.Create;
   try
    for Index:=0 to Successors.Count-1 do begin
-    s:=Successors[Index];
-    if assigned(s) and not assigned(AlreadySeenHashMap[s]) then begin
-     AlreadySeenHashMap[s]:=s;
-     p:=s.Phi;
-     while assigned(p) do begin
-      for SubIndex:=0 to p.CountOperands-1 do begin
-       if p.Blocks[SubIndex]=b then begin
-        for SubSubIndex:=SubIndex+1 to p.CountOperands-1 do begin
-         p.Operands[SubSubIndex-1]:=p.Operands[SubSubIndex];
-         p.Blocks[SubSubIndex-1]:=p.Blocks[SubSubIndex];
+    Successor:=Successors[Index];
+    if assigned(Successor) and not assigned(AlreadySeenHashMap[Successor]) then begin
+     AlreadySeenHashMap[Successor]:=Successor;
+     Phi:=Successor.Phi;
+     while assigned(Phi) do begin
+      for SubIndex:=Phi.CountOperands-1 downto 0 do begin
+       if Phi.Blocks[SubIndex]=Block then begin
+        for SubSubIndex:=SubIndex+1 to Phi.CountOperands-1 do begin
+         Phi.Operands[SubSubIndex-1]:=Phi.Operands[SubSubIndex];
+         Phi.Blocks[SubSubIndex-1]:=Phi.Blocks[SubSubIndex];
         end;
-        dec(p.CountOperands);
-        SetLength(p.Operands,p.CountOperands);
-        SetLength(p.Blocks,p.CountOperands);
-        break;
+        dec(Phi.CountOperands);
+        SetLength(Phi.Operands,Phi.CountOperands);
+        SetLength(Phi.Blocks,Phi.CountOperands);
        end;
       end;
-      p:=p.Link;
+      Phi:=Phi.Link;
      end;
-     if s.Predecessors.Count>0 then begin
-      for SubIndex:=0 to s.Predecessors.Count-1 do begin
-       if s.Predecessors[SubIndex]=b then begin
-        s.Predecessors.Delete(SubIndex);
+     if Successor.Predecessors.Count>0 then begin
+      for SubIndex:=Successor.Predecessors.Count-1 downto 0 do begin
+       if Successor.Predecessors[SubIndex]=Block then begin
+        Successor.Predecessors.Delete(SubIndex);
        end;
       end;
      end;
@@ -4264,39 +4263,39 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.FillRPO;
- function RPORec(const b:TPACCIntermediateRepresentationCodeBlock;const x:TPACCInt32):TPACCInt32;
+ function RPORec(const Block:TPACCIntermediateRepresentationCodeBlock;const x:TPACCInt32):TPACCInt32;
  var Index:TPACCInt32;
      Successors:TPACCIntermediateRepresentationCodeBlockList;
  begin
   result:=x;
-  if assigned(b) and (b.ID<0) then begin
-   b.ID:=1;
-   case b.Successors.Count of
+  if assigned(Block) and (Block.ID<0) then begin
+   Block.ID:=1;
+   case Block.Successors.Count of
     1:begin
-     if assigned(b.Successors[0]) then begin
-      result:=RPORec(b.Successors[0],result);
+     if assigned(Block.Successors[0]) then begin
+      result:=RPORec(Block.Successors[0],result);
      end;
     end;
     2:begin
-     if assigned(b.Successors[0]) and assigned(b.Successors[1]) then begin
-      if b.Successors[0].Loop>b.Successors[1].Loop then begin
-       result:=RPORec(b.Successors[1],result);
-       result:=RPORec(b.Successors[0],result);
+     if assigned(Block.Successors[0]) and assigned(Block.Successors[1]) then begin
+      if Block.Successors[0].Loop>Block.Successors[1].Loop then begin
+       result:=RPORec(Block.Successors[1],result);
+       result:=RPORec(Block.Successors[0],result);
       end else begin
-       result:=RPORec(b.Successors[0],result);
-       result:=RPORec(b.Successors[1],result);
+       result:=RPORec(Block.Successors[0],result);
+       result:=RPORec(Block.Successors[1],result);
       end;
-     end else if assigned(b.Successors[0]) then begin
-      result:=RPORec(b.Successors[0],result);
-     end else if assigned(b.Successors[1]) then begin
-      result:=RPORec(b.Successors[1],result);
+     end else if assigned(Block.Successors[0]) then begin
+      result:=RPORec(Block.Successors[0],result);
+     end else if assigned(Block.Successors[1]) then begin
+      result:=RPORec(Block.Successors[1],result);
      end;
     end;
     4..$7fffffff:begin
      Successors:=TPACCIntermediateRepresentationCodeBlockList.Create;
      try
-      for Index:=0 to b.Successors.Count-1 do begin
-       Successors.Add(b.Successors[Index]);
+      for Index:=0 to Block.Successors.Count-1 do begin
+       Successors.Add(Block.Successors[Index]);
       end;
       Successors.Sort(CompareTPACCIntermediateRepresentationCodeFunctionFillRPORPORecSuccessors);
       for Index:=0 to Successors.Count-1 do begin
@@ -4309,39 +4308,39 @@ procedure TPACCIntermediateRepresentationCodeFunction.FillRPO;
      end;
     end;
    end;
-   b.ID:=result;
+   Block.ID:=result;
    Assert(result>=0);
    dec(result);
   end;
  end;
-var n,CountRPO:TPACCInt32;
-    b:TPACCIntermediateRepresentationCodeBlock;
-    p:PPACCIntermediateRepresentationCodeBlock;
+var Count,CountRPO:TPACCInt32;
+    Block:TPACCIntermediateRepresentationCodeBlock;
+    Phi:PPACCIntermediateRepresentationCodeBlock;
 begin
- b:=StartBlock;
- while assigned(b) do begin
-  b.ID:=-1;
-  b:=b.Link;
+ Block:=StartBlock;
+ while assigned(Block) do begin
+  Block.ID:=-1;
+  Block:=Block.Link;
  end;
- n:=1+RPORec(StartBlock,CountBlocks-1);
- dec(CountBlocks,n);
- p:=@StartBlock;
+ Count:=1+RPORec(StartBlock,CountBlocks-1);
+ dec(CountBlocks,Count);
+ Phi:=@StartBlock;
  CountRPO:=0;
  try
   repeat
-   b:=p^;
-   if assigned(b) then begin
-    if b.ID<0 then begin
-     DeleteBlock(b);
-     p^:=b.Link;
+   Block:=Phi^;
+   if assigned(Block) then begin
+    if Block.ID<0 then begin
+     DeleteBlock(Block);
+     Phi^:=Block.Link;
     end else begin
-     dec(b.ID,n);
-     CountRPO:=Max(CountRPO,b.ID+1);
-     if length(RPO)<=b.ID then begin
-      SetLength(RPO,(b.ID+1)*2);
+     dec(Block.ID,Count);
+     CountRPO:=Max(CountRPO,Block.ID+1);
+     if length(RPO)<=Block.ID then begin
+      SetLength(RPO,(Block.ID+1)*2);
      end;
-     RPO[b.ID]:=b;
-     p:=@b.link;
+     RPO[Block.ID]:=Block;
+     Phi:=@Block.link;
     end;
    end else begin
     break;
@@ -4354,162 +4353,168 @@ end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.FillPredecessors;
 var Index:TPACCInt32;
-    b,s:TPACCIntermediateRepresentationCodeBlock;
+    Block,Successor:TPACCIntermediateRepresentationCodeBlock;
     AlreadySeenHashMap:TPACCPointerHashMap;
 begin
 
- b:=StartBlock;
- while assigned(b) do begin
-  b.Predecessors.Clear;
-  b.Visit:=0;
-  b:=b.Link;
+ Block:=StartBlock;
+ while assigned(Block) do begin
+  Block.Predecessors.Clear;
+  Block.Visit:=0;
+  Block:=Block.Link;
  end;
 
- b:=StartBlock;
- while assigned(b) do begin
+ Block:=StartBlock;
+ while assigned(Block) do begin
   AlreadySeenHashMap:=TPACCPointerHashMap.Create;
   try
-   for Index:=0 to b.Successors.Count-1 do begin
-    s:=b.Successors[Index];
-    if assigned(s) and not assigned(AlreadySeenHashMap[s]) then begin
-     AlreadySeenHashMap[s]:=s;
-     s.Predecessors.Add(nil);
+   for Index:=0 to Block.Successors.Count-1 do begin
+    Successor:=Block.Successors[Index];
+    if assigned(Successor) and not assigned(AlreadySeenHashMap[Successor]) then begin
+     AlreadySeenHashMap[Successor]:=Successor;
+     Successor.Predecessors.Add(nil);
     end;
    end;
   finally
    AlreadySeenHashMap.Free;
   end;
-  b:=b.Link;
+  Block:=Block.Link;
  end;
 
- b:=StartBlock;
- while assigned(b) do begin
+ Block:=StartBlock;
+ while assigned(Block) do begin
   AlreadySeenHashMap:=TPACCPointerHashMap.Create;
   try
-   for Index:=0 to b.Successors.Count-1 do begin
-    s:=b.Successors[Index];
-    if assigned(s) and not assigned(AlreadySeenHashMap[s]) then begin
-     AlreadySeenHashMap[s]:=s;
-     s.Predecessors[s.Visit]:=b;
-     inc(s.Visit);
+   for Index:=0 to Block.Successors.Count-1 do begin
+    Successor:=Block.Successors[Index];
+    if assigned(Successor) and not assigned(AlreadySeenHashMap[Successor]) then begin
+     AlreadySeenHashMap[Successor]:=Successor;
+     Successor.Predecessors[Successor.Visit]:=Block;
+     inc(Successor.Visit);
     end;
    end;
   finally
    AlreadySeenHashMap.Free;
   end;
-  b:=b.Link;
+  Block:=Block.Link;
  end;
 
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.FillUse;
 var Index,SubIndex:TPACCInt32;
-    a:TPACCUInt32;
-    b:TPACCIntermediateRepresentationCodeBlock;
-    p:TPACCIntermediateRepresentationCodePhi;
-    i:TPACCIntermediateRepresentationCodeInstruction;
-    t:TPACCIntermediateRepresentationCodeTemporary;
-    u:TPACCIntermediateRepresentationCodeUse;
+    Block:TPACCIntermediateRepresentationCodeBlock;
+    Phi:TPACCIntermediateRepresentationCodePhi;
+    Instruction:TPACCIntermediateRepresentationCodeInstruction;
+    Temporary:TPACCIntermediateRepresentationCodeTemporary;
+    Use:TPACCIntermediateRepresentationCodeUse;
 begin
 
  for Index:=0 to Temporaries.Count-1 do begin
-  t:=Temporaries[Index];
-  t.CountDefinitions:=0;
-  t.Uses_.Clear;
-  t.Phi:=0;
-  t.Type_:=pirctNONE;
+  Temporary:=Temporaries[Index];
+  Temporary.CountDefinitions:=0;
+  Temporary.Uses_.Clear;
+  Temporary.Phi:=0;
+  Temporary.Type_:=pirctNONE;
  end;
 
- b:=StartBlock;
- while assigned(b) do begin
-  p:=b.Phi;
-  while assigned(p) do begin
-   if p.To_.Kind=pircokTEMPORARY then begin
-    t:=Temporaries[p.To_.Temporary];
-    inc(t.CountDefinitions);
-    t.Type_:=p.Type_;
-    t.Phi:=p.To_.Temporary;
-    for Index:=0 to p.CountOperands-1 do begin
-     if p.Operands[Index].Kind=pircokTEMPORARY then begin
-      t:=Temporaries[p.Operands[Index].Temporary];
-      u:=TPACCIntermediateRepresentationCodeUse.Create;
-      TPACCInstance(fInstance).AllocatedObjects.Add(u);
-      t.Uses_.Add(u);
-      u.Kind:=pircukPHI;
-      u.BlockID:=b.ID;
-      u.By.Phi:=p;
-      if t.Phi=0 then begin
-       t.Phi:=p.To_.Temporary;
+ Block:=StartBlock;
+ while assigned(Block) do begin
+
+  Phi:=Block.Phi;
+  while assigned(Phi) do begin
+   if Phi.To_.Kind=pircokTEMPORARY then begin
+    Temporary:=Temporaries[Phi.To_.Temporary];
+    inc(Temporary.CountDefinitions);
+    Temporary.Type_:=Phi.Type_;
+    Temporary.Phi:=Phi.To_.Temporary;
+    for Index:=0 to Phi.CountOperands-1 do begin
+     if Phi.Operands[Index].Kind=pircokTEMPORARY then begin
+      Temporary:=Temporaries[Phi.Operands[Index].Temporary];
+      Use:=TPACCIntermediateRepresentationCodeUse.Create;
+      TPACCInstance(fInstance).AllocatedObjects.Add(Use);
+      Temporary.Uses_.Add(Use);
+      Use.Kind:=pircukPHI;
+      Use.BlockID:=Block.ID;
+      Use.By.Phi:=Phi;
+      if Temporary.Phi=0 then begin
+       Temporary.Phi:=Phi.To_.Temporary;
       end;
      end;
     end;
    end else begin
     TPACCInstance(fInstance).AddError('Internal error 2017-01-25-13-53-0000',nil,true);
    end;
-   p:=p.Link;
+   Phi:=Phi.Link;
   end;
-  for Index:=0 to b.Instructions.Count-1 do begin
-   i:=b.Instructions[Index];
-   if i.To_.Kind<>pircokNONE then begin
-    if i.To_.Kind=pircokTEMPORARY then begin
-     t:=Temporaries[i.To_.Temporary];
-     if i.Type_<>pirctNONE then begin
-      t.Type_:=i.Type_;
+
+  for Index:=0 to Block.Instructions.Count-1 do begin
+
+   Instruction:=Block.Instructions[Index];
+   if Instruction.To_.Kind<>pircokNONE then begin
+    if Instruction.To_.Kind=pircokTEMPORARY then begin
+     Temporary:=Temporaries[Instruction.To_.Temporary];
+     if Instruction.Type_<>pirctNONE then begin
+      Temporary.Type_:=Instruction.Type_;
      end;
-     inc(t.CountDefinitions);
+     inc(Temporary.CountDefinitions);
     end else begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-25-14-01-0000',nil,true);
     end;
    end;
-   for SubIndex:=0 to length(i.Operands)-1 do begin
-    if i.Operands[SubIndex].Kind=pircokTEMPORARY then begin
-     t:=Temporaries[i.Operands[SubIndex].Temporary];
-     u:=TPACCIntermediateRepresentationCodeUse.Create;
-     TPACCInstance(fInstance).AllocatedObjects.Add(u);
-     t.Uses_.Add(u);
-     u.Kind:=pircukINS;
-     u.BlockID:=b.ID;
-     u.By.Instruction:=i;
+
+   for SubIndex:=0 to length(Instruction.Operands)-1 do begin
+    if Instruction.Operands[SubIndex].Kind=pircokTEMPORARY then begin
+     Temporary:=Temporaries[Instruction.Operands[SubIndex].Temporary];
+     Use:=TPACCIntermediateRepresentationCodeUse.Create;
+     TPACCInstance(fInstance).AllocatedObjects.Add(Use);
+     Temporary.Uses_.Add(Use);
+     Use.Kind:=pircukINS;
+     Use.BlockID:=Block.ID;
+     Use.By.Instruction:=Instruction;
     end;
    end;
-   if b.Jump.Operand.Kind=pircokTEMPORARY then begin
-    t:=Temporaries[b.Jump.Operand.Temporary];
-    u:=TPACCIntermediateRepresentationCodeUse.Create;
-    TPACCInstance(fInstance).AllocatedObjects.Add(u);
-    t.Uses_.Add(u);
-    u.Kind:=pircukJMP;
-    u.BlockID:=b.ID;
+
+   if Block.Jump.Operand.Kind=pircokTEMPORARY then begin
+    Temporary:=Temporaries[Block.Jump.Operand.Temporary];
+    Use:=TPACCIntermediateRepresentationCodeUse.Create;
+    TPACCInstance(fInstance).AllocatedObjects.Add(Use);
+    Temporary.Uses_.Add(Use);
+    Use.Kind:=pircukJMP;
+    Use.BlockID:=Block.ID;
    end;
+
   end;
-  b:=b.Link;
+
+  Block:=Block.Link;
  end;
 
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.LiveOn(var v:TPACCIntermediateRepresentationCodeBitSet;const b,s:TPACCIntermediateRepresentationCodeBlock);
+procedure TPACCIntermediateRepresentationCodeFunction.LiveOn(var BitSet:TPACCIntermediateRepresentationCodeBitSet;const Block,Successor:TPACCIntermediateRepresentationCodeBlock);
 var Index:TPACCInt32;
-    p:TPACCIntermediateRepresentationCodePhi;
+    Phi:TPACCIntermediateRepresentationCodePhi;
 begin
 
- v.Assign(s.In_);
+ BitSet.Assign(Successor.In_);
 
- p:=s.Phi;
- while assigned(p) do begin
-  if p.To_.Kind=pircokTEMPORARY then begin
-   v.SetBit(p.To_.Temporary,false);
+ Phi:=Successor.Phi;
+ while assigned(Phi) do begin
+  if Phi.To_.Kind=pircokTEMPORARY then begin
+   BitSet.SetBit(Phi.To_.Temporary,false);
   end;
-  p:=p.Link;
+  Phi:=Phi.Link;
  end;
 
- p:=s.Phi;
- while assigned(p) do begin
-  for Index:=0 to p.CountOperands-1 do begin
-   if (p.Blocks[Index]=b) and (p.Operands[Index].Kind=pircokTEMPORARY) then begin
-    v.SetBit(p.Operands[Index].Temporary,true);
-    b.Gen_.SetBit(p.Operands[Index].Temporary,true);
+ Phi:=Successor.Phi;
+ while assigned(Phi) do begin
+  for Index:=0 to Phi.CountOperands-1 do begin
+   if (Phi.Blocks[Index]=Block) and (Phi.Operands[Index].Kind=pircokTEMPORARY) then begin
+    BitSet.SetBit(Phi.Operands[Index].Temporary,true);
+    Block.Gen_.SetBit(Phi.Operands[Index].Temporary,true);
    end;
   end;
-  p:=p.Link;
+  Phi:=Phi.Link;
  end;
 
 end;
@@ -4536,7 +4541,7 @@ end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.FillLive;
 var Phis:array of TPACCInt32;
-    nlv,m:array[0..1] of TPACCInt32;
+    CountLive,TemporaryCountLive:array[0..1] of TPACCInt32;
  function PhiTmp(const t:TPACCInt32):TPACCInt32;
  begin
   result:=Temporaries[t].Phi;
@@ -4566,34 +4571,35 @@ var Phis:array of TPACCInt32;
    b.Gen_.SetBit(Operand.Temporary,true);
    PhiFix(Operand.Temporary);
    if not b.In_.GetBit(Operand.Temporary) then begin
-    inc(nlv[CodeTypeBaseClass[Temporaries[Operand.Temporary].Type_]]);
+    inc(CountLive[CodeTypeBaseClass[Temporaries[Operand.Temporary].Type_]]);
     b.In_.SetBit(Operand.Temporary,true);
    end;
   end;
  end;
-var Index,SubIndex,k,t:TPACCInt32;
-    b,s:TPACCIntermediateRepresentationCodeBlock;
-    i:TPACCIntermediateRepresentationCodeInstruction;
-    u,v:TPACCIntermediateRepresentationCodeBitSet;
+var Index,SubIndex,OtherIndex,TemporaryIndex:TPACCInt32;
+    Block,Successor:TPACCIntermediateRepresentationCodeBlock;
+    Instruction:TPACCIntermediateRepresentationCodeInstruction;
+    TemporaryBitSet0,TemporaryBitSet1:TPACCIntermediateRepresentationCodeBitSet;
     Changed:boolean;
 begin
 
  Phis:=nil;
  try
-  u.BitmapSize:=Temporaries.Count;
-  v.BitmapSize:=Temporaries.Count;
-  u.ClearBits;
-  v.ClearBits;
 
-  b:=StartBlock;
-  while assigned(b) do begin
-   b.In_.BitmapSize:=Temporaries.Count;
-   b.Out_.BitmapSize:=Temporaries.Count;
-   b.Gen_.BitmapSize:=Temporaries.Count;
-   b.In_.ClearBits;
-   b.Out_.ClearBits;
-   b.Gen_.ClearBits;
-   b:=b.Link;
+  TemporaryBitSet0.BitmapSize:=Temporaries.Count;
+  TemporaryBitSet1.BitmapSize:=Temporaries.Count;
+  TemporaryBitSet0.ClearBits;
+  TemporaryBitSet1.ClearBits;
+
+  Block:=StartBlock;
+  while assigned(Block) do begin
+   Block.In_.BitmapSize:=Temporaries.Count;
+   Block.Out_.BitmapSize:=Temporaries.Count;
+   Block.Gen_.BitmapSize:=Temporaries.Count;
+   Block.In_.ClearBits;
+   Block.Out_.ClearBits;
+   Block.Gen_.ClearBits;
+   Block:=Block.Link;
   end;
 
   SetLength(Phis,Temporaries.Count);
@@ -4602,85 +4608,85 @@ begin
   repeat
 
    for Index:=CountBlocks-1 downto 0 do begin
-    b:=RPO[Index];
-    u.Assign(b.Out_);
-    for SubIndex:=0 to b.Successors.Count-1 do begin
-     s:=b.Successors[SubIndex];
-     if assigned(s) then begin
-      LiveOn(v,b,s);
-      b.Out_.Union(v);
+    Block:=RPO[Index];
+    TemporaryBitSet0.Assign(Block.Out_);
+    for SubIndex:=0 to Block.Successors.Count-1 do begin
+     Successor:=Block.Successors[SubIndex];
+     if assigned(Successor) then begin
+      LiveOn(TemporaryBitSet1,Block,Successor);
+      Block.Out_.Union(TemporaryBitSet1);
      end;
     end;
    end;
 
-   Changed:=Changed or not b.Out_.EqualsTo(u);
+   Changed:=Changed or not Block.Out_.EqualsTo(TemporaryBitSet0);
 
    FillChar(Phis[0],length(Phis)*SizeOf(TPACCInt32),#0);
-   FillChar(nlv[0],length(nlv)*SizeOf(TPACCInt32),#0);
-   B.In_.Assign(b.Out_);
+   FillChar(CountLive[0],length(CountLive)*SizeOf(TPACCInt32),#0);
+   Block.In_.Assign(Block.Out_);
    Index:=-1;
-   while B.In_.IterateToNextBit(Index) do begin
+   while Block.In_.IterateToNextBit(Index) do begin
     PhiFix(Index);
-    inc(nlv[CodeTypeBaseClass[Temporaries[Index].Type_]]);
+    inc(CountLive[CodeTypeBaseClass[Temporaries[Index].Type_]]);
    end;
 
-   if b.Jump.Operand.Kind=pircokCALL then begin
-    if (b.In_.Count=0) and (nlv[0]=0) and (nlv[1]=0) then begin
-     b.In_.Union(ReturnRegisters(b.Jump.Operand,nlv[0],nlv[1]));
+   if Block.Jump.Operand.Kind=pircokCALL then begin
+    if (Block.In_.Count=0) and (CountLive[0]=0) and (CountLive[1]=0) then begin
+     Block.In_.Union(ReturnRegisters(Block.Jump.Operand,CountLive[0],CountLive[1]));
     end else begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-25-16-45-0000',nil,true);
     end;
    end else begin
-    BSet(b.Jump.Operand,b);
+    BSet(Block.Jump.Operand,Block);
    end;
 
-   b.CountLive[0]:=nlv[0];
-   b.CountLive[1]:=nlv[1];
+   Block.CountLive[0]:=CountLive[0];
+   Block.CountLive[1]:=CountLive[1];
 
-   for Index:=b.Instructions.Count-1 downto 0 do begin
-    i:=b.Instructions[Index];
-    if (i.Opcode=pircoCALL) and (length(i.Operands)>0) and (i.Operands[0].Kind=pircokCALL) then begin
-     m[0]:=0;
-     m[1]:=0;
-     b.In_.Subtraction(ReturnRegisters(b.Jump.Operand,m[0],m[1]));
-     for k:=0 to 1 do begin
-      dec(nlv[k],m[k]);
+   for Index:=Block.Instructions.Count-1 downto 0 do begin
+    Instruction:=Block.Instructions[Index];
+    if (Instruction.Opcode=pircoCALL) and (length(Instruction.Operands)>0) and (Instruction.Operands[0].Kind=pircokCALL) then begin
+     TemporaryCountLive[0]:=0;
+     TemporaryCountLive[1]:=0;
+     Block.In_.Subtraction(ReturnRegisters(Block.Jump.Operand,TemporaryCountLive[0],TemporaryCountLive[1]));
+     for OtherIndex:=0 to 1 do begin
+      dec(CountLive[OtherIndex],TemporaryCountLive[OtherIndex]);
      end;
-     if (nlv[0]+IntegerRegisterToSave(b.Jump.Operand))>b.CountLive[0] then begin
-      b.CountLive[0]:=nlv[0]+IntegerRegisterToSave(b.Jump.Operand);
+     if (CountLive[0]+IntegerRegisterToSave(Block.Jump.Operand))>Block.CountLive[0] then begin
+      Block.CountLive[0]:=CountLive[0]+IntegerRegisterToSave(Block.Jump.Operand);
      end;
-     if (nlv[1]+FloatRegisterToSave(b.Jump.Operand))>b.CountLive[1] then begin
-      b.CountLive[1]:=nlv[1]+FloatRegisterToSave(b.Jump.Operand);
+     if (CountLive[1]+FloatRegisterToSave(Block.Jump.Operand))>Block.CountLive[1] then begin
+      Block.CountLive[1]:=CountLive[1]+FloatRegisterToSave(Block.Jump.Operand);
      end;
-     b.In_.Union(ArgumentRegisters(b.Jump.Operand,m[0],m[1]));
-     for k:=0 to 1 do begin
-      inc(nlv[k],m[k]);
+     Block.In_.Union(ArgumentRegisters(Block.Jump.Operand,TemporaryCountLive[0],TemporaryCountLive[1]));
+     for OtherIndex:=0 to 1 do begin
+      inc(CountLive[OtherIndex],TemporaryCountLive[OtherIndex]);
      end;
     end;
-    if i.To_.Kind<>pircokNONE then begin
-     if i.To_.Kind=pircokTEMPORARY then begin
-      t:=i.To_.Temporary;
-      if b.In_.GetBit(t) then begin
-       dec(nlv[CodeTypeBaseClass[Temporaries[t].Type_]]);
+    if Instruction.To_.Kind<>pircokNONE then begin
+     if Instruction.To_.Kind=pircokTEMPORARY then begin
+      TemporaryIndex:=Instruction.To_.Temporary;
+      if Block.In_.GetBit(TemporaryIndex) then begin
+       dec(CountLive[CodeTypeBaseClass[Temporaries[TemporaryIndex].Type_]]);
       end;
-      b.Gen_.SetBit(t,true);
-      b.In_.SetBit(t,false);
-      Phis[PhiTmp(t)]:=0;
+      Block.Gen_.SetBit(TemporaryIndex,true);
+      Block.In_.SetBit(TemporaryIndex,false);
+      Phis[PhiTmp(TemporaryIndex)]:=0;
      end else begin
       TPACCInstance(fInstance).AddError('Internal error 2017-01-25-17-34-0000',nil,true);
      end;
     end;
-    for k:=0 to length(i.Operands)-1 do begin
-     case i.Operands[k].Kind of
+    for OtherIndex:=0 to length(Instruction.Operands)-1 do begin
+     case Instruction.Operands[OtherIndex].Kind of
       pircokNONE:begin
       end;
       else begin
-       BSet(i.Operands[k],b);
+       BSet(Instruction.Operands[OtherIndex],Block);
       end;
      end;
     end;
-    for k:=0 to 1 do begin
-     b.CountLive[k]:=max(b.CountLive[k],nlv[k]);
+    for OtherIndex:=0 to 1 do begin
+     Block.CountLive[OtherIndex]:=max(Block.CountLive[OtherIndex],CountLive[OtherIndex]);
     end;
    end;
 
@@ -4693,23 +4699,23 @@ begin
   until false;
 
  finally
-  u.Clear;
-  v.Clear;
+  TemporaryBitSet0.Clear;
+  TemporaryBitSet1.Clear;
   Phis:=nil;
  end;
 
 end;
 
-function TPACCIntermediateRepresentationCodeFunction.CompareSDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
+function TPACCIntermediateRepresentationCodeFunction.CompareSDominance(Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock):boolean;
 begin
- if assigned(a) and assigned(b) then begin
-  if a=b then begin
+ if assigned(Block) and assigned(OtherBlock) then begin
+  if Block=OtherBlock then begin
    result:=false;
   end else begin
-   while a.ID<b.ID do begin
-    b:=b.InterDominance;
+   while Block.ID<OtherBlock.ID do begin
+    OtherBlock:=OtherBlock.InterDominance;
    end;
-   result:=a=b;
+   result:=Block=OtherBlock;
   end;
  end else begin
   result:=false;
@@ -4717,9 +4723,9 @@ begin
  end;
 end;
 
-function TPACCIntermediateRepresentationCodeFunction.CompareDominance(a,b:TPACCIntermediateRepresentationCodeBlock):boolean;
+function TPACCIntermediateRepresentationCodeFunction.CompareDominance(Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock):boolean;
 begin
- result:=(a=b) or CompareSDominance(a,b);
+ result:=(Block=OtherBlock) or CompareSDominance(Block,OtherBlock);
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CodeTypeMerge(var ResultType_:TPACCIntermediateRepresentationCodeType;const Type_:TPACCIntermediateRepresentationCodeType):boolean;
@@ -4737,100 +4743,101 @@ end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.SSA;
  procedure FillDominators;
-  function FindInterDominance(b1,b2:TPACCIntermediateRepresentationCodeBlock):TPACCIntermediateRepresentationCodeBlock;
-  var bt:TPACCIntermediateRepresentationCodeBlock;
+  function FindInterDominance(Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock):TPACCIntermediateRepresentationCodeBlock;
+  var TemporaryBlock:TPACCIntermediateRepresentationCodeBlock;
   begin
-   if assigned(b1) then begin
-    while b1<>b2 do begin
-     if b1.ID<b2.ID then begin
-      bt:=b1;
-      b1:=b2;
-      b2:=bt;
+   if assigned(Block) then begin
+    while Block<>OtherBlock do begin
+     if Block.ID<OtherBlock.ID then begin
+      TemporaryBlock:=Block;
+      Block:=OtherBlock;
+      OtherBlock:=TemporaryBlock;
      end;
-     while b1.ID>b2.ID do begin
-      b1:=b1.InterDominance;
-      if not assigned(b1) then begin
+     while Block.ID>OtherBlock.ID do begin
+      Block:=Block.InterDominance;
+      if not assigned(Block) then begin
        TPACCInstance(fInstance).AddError('Internal error 2017-01-25-15-06-0000',nil,true);
       end;
      end;
     end;
-    result:=b1;
+    result:=Block;
    end else begin
-    result:=b2;
+    result:=OtherBlock;
    end;
   end;
- var ch,Index,SubIndex:TPACCInt32;
-     b,d:TPACCIntermediateRepresentationCodeBlock;
+ var Index,SubIndex:TPACCInt32;
+     Block,DominanceBlock:TPACCIntermediateRepresentationCodeBlock;
+     Changed:boolean;
  begin
-  b:=StartBlock;
-  while assigned(b) do begin
-   b.InterDominance:=nil;
-   b.Dominance:=nil;
-   b.DominanceLink:=nil;
-   b:=b.Link;
+  Block:=StartBlock;
+  while assigned(Block) do begin
+   Block.InterDominance:=nil;
+   Block.Dominance:=nil;
+   Block.DominanceLink:=nil;
+   Block:=Block.Link;
   end;
   repeat
-   ch:=0;
+   Changed:=false;
    for Index:=1 to CountBlocks-1 do begin
-    b:=RPO[Index];
-    d:=nil;
-    for SubIndex:=0 to b.Predecessors.Count-1 do begin
-     if assigned(b.Predecessors[SubIndex].InterDominance) or (b.Predecessors[SubIndex]=StartBlock) then begin
-      d:=FindInterDominance(d,b.Predecessors[SubIndex]);
+    Block:=RPO[Index];
+    DominanceBlock:=nil;
+    for SubIndex:=0 to Block.Predecessors.Count-1 do begin
+     if assigned(Block.Predecessors[SubIndex].InterDominance) or (Block.Predecessors[SubIndex]=StartBlock) then begin
+      DominanceBlock:=FindInterDominance(DominanceBlock,Block.Predecessors[SubIndex]);
      end;
     end;
-    if b.InterDominance<>d then begin
-     b.InterDominance:=d;
-     inc(ch);
+    if Block.InterDominance<>DominanceBlock then begin
+     Block.InterDominance:=DominanceBlock;
+     Changed:=true;
     end;
    end;
-  until ch=0;
-  b:=StartBlock;
-  while assigned(b) do begin
-   d:=b.InterDominance;
-   if assigned(d) then begin
-    if d=b then begin
+  until not Changed;
+  Block:=StartBlock;
+  while assigned(Block) do begin
+   DominanceBlock:=Block.InterDominance;
+   if assigned(DominanceBlock) then begin
+    if DominanceBlock=Block then begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-25-15-14-0000',nil,true);
     end else begin
-     b.DominanceLink:=d.Dominance;
-     d.Dominance:=b;
+     Block.DominanceLink:=DominanceBlock.Dominance;
+     DominanceBlock.Dominance:=Block;
     end;
    end;
-   b:=b.Link;
+   Block:=Block.Link;
   end;
  end;
  procedure FillDominanceFrontier;
-  procedure AddFrontier(const a,b:TPACCIntermediateRepresentationCodeBlock);
+  procedure AddFrontier(const Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock);
   var Index:TPACCInt32;
   begin
-   for Index:=0 to a.Frontiers.Count-1 do begin
-    if a.Frontiers[Index]=b then begin
+   for Index:=0 to Block.Frontiers.Count-1 do begin
+    if Block.Frontiers[Index]=OtherBlock then begin
      exit;
     end;
    end;
-   a.Frontiers.Add(b);
+   Block.Frontiers.Add(OtherBlock);
   end;
  var Index:TPACCInt32;
-     a,b,s:TPACCIntermediateRepresentationCodeBlock;
+     Block,OtherBlock,Successor:TPACCIntermediateRepresentationCodeBlock;
  begin
-  b:=StartBlock;
-  while assigned(b) do begin
-   for Index:=0 to b.Successors.Count-1 do begin
-    s:=b.Successors[Index];
-    if assigned(s) then begin
-     a:=b;
-     while not CompareSDominance(a,s) do begin
-      AddFrontier(a,s);
-      a:=a.InterDominance;
+  Block:=StartBlock;
+  while assigned(Block) do begin
+   for Index:=0 to Block.Successors.Count-1 do begin
+    Successor:=Block.Successors[Index];
+    if assigned(Successor) then begin
+     OtherBlock:=Block;
+     while not CompareSDominance(OtherBlock,Successor) do begin
+      AddFrontier(OtherBlock,Successor);
+      OtherBlock:=OtherBlock.InterDominance;
      end;
     end;
    end;
-   b:=b.Link;
+   Block:=Block.Link;
   end;
  end;
  procedure FillMissingPhiInstructions;
  var TemporaryIndex,InstructionIndex,InstructionOperandIndex,Index:TPACCInt32;
-     u,Defs:TPACCIntermediateRepresentationCodeBitSet;
+     TemporaryBitSet,DefinedBlockBitSet:TPACCIntermediateRepresentationCodeBitSet;
      BlockStack:TPACCIntermediateRepresentationCodeBlockList;
      Block,Frontier:TPACCIntermediateRepresentationCodeBlock;
      Temporary:TPACCIntermediateRepresentationCodeTemporary;
@@ -4840,10 +4847,10 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
      Phi:TPACCIntermediateRepresentationCodePhi;
  begin
 
-  u.BitmapSize:=CountBlocks;
-  Defs.BitmapSize:=CountBlocks;
-  u.ClearBits;
-  Defs.ClearBits;
+  TemporaryBitSet.BitmapSize:=CountBlocks;
+  DefinedBlockBitSet.BitmapSize:=CountBlocks;
+  TemporaryBitSet.ClearBits;
+  DefinedBlockBitSet.ClearBits;
   BlockStack:=TPACCIntermediateRepresentationCodeBlockList.Create;
   try
 
@@ -4855,7 +4862,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
 
     if Temporary.Phi=0 then begin
 
-     u.ClearBits;
+     TemporaryBitSet.ClearBits;
      CodeType:=pirctNONE;
 
      Block:=StartBlock;
@@ -4874,8 +4881,8 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
        end;
        if (Instruction.To_.Kind=pircokTEMPORARY) and (Instruction.To_.Temporary=TemporaryIndex) then begin
         if Block.Out_.GetBit(TemporaryIndex) then begin
-         if not u.GetBit(Block.ID) then begin
-          u.SetBit(Block.ID,true);
+         if not TemporaryBitSet.GetBit(Block.ID) then begin
+          TemporaryBitSet.SetBit(Block.ID,true);
           BlockStack.Add(Block);
          end;
          if CodeTypeMerge(CodeType,Instruction.Type_) then begin
@@ -4897,13 +4904,13 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
       Block:=Block.Link;
      end;
 
-     Defs.Assign(u);
+     DefinedBlockBitSet.Assign(TemporaryBitSet);
 
      while BlockStack.Count>0 do begin
       Block:=BlockStack[BlockStack.Count-1];
       BlockStack.Delete(BlockStack.Count-1);
       Temporary.Visit:=TemporaryIndex;
-      u.SetBit(Block.ID,false);
+      TemporaryBitSet.SetBit(Block.ID,false);
       for Index:=0 to Block.Frontiers.Count-1 do begin
        Frontier:=Block.Frontiers[Index];
        if Frontier.Visit=0 then begin
@@ -4915,8 +4922,8 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
          Phi.To_:=CreateTemporaryOperand(TemporaryIndex);
          Phi.Link:=Frontier.Phi;
          Frontier.Phi:=Phi;
-         if not (Defs.GetBit(Frontier.ID) or u.GetBit(Frontier.ID)) then begin
-          u.SetBit(Frontier.ID,true);
+         if not (DefinedBlockBitSet.GetBit(Frontier.ID) or TemporaryBitSet.GetBit(Frontier.ID)) then begin
+          TemporaryBitSet.SetBit(Frontier.ID,true);
           BlockStack.Add(Frontier);
          end;
         end;
@@ -4932,8 +4939,8 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
 
 
   finally
-   u.Clear;
-   Defs.Clear;
+   TemporaryBitSet.Clear;
+   DefinedBlockBitSet.Clear;
    BlockStack.Free;
   end;
 
