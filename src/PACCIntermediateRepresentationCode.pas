@@ -4502,6 +4502,7 @@ begin
       Temporary.Type_:=Instruction.Type_;
      end;
      inc(Temporary.CountDefinitions);
+//   writeln(Temporary.CountDefinitions,' ',Instruction.To_.Temporary,' ',TPACCPtrUInt(Temporary.Variable));
     end else begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-25-14-01-0000',nil,true);
     end;
