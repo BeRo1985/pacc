@@ -445,6 +445,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Type_:TPACCIntermediateRepresentationCodeType;
        To_:TPACCIntermediateRepresentationCodeOperand;
        Operands:TPACCIntermediateRepresentationCodeOperands;
+       SourceLocation:TPACCSourceLocation;
      end;
 
      TPACCIntermediateRepresentationCodeInstructionList=class(TList)
@@ -1484,6 +1485,7 @@ begin
    Instruction.Operands[Index]:=AOperands[Index];
   end;
  end;
+ Instruction.SourceLocation:=SourceLocation;
  CreateNewBlockIfNeeded;
  CurrentBlock.AddInstruction(Instruction);
 end;
