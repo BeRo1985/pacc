@@ -4990,11 +4990,174 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
   end;
 
  end;
+ procedure Rename;
+ type PStackItem=^TStackItem;
+      TStackItem=record
+       Up:PStackItem;
+       Operand:TPACCIntermediateRepresentationCodeOperand;
+       Block:TPACCIntermediateRepresentationCodeBlock;
+      end;
+      TStackItems=array of PStackItem;
+ var StackItems:TStackItems;
+     LastStackItem:PStackItem;
+     AllocatedStackItems:TList;
+  procedure ProcessBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
+   function NewStackItem(const Operand:TPACCIntermediateRepresentationCodeOperand;const Up:PStackItem):PStackItem;
+   begin
+    result:=LastStackItem;
+    if assigned(result) then begin
+     LastStackItem:=result^.Up;
+    end else begin
+     GetMem(result,SizeOf(TStackItem));
+     FillChar(result^,SizeOf(TStackItem),#0);
+     AllocatedStackItems.Add(result);
+    end;
+    result^.Up:=Up;
+    result^.Operand:=Operand;
+    result^.Block:=Block;
+   end;
+   procedure FreeStackItem(const StackItem:PStackItem);
+   begin
+    StackItem^.Up:=LastStackItem;
+    LastStackItem:=StackItem;
+   end;
+   function GetStack(const TemporaryIndex:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
+   var StackItem,OldStackItem:PStackItem;
+   begin
+    StackItem:=StackItems[TemporaryIndex];
+    while assigned(StackItem) and not CompareDominance(StackItem^.Block,Block) do begin
+     OldStackItem:=StackItem;
+     StackItem:=StackItem^.Up;
+     FreeStackItem(OldStackItem);
+    end;
+    StackItems[TemporaryIndex]:=StackItem;
+   end;
+   procedure ProcessOperand(var Operand:TPACCIntermediateRepresentationCodeOperand);
+   var TemporaryIndex,LinkTemporaryIndex:TPACCInt32;
+   begin
+    if (Operand.Kind=pircokTEMPORARY) and (Temporaries[Operand.Temporary].Visit<>0) then begin
+     TemporaryIndex:=Operand.Temporary;
+     LinkTemporaryIndex:=CreateLinkTemporary(TemporaryIndex);
+     Temporaries[LinkTemporaryIndex].Visit:=TemporaryIndex;
+     StackItems[TemporaryIndex]:=NewStackItem(Operand,StackItems[TemporaryIndex]);
+     Operand.Temporary:=LinkTemporaryIndex;
+    end;
+   end;
+  var InstructionIndex,InstructionOperandIndex,TemporaryIndex,SuccessorIndex,Index:TPACCInt32;
+      Phi:TPACCIntermediateRepresentationCodePhi;
+      Instruction:TPACCIntermediateRepresentationCodeInstruction;
+      Temporary:TPACCIntermediateRepresentationCodeTemporary;
+      Successor:TPACCIntermediateRepresentationCodeBlock;
+      Successors:TPACCIntermediateRepresentationCodeBlockList;
+      AlreadySeenHashMap:TPACCPointerHashMap;
+  begin
+
+   Phi:=Block.Phi;
+   while assigned(Phi) do begin
+    ProcessOperand(Phi.To_);
+    Phi:=Phi.Link;
+   end;
+
+   for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+    Instruction:=Block.Instructions[InstructionIndex];
+    for InstructionOperandIndex:=0 to length(Instruction.Operands)-1 do begin
+     if Instruction.Operands[InstructionOperandIndex].Kind=pircokTEMPORARY then begin
+      TemporaryIndex:=Instruction.Operands[InstructionOperandIndex].Temporary;
+      Temporary:=Temporaries[TemporaryIndex];
+      if Temporary.Visit<>0 then begin
+       Instruction.Operands[InstructionOperandIndex]:=GetStack(TemporaryIndex);
+      end;
+     end;
+     ProcessOperand(Instruction.To_);
+    end;
+   end;
+
+   if Block.Jump.Operand.Kind=pircokTEMPORARY then begin
+    TemporaryIndex:=Block.Jump.Operand.Temporary;
+    Temporary:=Temporaries[TemporaryIndex];
+    if Temporary.Visit<>0 then begin
+     Block.Jump.Operand:=GetStack(TemporaryIndex);
+    end;
+   end;
+
+   Successors:=TPACCIntermediateRepresentationCodeBlockList.Create;
+   try
+    AlreadySeenHashMap:=TPACCPointerHashMap.Create;
+    try
+     for SuccessorIndex:=0 to Block.Successors.Count-1 do begin
+      Successor:=Block.Successors[SuccessorIndex];
+      if not assigned(AlreadySeenHashMap[Successor]) then begin
+       AlreadySeenHashMap[Successor]:=Successor;
+       Successors.Add(Successor);
+      end;
+     end;
+    finally
+     AlreadySeenHashMap.Free;
+    end;
+    for SuccessorIndex:=0 to Successors.Count-1 do begin
+     Successor:=Successors[SuccessorIndex];
+     Phi:=Successor.Phi;
+     while assigned(Phi) do begin
+      if Phi.To_.Kind=pircokTEMPORARY then begin
+       TemporaryIndex:=Phi.To_.Temporary;
+       Temporary:=Temporaries[TemporaryIndex];
+       if TemporaryIndex=Temporary.Visit then begin
+        Index:=Phi.CountOperands;
+        inc(Phi.CountOperands);
+        if length(Phi.Operands)<Phi.CountOperands then begin
+         SetLength(Phi.Operands,Phi.CountOperands*2);
+        end;
+        if length(Phi.Blocks)<Phi.CountOperands then begin
+         SetLength(Phi.Blocks,Phi.CountOperands*2);
+        end;
+        Phi.Operands[Index]:=GetStack(TemporaryIndex);
+        Phi.Blocks[Index]:=Block;
+       end;
+      end else begin
+       TPACCInstance(fInstance).AddError('Internal error 2017-01-27-23-38-0000',nil,true);
+      end;
+      Phi:=Phi.Link;
+     end;
+    end;
+   finally
+    Successors.Free;
+   end;
+
+   Successor:=Block.Dominance;
+   while assigned(Successor) do begin
+    ProcessBlock(Successor);
+    Successor:=Successor.DominanceLink;
+   end;
+
+  end;
+ var Index:TPACCInt32;
+ begin
+  StackItems:=nil;
+  try
+   SetLength(StackItems,Temporaries.Count);
+   if length(StackItems)>0 then begin
+    FillChar(StackItems[0],length(StackItems)*SizeOf(PStackItem),#0);
+   end;
+   LastStackItem:=nil;
+   AllocatedStackItems:=TList.Create;
+   try
+    ProcessBlock(StartBlock);
+   finally
+    for Index:=0 to AllocatedStackItems.Count-1 do begin
+     FreeMem(AllocatedStackItems[Index]);
+    end;
+    AllocatedStackItems.Free;
+   end;
+  finally
+   StackItems:=nil;
+  end;
+ end;
 begin
  FillDominators;
  FillDominanceFrontier;
  FillLive;
  FillMissingPhiInstructions;
+ Rename;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
