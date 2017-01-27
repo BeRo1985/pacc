@@ -704,6 +704,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        constructor Create(const AInstance:TObject); reintroduce;
        destructor Destroy; override;
 
+       procedure DumpTo(const AStringList:TStringList);
+
       published
 
        property Instance:TObject read fInstance;
@@ -853,6 +855,8 @@ const EmptyOperand:TPACCIntermediateRepresentationCodeOperand=
       CodeTypeBaseClass:array[TPACCIntermediateRepresentationCodeType] of TPACCInt32=(0,0,0,0,1,1);
 
       CodeTypeBaseWidth:array[TPACCIntermediateRepresentationCodeType] of TPACCInt32=(0,0,0,1,0,1);
+
+      CodeTypeChars:array[TPACCIntermediateRepresentationCodeType] of AnsiChar=('n','t','i','l','f','d');
 
 var OpcodeNames:array[TPACCIntermediateRepresentationCodeOpcode] of TPACCRawByteString;
     
@@ -5173,6 +5177,7 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
+var StringList:TStringList;
 begin
 
  FunctionDeclaration:=AFunctionNode;
@@ -5213,6 +5218,36 @@ begin
 
  PostProcess;
 
+ StringList:=TStringList.Create;
+ try
+  DumpTo(StringList);
+  writeln(StringList.Text);
+ finally
+  StringList.Free;
+ end;
+
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.DumpTo(const AStringList:TStringList);
+
+var s:TPACCRawByteString;
+begin
+
+ if assigned(FunctionDeclaration.Type_) and not ((tfStatic in FunctionDeclaration.Type_^.Flags) or (afInline in FunctionDeclaration.Type_^.Attribute.Flags)) then begin
+  s:='export ';
+ end else begin
+  s:='';
+ end;
+ s:=s+'function ';
+ if assigned(FunctionDeclaration.Type_) and
+    assigned(FunctionDeclaration.Type_^.ReturnType) and
+    (FunctionDeclaration.Type_^.ReturnType^.Kind<>tkVOID) then begin
+  s:=s+CodeTypeChars[DataTypeToCodeType(FunctionDeclaration.Type_^.ReturnType)]+' ';
+ end;
+ s:=s+'$'+FunctionName+'(';
+ s:=s+'){';
+ AStringList.Add(s);
+ AStringList.Add('}');
 end;
 
 constructor TPACCIntermediateRepresentationCodeFunctionList.Create;
