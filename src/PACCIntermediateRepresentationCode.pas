@@ -5177,7 +5177,9 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
-var StringList:TStringList;
+var Index:TPACCInt32;
+    Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+    StringList:TStringList;
 begin
 
  FunctionDeclaration:=AFunctionNode;
@@ -5194,21 +5196,23 @@ begin
 
  EmitLabel(NewHiddenLabel);
 
-{for Index:=0 to AFunctionNode.LocalVariables.Count-1 do begin
-
-  LocalVariable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(AFunctionNode.LocalVariables[Index]);
-  if assigned(LocalVariable) then begin
-
-   Reference:=GetVariableReference(LocalVariable);
-
-   ParameterIndex:=AFunctionNode.Parameters.IndexOf(LocalVariable);
-   if ParameterIndex>=0 then begin
-
+ if assigned(FunctionDeclaration.Parameters) then begin
+  for Index:=0 to FunctionDeclaration.Parameters.Count-1 do begin
+   Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(FunctionDeclaration.Parameters[Index]);
+   if assigned(Variable) then begin
+    CreateVariableTemporary(Variable);
    end;
-
   end;
+ end;
 
- end;}
+ if assigned(FunctionDeclaration.LocalVariables) then begin
+  for Index:=0 to FunctionDeclaration.LocalVariables.Count-1 do begin
+   Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(FunctionDeclaration.LocalVariables[Index]);
+   if assigned(Variable) then begin
+    CreateVariableTemporary(Variable);
+   end;
+  end;
+ end;
 
  EmitStatements(TPACCAbstractSyntaxTreeNodeStatements(AFunctionNode.Body));
 
@@ -5230,9 +5234,11 @@ end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.DumpTo(const AStringList:TStringList);
 
-var s:TPACCRawByteString;
+var Index:TPACCInt32;
+    s:TPACCRawByteString;
+    Parameter:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+    Temporary:TPACCIntermediateRepresentationCodeTemporary;
 begin
-
  if assigned(FunctionDeclaration.Type_) and not ((tfStatic in FunctionDeclaration.Type_^.Flags) or (afInline in FunctionDeclaration.Type_^.Attribute.Flags)) then begin
   s:='export ';
  end else begin
@@ -5245,6 +5251,20 @@ begin
   s:=s+CodeTypeChars[DataTypeToCodeType(FunctionDeclaration.Type_^.ReturnType)]+' ';
  end;
  s:=s+'$'+FunctionName+'(';
+ if assigned(FunctionDeclaration.Parameters) then begin
+  for Index:=0 to FunctionDeclaration.Parameters.Count-1 do begin
+   Parameter:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(FunctionDeclaration.Parameters[Index]);
+   if assigned(Parameter) then begin
+    Temporary:=VariableTemporaryHashMap[Parameter];
+    if assigned(Temporary) then begin
+     if Index>0 then begin
+      s:=s+', ';
+     end;
+     s:=s+CodeTypeChars[DataTypeToCodeType(Parameter.Type_)]+' %'+IntToStr(Temporary.Index)+'';
+    end;
+   end;
+  end;
+ end;
  s:=s+'){';
  AStringList.Add(s);
  AStringList.Add('}');
