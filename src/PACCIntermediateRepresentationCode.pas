@@ -859,6 +859,8 @@ const EmptyOperand:TPACCIntermediateRepresentationCodeOperand=
       CodeTypeChars:array[TPACCIntermediateRepresentationCodeType] of AnsiChar=('n','t','i','l','f','d');
 
 var OpcodeNames:array[TPACCIntermediateRepresentationCodeOpcode] of TPACCRawByteString;
+
+    JumpKindNames:array[TPACCIntermediateRepresentationCodeJumpKind] of TPACCRawByteString;
     
 procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const ARootAbstractSyntaxTreeNode:TPACCAbstractSyntaxTreeNode);
 
@@ -5231,11 +5233,13 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.DumpTo(const AStringList:TStringList);
+const AlignmentOpcode=20;
  procedure ProcessBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
- var InstructionIndex,OperandIndex:TPACCInt32;
+ var InstructionIndex,OperandIndex,SuccessorIndex:TPACCInt32;
      Instruction:TPACCIntermediateRepresentationCodeInstruction;
      Phi:TPACCIntermediateRepresentationCodePhi;
      Line:TPACCRawByteString;
+     Successor:TPACCIntermediateRepresentationCodeBlock;
   procedure ProcessOperand(const Operand:TPACCIntermediateRepresentationCodeOperand);
   begin
    case Operand.Kind of
@@ -5285,7 +5289,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.DumpTo(const AStringList:T
       TPACCInstance(fInstance).AddError('Internal error 2017-01-28-01-01-0000',nil,true);
      end;
     end;
-    while length(Line)<20 do begin
+    while length(Line)<AlignmentOpcode do begin
      Line:=Line+' ';
     end;
     Line:=Line+'phi';
@@ -5315,7 +5319,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.DumpTo(const AStringList:T
      end;
     end;
 
-    while length(Line)<20 do begin
+    while length(Line)<AlignmentOpcode do begin
      Line:=Line+' ';
     end;
 
@@ -5333,6 +5337,29 @@ procedure TPACCIntermediateRepresentationCodeFunction.DumpTo(const AStringList:T
     AStringList.Add(Line);
 
    end;
+
+   Line:='';
+   while length(Line)<AlignmentOpcode do begin
+    Line:=Line+' ';
+   end;
+   Line:=Line+JumpKindNames[Block.Jump.Kind];
+   if Block.Jump.Operand.Kind<>pircokNONE then begin
+    Line:=Line+' ';
+    ProcessOperand(Block.Jump.Operand);
+   end;
+   if Block.Successors.Count>0 then begin
+    Line:=Line+' => [';
+    for SuccessorIndex:=0 to Block.Successors.Count-1 do begin
+     Successor:=Block.Successors[SuccessorIndex];
+     Line:=Line+'@'+LowerCase(IntToHex(TPACCPtrUInt(Successor),SizeOf(TPACCPtrUInt) shl 1));
+     if (SuccessorIndex+1)<Block.Successors.Count then begin
+      Line:=Line+', ';
+     end;
+    end;
+    Line:=Line+']';
+   end;
+   AStringList.Add(Line);
+
   end;
  end;
 var Index:TPACCInt32;
@@ -6012,6 +6039,30 @@ begin
  OpcodeNames[pircoCOUNT]:='count';
 end;
 
+procedure InitializeJumpKindNames;
+begin
+ FillChar(JumpKindNames,SizeOf(JumpKindNames),#0);
+ JumpKindNames[pircjkNONE]:='none';
+ JumpKindNames[pircjkRET]:='ret';
+ JumpKindNames[pircjkRETI]:='reti';
+ JumpKindNames[pircjkRETL]:='retl';
+ JumpKindNames[pircjkRETF]:='retf';
+ JumpKindNames[pircjkRETD]:='retd';
+ JumpKindNames[pircjkJMP]:='jmp';
+ JumpKindNames[pircjkJMPA]:='jmpa';
+ JumpKindNames[pircjkJMPT]:='jmpt';
+ JumpKindNames[pircjkJZI]:='jzi';
+ JumpKindNames[pircjkJNZI]:='jnzi';
+ JumpKindNames[pircjkJZL]:='jzl';
+ JumpKindNames[pircjkJNZL]:='jnzl';
+ JumpKindNames[pircjkJZF]:='jzf';
+ JumpKindNames[pircjkJNZF]:='jnzf';
+ JumpKindNames[pircjkJZD]:='jzd';
+ JumpKindNames[pircjkJNZD]:='jnzd';
+ JumpKindNames[pircjkCOUNT]:='count';
+end;
+
 initialization
  InitializeOpcodeNames;
+ InitializeJumpKindNames;
 end.
