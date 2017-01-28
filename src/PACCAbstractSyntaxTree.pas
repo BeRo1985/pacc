@@ -167,6 +167,7 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
        InitializedBeforeUse:boolean;
        constructor Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation;const AVariableName:TPACCRawByteString;const ALocalOffset:TPACCInt); reintroduce;
        destructor Destroy; override;
+       function MustBeMemoryAccessed:boolean;
      end;
 
      TPACCAbstractSyntaxTreeNodeBinaryOperator=class(TPACCAbstractSyntaxTreeNode)
@@ -461,6 +462,11 @@ destructor TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Destroy;
 begin
  VariableName:='';
  inherited Destroy;
+end;
+
+function TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.MustBeMemoryAccessed:boolean;
+begin
+ result:=(Kind=astnkGVAR) or MustOnStack;
 end;
 
 constructor TPACCAbstractSyntaxTreeNodeBinaryOperator.Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation;const ALeft,ARight:TPACCAbstractSyntaxTreeNode);

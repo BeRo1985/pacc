@@ -5233,11 +5233,11 @@ begin
    Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(FunctionDeclaration.LocalVariables[Index]);
    if assigned(Variable) then begin
     Type_:=Variable.Type_;
-    if (Type_.Kind in (PACCIntermediateRepresentationCodeINTTypeKinds+
-                       PACCIntermediateRepresentationCodeLONGTypeKinds+
-                       PACCIntermediateRepresentationCodeFLOATTypeKinds+
-                       PACCIntermediateRepresentationCodeDOUBLETypeKinds+
-                       [tkPOINTER])) and not Variable.MustOnStack then begin
+    if Type_.Kind in (PACCIntermediateRepresentationCodeINTTypeKinds+
+                      PACCIntermediateRepresentationCodeLONGTypeKinds+
+                      PACCIntermediateRepresentationCodeFLOATTypeKinds+
+                      PACCIntermediateRepresentationCodeDOUBLETypeKinds+
+                      [tkPOINTER]) then begin
      if not Variable.InitializedBeforeUse then begin
       EmitStoreIntegerValueToVariable(Variable,0);
      end;
