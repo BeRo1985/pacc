@@ -616,6 +616,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
+       function DumpTemporaryBitSet(const BitSet:TPACCIntermediateRepresentationCodeBitSet):TPACCRawByteString;
+
       public
 
        FunctionDeclaration:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration;
@@ -4841,17 +4843,17 @@ var Phis:array of TPACCInt32;
 var Index,SubIndex,OtherIndex,TemporaryIndex:TPACCInt32;
     Block,Successor:TPACCIntermediateRepresentationCodeBlock;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
-    TemporaryBitSet0,TemporaryBitSet1:TPACCIntermediateRepresentationCodeBitSet;
+    TemporaryBitSetU,TemporaryBitSetV:TPACCIntermediateRepresentationCodeBitSet;
     Changed:boolean;
 begin
 
  Phis:=nil;
  try
 
-  TemporaryBitSet0.BitmapSize:=Temporaries.Count;
-  TemporaryBitSet1.BitmapSize:=Temporaries.Count;
-  TemporaryBitSet0.ClearBits;
-  TemporaryBitSet1.ClearBits;
+  TemporaryBitSetU.BitmapSize:=Temporaries.Count;
+  TemporaryBitSetV.BitmapSize:=Temporaries.Count;
+  TemporaryBitSetU.ClearBits;
+  TemporaryBitSetV.ClearBits;
 
   Block:=StartBlock;
   while assigned(Block) do begin
@@ -4871,17 +4873,17 @@ begin
 
    for Index:=CountBlocks-1 downto 0 do begin
     Block:=RPO[Index];
-    TemporaryBitSet0.Assign(Block.Out_);
+    TemporaryBitSetU.Assign(Block.Out_);
     for SubIndex:=0 to Block.Successors.Count-1 do begin
      Successor:=Block.Successors[SubIndex];
      if assigned(Successor) then begin
-      LiveOn(TemporaryBitSet1,Block,Successor);
-      Block.Out_.Union(TemporaryBitSet1);
+      LiveOn(TemporaryBitSetV,Block,Successor);
+      Block.Out_.Union(TemporaryBitSetV);
      end;
     end;
    end;
 
-   Changed:=Changed or not Block.Out_.EqualsTo(TemporaryBitSet0);
+   Changed:=Changed or not Block.Out_.EqualsTo(TemporaryBitSetU);
 
    FillChar(Phis[0],length(Phis)*SizeOf(TPACCInt32),#0);
    FillChar(CountLive[0],length(CountLive)*SizeOf(TPACCInt32),#0);
@@ -4960,9 +4962,22 @@ begin
    end;
   until false;
 
+{$ifdef IRDebug}
+  writeln('> Liveness analysis:');
+  Block:=StartBlock;
+  while assigned(Block) do begin
+   writeln('    b'+IntToStr(Block.Index)+':');
+   writeln('       in: '+DumpTemporaryBitSet(Block.In_));
+   writeln('      out: '+DumpTemporaryBitSet(Block.Out_));
+   writeln('      gen: '+DumpTemporaryBitSet(Block.Gen_));
+   writeln('      live: ',Block.CountLive[0],' ',Block.CountLive[1]);
+   Block:=Block.Link;
+  end;
+{$endif}
+
  finally
-  TemporaryBitSet0.Clear;
-  TemporaryBitSet1.Clear;
+  TemporaryBitSetU.Clear;
+  TemporaryBitSetV.Clear;
   Phis:=nil;
  end;
 
@@ -5497,6 +5512,17 @@ begin
 
  PostProcess;
 
+end;
+
+function TPACCIntermediateRepresentationCodeFunction.DumpTemporaryBitSet(const BitSet:TPACCIntermediateRepresentationCodeBitSet):TPACCRawByteString;
+var Index:TPACCInt32;
+begin
+ result:='[';
+ Index:=-1;
+ while BitSet.IterateToNextBit(Index) do begin
+  result:=result+' tmp('+IntToStr(Index)+')';
+ end;
+ result:=result+' ]';
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.DumpTo(const AStringList:TStringList);
