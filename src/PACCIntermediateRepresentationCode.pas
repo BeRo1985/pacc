@@ -5876,7 +5876,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.FillAlias;
    end;
   end;
  end;
-var Index,InstructionIndex:TPACCInt32;
+var Index,InstructionIndex,InstructionOperandIndex:TPACCInt32;
     Block:TPACCIntermediateRepresentationCodeBlock;
     Phi:TPACCIntermediateRepresentationCodePhi;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
@@ -5945,9 +5945,10 @@ begin
      Alias0.Free;
     end;
    end;
-   if ((Instruction.To_.Kind=pircokNONE) or (Alias.Kind=pircakUNKNOWN)) and
-      not (Instruction.Opcode in [pircoLDUCI..pircoLDD,pircoSTIC..pircoSTD]) then begin
-    Escape(Instruction.Operands[0]);
+   if ((Instruction.To_.Kind=pircokNONE) or (Alias.Kind=pircakUNKNOWN)) then begin
+    for InstructionOperandIndex:=IfThen(Instruction.Opcode in [pircoLDUCI..pircoLDD,pircoSTIC..pircoSTD],1,0) to length(Instruction.Operands)-1 do begin
+     Escape(Instruction.Operands[InstructionOperandIndex]);
+    end;
    end;
   end;
   Escape(Block.Jump.Operand);
@@ -5968,6 +5969,7 @@ begin
  FillUse;
  SSACheck;
  FillLoop;
+ FillAlias;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
