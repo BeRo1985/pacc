@@ -1604,18 +1604,44 @@ var CurrentState:TState;
     NextToken;
     Right:=TPACCInstance(Instance).TypeConversion(ParseAssignmentExpression);
     EnsureLValue(result);
-    Right:=BinaryOperation(Op,
-                           TPACCInstance(Instance).TypeConversion(TPACCAbstractSyntaxTreeNode.Create(TPACCInstance(Instance),astnkOP_ASSIGN_SRC,result.Type_,result.SourceLocation)),
-                           Right);
-    if TPACCInstance(Instance).IsArithmeticType(result.Type_) and (result.Type_.Kind<>Right.Type_.Kind) then begin
-     Right:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkCONV,result.Type_,Right.SourceLocation,Right);
-    end;
-    result:=TPACCAbstractSyntaxTreeNodeBinaryOperator.Create(TPACCInstance(Instance),
-                                                             astnkOP_ASSIGN_OP,
+    if result.Kind in [astnkLVAR,astnkGVAR] then begin
+     Right:=TPACCAbstractSyntaxTreeNodeBinaryOperator.Create(TPACCInstance(Instance),
+                                                             Op,
                                                              result.Type_,
                                                              result.SourceLocation,
                                                              result,
                                                              Right);
+     if TPACCInstance(Instance).IsArithmeticType(result.Type_) and (result.Type_.Kind<>Right.Type_.Kind) then begin
+      Right:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),
+                                                             astnkCONV,
+                                                             result.Type_,
+                                                             Right.SourceLocation,
+                                                             Right);
+     end;
+     result:=TPACCAbstractSyntaxTreeNodeBinaryOperator.Create(TPACCInstance(Instance),
+                                                              astnkOP_ASSIGN,
+                                                              result.Type_,
+                                                              result.SourceLocation,
+                                                              result,
+                                                              Right);
+    end else begin
+     Right:=BinaryOperation(Op,
+                            TPACCInstance(Instance).TypeConversion(TPACCAbstractSyntaxTreeNode.Create(TPACCInstance(Instance),astnkOP_ASSIGN_SRC,result.Type_,result.SourceLocation)),
+                            Right);
+     if TPACCInstance(Instance).IsArithmeticType(result.Type_) and (result.Type_.Kind<>Right.Type_.Kind) then begin
+      Right:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),
+                                                             astnkCONV,
+                                                             result.Type_,
+                                                             Right.SourceLocation,
+                                                             Right);
+     end;
+     result:=TPACCAbstractSyntaxTreeNodeBinaryOperator.Create(TPACCInstance(Instance),
+                                                              astnkOP_ASSIGN_OP,
+                                                              result.Type_,
+                                                              result.SourceLocation,
+                                                              result,
+                                                              Right);
+    end;
    end;
   end;
  end;
