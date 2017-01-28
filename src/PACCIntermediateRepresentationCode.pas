@@ -214,8 +214,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       (
        pircukNONE,
        pircukPHI,
-       pircukINS,
-       pircukJMP
+       pircukINSTRUCTION,
+       pircukJUMP
       );
 
      PPPACCIntermediateRepresentationCodePhi=^PPACCIntermediateRepresentationCodePhi;
@@ -230,10 +230,10 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircukPHI:(
         Phi:TPACCIntermediateRepresentationCodePhi;
        );
-       pircukINS:(
+       pircukINSTRUCTION:(
         Instruction:TPACCIntermediateRepresentationCodeInstruction;
        );
-       pircukJMP:(
+       pircukJUMP:(
        );
      end;
 
@@ -4504,7 +4504,7 @@ begin
      Use:=TPACCIntermediateRepresentationCodeUse.Create;
      TPACCInstance(fInstance).AllocatedObjects.Add(Use);
      Temporary.Uses_.Add(Use);
-     Use.Kind:=pircukINS;
+     Use.Kind:=pircukINSTRUCTION;
      Use.BlockID:=Block.ID;
      Use.By.Instruction:=Instruction;
     end;
@@ -4515,7 +4515,7 @@ begin
     Use:=TPACCIntermediateRepresentationCodeUse.Create;
     TPACCInstance(fInstance).AllocatedObjects.Add(Use);
     Temporary.Uses_.Add(Use);
-    Use.Kind:=pircukJMP;
+    Use.Kind:=pircukJUMP;
     Use.BlockID:=Block.ID;
    end;
 
@@ -4553,7 +4553,7 @@ begin
       CodeType:=pirctNONE;
       for UseIndex:=0 to Temporary.Uses_.Count-1 do begin
        Use:=Temporary.Uses_[UseIndex];
-       if assigned(Use) and (Use.Kind=pircukINS) then begin
+       if assigned(Use) and (Use.Kind=pircukINSTRUCTION) then begin
         ByInstruction:=Use.By.Instruction;
         if assigned(ByInstruction) then begin
          case ByInstruction.Opcode of
@@ -4678,7 +4678,7 @@ begin
        dec(Temporary.CountDefinitions);
        for UseIndex:=Temporary.Uses_.Count-1 downto 0 do begin
         Use:=Temporary.Uses_[UseIndex];
-        if assigned(Use) and (Use.Kind=pircukINS) then begin
+        if assigned(Use) and (Use.Kind=pircukINSTRUCTION) then begin
          ByInstruction:=Use.By.Instruction;
          if assigned(ByInstruction) then begin
           case ByInstruction.Opcode of
@@ -5469,12 +5469,13 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSACheck;
    end;
   end;
  end;
-var TemporaryIndex,UseIndex:TPACCInt32;
+var TemporaryIndex,UseIndex,InstructionIndex:TPACCInt32;
     Temporary:TPACCIntermediateRepresentationCodeTemporary;
     Block,UseInBlock:TPACCIntermediateRepresentationCodeBlock;
     Phi:TPACCIntermediateRepresentationCodePhi;
     Operand:TPACCIntermediateRepresentationCodeOperand;
     Use:TPACCIntermediateRepresentationCodeUse;
+    Instruction:TPACCIntermediateRepresentationCodeInstruction;
  procedure Error;
  begin
   if Temporary.Visit<>0 then begin
@@ -5520,9 +5521,33 @@ begin
    end;
    Phi:=Phi.Link;
   end;
+  for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+   Instruction:=Block.Instructions[InstructionIndex];
+   if Instruction.To_.Kind=pircokTEMPORARY then begin
+    Operand:=Instruction.To_;
+    TemporaryIndex:=Operand.Temporary;
+    Temporary:=Temporaries[TemporaryIndex];
+    for UseIndex:=0 to Temporary.Uses_.Count-1 do begin
+     Use:=Temporary.Uses_[UseIndex];
+     UseInBlock:=RPO[Use.BlockID];
+     if Use.Kind=pircukPHI then begin
+      if PhiCheck(Use.By.Phi,Block,Operand) then begin
+       Error;
+      end;
+     end else begin
+      if Block=UseInBlock then begin
+       if (Use.Kind=pircukINSTRUCTION) and (Block.Instructions.IndexOf(Use.By.Instruction)<=InstructionIndex) then begin
+        Error;
+       end;
+      end else if not CompareSDominance(Block,UseInBlock) then begin
+       Error;
+      end;
+     end;
+    end;
+   end;
+  end;
   Block:=Block.Link;
  end;
- 
   
 end;
 
