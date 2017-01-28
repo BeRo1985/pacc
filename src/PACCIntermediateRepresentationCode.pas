@@ -5274,15 +5274,15 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
      result:=CreateIntegerValueOperand(0);
     end;
    end;
-   procedure ProcessOperand(var Operand:TPACCIntermediateRepresentationCodeOperand);
+   procedure ProcessDefinition(var Operand:TPACCIntermediateRepresentationCodeOperand);
    var TemporaryIndex,LinkTemporaryIndex:TPACCInt32;
    begin
     if (Operand.Kind=pircokTEMPORARY) and (Temporaries[Operand.Temporary].Visit<>0) then begin
      TemporaryIndex:=Operand.Temporary;
      LinkTemporaryIndex:=CreateLinkTemporary(TemporaryIndex);
      Temporaries[LinkTemporaryIndex].Visit:=TemporaryIndex;
+     Operand:=CreateTemporaryOperand(LinkTemporaryIndex);
      StackItems[TemporaryIndex]:=NewStackItem(Operand,StackItems[TemporaryIndex]);
-     Operand.Temporary:=LinkTemporaryIndex;
     end;
    end;
   var InstructionIndex,InstructionOperandIndex,TemporaryIndex,SuccessorIndex,Index:TPACCInt32;
@@ -5296,7 +5296,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
 
    Phi:=Block.Phi;
    while assigned(Phi) do begin
-    ProcessOperand(Phi.To_);
+    ProcessDefinition(Phi.To_);
     Phi:=Phi.Link;
    end;
 
@@ -5310,7 +5310,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
        Instruction.Operands[InstructionOperandIndex]:=GetStack(TemporaryIndex);
       end;
      end;
-     ProcessOperand(Instruction.To_);
+     ProcessDefinition(Instruction.To_);
     end;
    end;
 
