@@ -28,7 +28,6 @@ uses
   PACCParser in 'PACCParser.pas',
   PACCAnalyzer in 'PACCAnalyzer.pas',
   PACCHighLevelOptimizer in 'PACCHighLevelOptimizer.pas',
-  PACCControlFlowGraph in 'PACCControlFlowGraph.pas',
   PACCLinker in 'PACCLinker.pas',
   PACCLinker_COFF_PE in 'PACCLinker_COFF_PE.pas',
   PACCLinker_COFF_PE_LCIDToCodePageLookUpTable in 'PACCLinker_COFF_PE_LCIDToCodePageLookUpTable.pas',
@@ -204,14 +203,6 @@ begin
       OutputLock.Release;
      end;
      GenerateIntermediateRepresentationCode(Instance,Instance.Parser.Root);
-
-     OutputLock.Acquire;
-     try
-      writeln('Generating control flow graphs for ',ExtractFileName(InputFileName),' . . .');
-     finally
-      OutputLock.Release;
-     end;
-     GenerateControlFlowGraphs(Instance,Instance.Parser.Root);
 
      OutputLock.Acquire;
      try

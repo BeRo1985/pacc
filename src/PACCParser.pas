@@ -19,7 +19,7 @@ type TPACCParser=class
 
 implementation
 
-uses PACCSort,PACCInstance,PACCTarget,PACCControlFlowGraph;
+uses PACCSort,PACCInstance,PACCTarget;
 
 var StaticCounter:TPasMPInt32=0;
     TempVariableCounter:TPasMPInt32=0;
