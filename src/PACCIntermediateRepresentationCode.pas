@@ -4352,8 +4352,8 @@ begin
     end else begin
      dec(Block.ID,Count);
      CountRPO:=Max(CountRPO,Block.ID+1);
-     if length(RPO)<=Block.ID then begin
-      SetLength(RPO,(Block.ID+1)*2);
+     if length(RPO)<CountRPO then begin
+      SetLength(RPO,CountRPO*2);
      end;
      RPO[Block.ID]:=Block;
      Phi:=@Block.link;
@@ -5009,20 +5009,20 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
   var TemporaryBlock:TPACCIntermediateRepresentationCodeBlock;
   begin
    if assigned(Block) then begin
-    while Block<>OtherBlock do begin
-     if Block.ID<OtherBlock.ID then begin
-      TemporaryBlock:=Block;
-      Block:=OtherBlock;
+    result:=Block;
+    while result<>OtherBlock do begin
+     if result.ID<OtherBlock.ID then begin
+      TemporaryBlock:=result;
+      result:=OtherBlock;
       OtherBlock:=TemporaryBlock;
      end;
-     while Block.ID>OtherBlock.ID do begin
-      Block:=Block.InterDominance;
-      if not assigned(Block) then begin
+     while result.ID>OtherBlock.ID do begin
+      result:=result.InterDominance;
+      if not assigned(result) then begin
        TPACCInstance(fInstance).AddError('Internal error 2017-01-25-15-06-0000',nil,true);
       end;
      end;
     end;
-    result:=Block;
    end else begin
     result:=OtherBlock;
    end;
