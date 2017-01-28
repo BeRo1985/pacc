@@ -864,7 +864,7 @@ procedure GenerateIntermediateRepresentationCode(const AInstance:TObject;const A
 
 implementation
 
-uses PACCInstance,PACCSort;
+uses PACCInstance,PACCSort,PasDblStrUtils;
 
 constructor TPACCIntermediateRepresentationCodeUseList.Create;
 begin
@@ -1169,8 +1169,6 @@ end;
 
 destructor TPACCIntermediateRepresentationCodeBlock.Destroy;
 begin
-
- FreeAndNil(Phi);
 
  FreeAndNil(Instructions);
 
@@ -5233,24 +5231,129 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.DumpTo(const AStringList:TStringList);
+ procedure ProcessBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
+ var InstructionIndex,OperandIndex:TPACCInt32;
+     Instruction:TPACCIntermediateRepresentationCodeInstruction;
+     Phi:TPACCIntermediateRepresentationCodePhi;
+     Line:TPACCRawByteString;
+  procedure ProcessOperand(const Operand:TPACCIntermediateRepresentationCodeOperand);
+  begin
+   case Operand.Kind of
+    pircokNONE:begin
+    end;
+    pircokTEMPORARY:begin
+     Line:=Line+'tmp('+IntToStr(Operand.Temporary)+')';
+    end;
+    pircokCALL:begin
+     Assert(false);
+    end;
+    pircokINTEGER:begin
+     Line:=Line+'integer('+IntToStr(Operand.IntegerValue)+')';
+    end;
+    pircokFLOAT:begin
+     Line:=Line+'float('+ConvertDoubleToString(Operand.FloatValue,omStandard)+')';
+    end;
+    pircokVARIABLE:begin
+     Line:=Line+'variable('+Operand.Variable.VariableName+')';
+    end;
+    pircokLABEL:begin
+     Line:=Line+'label('+LowerCase(IntToHex(TPACCPtrUInt(Operand.Label_),SizeOf(TPACCPtrUInt) shl 1))+')';
+    end;
+    pircokFUNCTION:begin
+     Assert(false);
+    end;
+    else begin
+//       TPACCInstance(fInstance).AddError('Internal error 2017-01-28-00-38-0000',@Instruction.SourceLocation,true);
+    end;
+   end
+  end;
+ begin
+  if assigned(Block) then begin
 
+   AStringList.Add('  @'+LowerCase(IntToHex(TPACCPtrUInt(Block),SizeOf(TPACCPtrUInt) shl 1))+':');
+
+   Phi:=Block.Phi;
+   if assigned(Phi) then begin
+    Line:='    ';
+    case Phi.To_.Kind of
+     pircokNONE:begin
+     end;
+     pircokTEMPORARY:begin
+      Line:=Line+'tmp('+IntToStr(Phi.To_.Temporary)+') ='+CodeTypeChars[Phi.Type_]+' ';
+     end;
+     else begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-28-01-01-0000',nil,true);
+     end;
+    end;
+    while length(Line)<20 do begin
+     Line:=Line+' ';
+    end;
+    Line:=Line+'phi';
+    for OperandIndex:=0 to Phi.CountOperands-1 do begin
+     if OperandIndex=0 then begin
+      Line:=Line+' ';
+     end else begin
+      Line:=Line+', ';
+     end;
+     Line:=Line+'@'+LowerCase(IntToHex(TPACCPtrUInt(Phi.Blocks[OperandIndex]),SizeOf(TPACCPtrUInt) shl 1))+' ';
+     ProcessOperand(Phi.Operands[OperandIndex]);
+    end;
+    AStringList.Add(Line);
+   end;
+
+   for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+    Instruction:=Block.Instructions[InstructionIndex];
+    Line:='    ';
+    case Instruction.To_.Kind of
+     pircokNONE:begin
+     end;
+     pircokTEMPORARY:begin
+      Line:=Line+'tmp('+IntToStr(Instruction.To_.Temporary)+') ='+CodeTypeChars[Instruction.Type_]+' ';
+     end;
+     else begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-28-00-38-0000',@Instruction.SourceLocation,true);
+     end;
+    end;
+
+    while length(Line)<20 do begin
+     Line:=Line+' ';
+    end;
+
+    Line:=Line+OpcodeNames[Instruction.Opcode];
+
+    for OperandIndex:=0 to length(Instruction.Operands)-1 do begin
+     if OperandIndex=0 then begin
+      Line:=Line+' ';
+     end else begin
+      Line:=Line+', ';
+     end;
+     ProcessOperand(Instruction.Operands[OperandIndex]);
+    end;
+
+    AStringList.Add(Line);
+
+   end;
+  end;
+ end;
 var Index:TPACCInt32;
-    s:TPACCRawByteString;
+    Line:TPACCRawByteString;
     Parameter:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
     Temporary:TPACCIntermediateRepresentationCodeTemporary;
-begin
+    Block:TPACCIntermediateRepresentationCodeBlock;
+begin                                         
+
  if assigned(FunctionDeclaration.Type_) and not ((tfStatic in FunctionDeclaration.Type_^.Flags) or (afInline in FunctionDeclaration.Type_^.Attribute.Flags)) then begin
-  s:='export ';
+  Line:='export ';
  end else begin
-  s:='';
+  Line:='';
  end;
- s:=s+'function ';
+ Line:=Line+'function ';
  if assigned(FunctionDeclaration.Type_) and
     assigned(FunctionDeclaration.Type_^.ReturnType) and
     (FunctionDeclaration.Type_^.ReturnType^.Kind<>tkVOID) then begin
-  s:=s+CodeTypeChars[DataTypeToCodeType(FunctionDeclaration.Type_^.ReturnType)]+' ';
+  Line:=Line+CodeTypeChars[DataTypeToCodeType(FunctionDeclaration.Type_^.ReturnType)]+' ';
  end;
- s:=s+'$'+FunctionName+'(';
+ Line:=Line+'$'+FunctionName+'(';
  if assigned(FunctionDeclaration.Parameters) then begin
   for Index:=0 to FunctionDeclaration.Parameters.Count-1 do begin
    Parameter:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(FunctionDeclaration.Parameters[Index]);
@@ -5258,15 +5361,22 @@ begin
     Temporary:=VariableTemporaryHashMap[Parameter];
     if assigned(Temporary) then begin
      if Index>0 then begin
-      s:=s+', ';
+      Line:=Line+', ';
      end;
-     s:=s+CodeTypeChars[DataTypeToCodeType(Parameter.Type_)]+' %'+IntToStr(Temporary.Index)+'';
+     Line:=Line+CodeTypeChars[DataTypeToCodeType(Parameter.Type_)]+' tmp('+IntToStr(Temporary.Index)+')';
     end;
    end;
   end;
  end;
- s:=s+'){';
- AStringList.Add(s);
+ Line:=Line+'){';
+ AStringList.Add(Line);
+
+ Block:=StartBlock;
+ while assigned(Block) do begin
+  ProcessBlock(Block);
+  Block:=Block.Link;
+ end;
+
  AStringList.Add('}');
 end;
 

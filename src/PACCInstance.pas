@@ -179,7 +179,7 @@ begin
  TokenSymbolStringHashMap.Free;
 
  IntermediateRepresentationCode.Free;
- 
+
  Linker.Free;
 
  HighLevelOptimizer.Free;
