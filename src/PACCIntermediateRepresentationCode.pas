@@ -4388,24 +4388,7 @@ begin
     Successor:=Block.Successors[Index];
     if assigned(Successor) and not assigned(AlreadySeenHashMap[Successor]) then begin
      AlreadySeenHashMap[Successor]:=Successor;
-     Successor.Predecessors.Add(nil);
-    end;
-   end;
-  finally
-   AlreadySeenHashMap.Free;
-  end;
-  Block:=Block.Link;
- end;
-
- Block:=StartBlock;
- while assigned(Block) do begin
-  AlreadySeenHashMap:=TPACCPointerHashMap.Create;
-  try
-   for Index:=0 to Block.Successors.Count-1 do begin
-    Successor:=Block.Successors[Index];
-    if assigned(Successor) and not assigned(AlreadySeenHashMap[Successor]) then begin
-     AlreadySeenHashMap[Successor]:=Successor;
-     Successor.Predecessors[Successor.Visit]:=Block;
+     Successor.Predecessors.Add(Block);
      inc(Successor.Visit);
     end;
    end;
