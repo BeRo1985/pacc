@@ -5191,7 +5191,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
      while BlockStack.Count>0 do begin
       Block:=BlockStack[BlockStack.Count-1];
       BlockStack.Delete(BlockStack.Count-1);
-      Temporary.Visit:=TemporaryIndex;
+      Temporary.Visit:=TemporaryIndex+1;
       TemporaryBitSet.SetBit(Block.ID,false);
       for Index:=0 to Block.Frontiers.Count-1 do begin
        Frontier:=Block.Frontiers[Index];
@@ -5217,8 +5217,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
 
     end;
 
-   end;
-
+   end;    
 
   finally
    TemporaryBitSet.Clear;
@@ -5280,7 +5279,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
     if (Operand.Kind=pircokTEMPORARY) and (Temporaries[Operand.Temporary].Visit<>0) then begin
      TemporaryIndex:=Operand.Temporary;
      LinkTemporaryIndex:=CreateLinkTemporary(TemporaryIndex);
-     Temporaries[LinkTemporaryIndex].Visit:=TemporaryIndex;
+     Temporaries[LinkTemporaryIndex].Visit:=TemporaryIndex+1;
      Operand:=CreateTemporaryOperand(LinkTemporaryIndex);
      StackItems[TemporaryIndex]:=NewStackItem(Operand,StackItems[TemporaryIndex]);
     end;
@@ -5290,7 +5289,6 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
       Instruction:TPACCIntermediateRepresentationCodeInstruction;
       Temporary:TPACCIntermediateRepresentationCodeTemporary;
       Successor:TPACCIntermediateRepresentationCodeBlock;
-      Successors:TPACCIntermediateRepresentationCodeBlockList;
       AlreadySeenHashMap:TPACCPointerHashMap;
   begin
 
@@ -5322,47 +5320,38 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
     end;
    end;
 
-   Successors:=TPACCIntermediateRepresentationCodeBlockList.Create;
+   AlreadySeenHashMap:=TPACCPointerHashMap.Create;
    try
-    AlreadySeenHashMap:=TPACCPointerHashMap.Create;
-    try
-     for SuccessorIndex:=0 to Block.Successors.Count-1 do begin
-      Successor:=Block.Successors[SuccessorIndex];
-      if not assigned(AlreadySeenHashMap[Successor]) then begin
-       AlreadySeenHashMap[Successor]:=Successor;
-       Successors.Add(Successor);
-      end;
-     end;
-    finally
-     AlreadySeenHashMap.Free;
-    end;
-    for SuccessorIndex:=0 to Successors.Count-1 do begin
-     Successor:=Successors[SuccessorIndex];
-     Phi:=Successor.Phi;
-     while assigned(Phi) do begin
-      if Phi.To_.Kind=pircokTEMPORARY then begin
-       TemporaryIndex:=Phi.To_.Temporary;
-       Temporary:=Temporaries[TemporaryIndex];
-       if TemporaryIndex=Temporary.Visit then begin
-        Index:=Phi.CountOperands;
-        inc(Phi.CountOperands);
-        if length(Phi.Operands)<Phi.CountOperands then begin
-         SetLength(Phi.Operands,Phi.CountOperands*2);
+    for SuccessorIndex:=0 to Block.Successors.Count-1 do begin
+     Successor:=Block.Successors[SuccessorIndex];
+     if not assigned(AlreadySeenHashMap[Successor]) then begin
+      AlreadySeenHashMap[Successor]:=Successor;
+      Phi:=Successor.Phi;
+      while assigned(Phi) do begin
+       if Phi.To_.Kind=pircokTEMPORARY then begin
+        TemporaryIndex:=Phi.To_.Temporary;
+        Temporary:=Temporaries[TemporaryIndex];
+        if (TemporaryIndex+1)=Temporary.Visit then begin
+         Index:=Phi.CountOperands;
+         inc(Phi.CountOperands);
+         if length(Phi.Operands)<Phi.CountOperands then begin
+          SetLength(Phi.Operands,Phi.CountOperands*2);
+         end;
+         if length(Phi.Blocks)<Phi.CountOperands then begin
+          SetLength(Phi.Blocks,Phi.CountOperands*2);
+         end;
+         Phi.Operands[Index]:=GetStack(TemporaryIndex);
+         Phi.Blocks[Index]:=Block;
         end;
-        if length(Phi.Blocks)<Phi.CountOperands then begin
-         SetLength(Phi.Blocks,Phi.CountOperands*2);
-        end;
-        Phi.Operands[Index]:=GetStack(TemporaryIndex);
-        Phi.Blocks[Index]:=Block;
+       end else begin
+        TPACCInstance(fInstance).AddError('Internal error 2017-01-27-23-38-0000',nil,true);
        end;
-      end else begin
-       TPACCInstance(fInstance).AddError('Internal error 2017-01-27-23-38-0000',nil,true);
+       Phi:=Phi.Link;
       end;
-      Phi:=Phi.Link;
      end;
     end;
    finally
-    Successors.Free;
+    AlreadySeenHashMap.Free;
    end;
 
    Successor:=Block.Dominance;
