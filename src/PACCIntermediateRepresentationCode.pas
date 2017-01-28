@@ -116,7 +116,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircoLDSIL, // Load from signed int to long
        pircoLDSLL, // Load from signed long to long
        pircoLDF, // Load from float to float
-       pircoLDD, // Load from double to double
+       pircoLDD, // Load from float to double
 
        pircoSTIC, // Store from int to char
        pircoSTIS, // Store from int to short
@@ -126,7 +126,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircoSTLI, // Store from long to int
        pircoSTLL, // Store from long to long
        pircoSTF,  // Store from float to float
-       pircoSTD,  // Store from double to double
+       pircoSTD,  // Store from float to double
 
        pircoNEG, // Negation int
        pircoADD, // Addition int
@@ -4510,8 +4510,38 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.MemoryOptimization;
+var InstructionIndex,TemporaryIndex,UseIndex,Size:TPACCInt32;
+    Block:TPACCIntermediateRepresentationCodeBlock;
+    Instruction,ByInstruction:TPACCIntermediateRepresentationCodeInstruction;
+    Temporary:TPACCIntermediateRepresentationCodeTemporary;
+    CodeType:TPACCIntermediateRepresentationCodeType;
+    Use:TPACCIntermediateRepresentationCodeUse;
 begin
+ Block:=StartBlock;
+ if assigned(Block) then begin
+  for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+   Instruction:=Block.Instructions[InstructionIndex];
+   if Instruction.Opcode=pircoALLOC then begin
+    if Instruction.To_.Kind=pircokTEMPORARY then begin
+     TemporaryIndex:=Instruction.To_.Temporary;
+     Temporary:=Temporaries[TemporaryIndex];
+     if Temporary.CountDefinitions=1 then begin
+      for UseIndex:=0 to Temporary.Uses_.Count-1 do begin
+       Use:=Temporary.Uses_[UseIndex];
+       if assigned(Use) and (Use.Kind=pircukINS) then begin
+        ByInstruction:=Use.By.Instruction;
+        if assigned(ByInstruction) then begin
 
+        end;
+       end;
+      end;
+     end;
+    end else begin
+     TPACCInstance(fInstance).AddError('Internal error 2017-01-28-13-03-0000',@Instruction.SourceLocation,true);
+    end;
+   end;
+  end;
+ end;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.LiveOn(var BitSet:TPACCIntermediateRepresentationCodeBitSet;const Block,Successor:TPACCIntermediateRepresentationCodeBlock);
@@ -5182,15 +5212,7 @@ begin
    Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(FunctionDeclaration.LocalVariables[Index]);
    if assigned(Variable) then begin
     Type_:=Variable.Type_;
-    if Type_.Kind in (PACCIntermediateRepresentationCodeINTTypeKinds+
-                      PACCIntermediateRepresentationCodeLONGTypeKinds+
-                      PACCIntermediateRepresentationCodeFLOATTypeKinds+
-                      PACCIntermediateRepresentationCodeDOUBLETypeKinds+
-                      [tkPOINTER]) then begin
-     if not Variable.InitializedBeforeUse then begin
-      EmitStoreIntegerValueToVariable(Variable,0);
-     end;
-    end else begin
+    begin
      Alignment:=Variable.Type_^.Alignment;
      Size:=1;
      case Type_^.Kind of
@@ -5213,6 +5235,15 @@ begin
       end;
      end;
      EmitInstruction(pircoALLOC,DataTypeToCodeType(Type_),CreateTemporaryOperand(CreateVariableTemporary(Variable)),[CreateIntegerValueOperand(Size),CreateIntegerValueOperand(Alignment)],AFunctionNode.SourceLocation);
+    end;
+    if Type_.Kind in (PACCIntermediateRepresentationCodeINTTypeKinds+
+                      PACCIntermediateRepresentationCodeLONGTypeKinds+
+                      PACCIntermediateRepresentationCodeFLOATTypeKinds+
+                      PACCIntermediateRepresentationCodeDOUBLETypeKinds+
+                      [tkPOINTER]) then begin
+     if not Variable.InitializedBeforeUse then begin
+      EmitStoreIntegerValueToVariable(Variable,0);
+     end;
     end;
    end;
   end;
