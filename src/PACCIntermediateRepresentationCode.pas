@@ -4525,7 +4525,11 @@ begin
      Skip:=false;
      TemporaryIndex:=Instruction.To_.Temporary;
      Temporary:=Temporaries[TemporaryIndex];
-     if Temporary.CountDefinitions=1 then begin
+     if (Temporary.Kind=pirctkVARIABLE) and
+        ((afVolatile in Temporary.Variable.Type_^.Attribute.Flags) or
+         (afRestrict in Temporary.Variable.Type_^.Attribute.Flags)) then begin
+      continue;
+     end else if Temporary.CountDefinitions=1 then begin
       Size:=-1;
       CodeType:=pirctNONE;
       for UseIndex:=0 to Temporary.Uses_.Count-1 do begin
@@ -5391,7 +5395,7 @@ begin
  FillPredecessors;
  FillUse;
  MemoryOptimization;
- SSA;
+// SSA;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
