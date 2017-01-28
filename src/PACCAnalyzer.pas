@@ -309,6 +309,9 @@ var FunctionUsedVariablesHashMap:TPACCPointerHashMap;
            (TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).Index<length(FunctionUninitializedAccessVariables)) then begin
          if FunctionUninitializedAccessVariables[TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).Index] then begin
           AddWarning('Read access to potentially non-initialized variable "'+TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).VariableName+'"',@SubNode.SourceLocation);
+         TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).InitializedBeforeUse:=false;
+         end else begin
+          TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(SubNode).InitializedBeforeUse:=true;
          end;
         end;
        end;

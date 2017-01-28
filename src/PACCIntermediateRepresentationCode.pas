@@ -5233,14 +5233,14 @@ begin
    Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(FunctionDeclaration.LocalVariables[Index]);
    if assigned(Variable) then begin
     Type_:=Variable.Type_;
-    if Type_.Kind in (PACCIntermediateRepresentationCodeINTTypeKinds+
-                      PACCIntermediateRepresentationCodeLONGTypeKinds+
-                      PACCIntermediateRepresentationCodeFLOATTypeKinds+
-                      PACCIntermediateRepresentationCodeDOUBLETypeKinds+
-                      [tkPOINTER]) then begin
-     Alignment:=Variable.Type_^.Alignment;
-     Size:=1;
-     EmitInstruction(pircoLVAR,DataTypeToCodeType(Type_),CreateTemporaryOperand(CreateVariableTemporary(Variable)),[CreateIntegerValueOperand(Size),CreateIntegerValueOperand(Alignment)],AFunctionNode.SourceLocation);
+    if (Type_.Kind in (PACCIntermediateRepresentationCodeINTTypeKinds+
+                       PACCIntermediateRepresentationCodeLONGTypeKinds+
+                       PACCIntermediateRepresentationCodeFLOATTypeKinds+
+                       PACCIntermediateRepresentationCodeDOUBLETypeKinds+
+                       [tkPOINTER])) and not Variable.MustOnStack then begin
+     if not Variable.InitializedBeforeUse then begin
+      EmitStoreIntegerValueToVariable(Variable,0);
+     end;
     end else begin
      Alignment:=Variable.Type_^.Alignment;
      Size:=1;
