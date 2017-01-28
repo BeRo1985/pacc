@@ -4526,12 +4526,20 @@ begin
      TemporaryIndex:=Instruction.To_.Temporary;
      Temporary:=Temporaries[TemporaryIndex];
      if Temporary.CountDefinitions=1 then begin
+      Size:=-1;
+      CodeType:=pirctNONE;
       for UseIndex:=0 to Temporary.Uses_.Count-1 do begin
        Use:=Temporary.Uses_[UseIndex];
        if assigned(Use) and (Use.Kind=pircukINS) then begin
         ByInstruction:=Use.By.Instruction;
         if assigned(ByInstruction) then begin
-
+         case ByInstruction.Opcode of
+          pircoLDUCI..pircoLDD:begin
+           
+          end;
+          pircoSTIC..pircoSTD:begin
+          end;
+         end;
         end;
        end;
       end;
