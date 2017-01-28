@@ -5381,8 +5381,31 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
    StackItems:=nil;
   end;
  end;
+{$ifdef IRDebug}
+ procedure DebugPrintDominators;
+ var Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock;
+ begin
+  writeln('> Dominators:');
+  Block:=StartBlock;
+  while assigned(Block) do begin
+   OtherBlock:=Block.Dominance;
+   if assigned(OtherBlock) then begin
+    write('    b'+IntToStr(Block.Index)+' :');
+    while assigned(OtherBlock) do begin
+     write(' b'+IntToStr(OtherBlock.Index));
+     OtherBlock:=OtherBlock.DominanceLink;
+    end;
+    writeln;
+   end;
+   Block:=Block.Link;
+  end;
+ end;
+{$endif}
 begin
  FillDominators;
+{$ifdef IRDebug}
+ DebugPrintDominators;
+{$endif}
  FillDominanceFrontier;
  FillLive;
  FillMissingPhiInstructions;
@@ -5395,7 +5418,7 @@ begin
  FillPredecessors;
  FillUse;
  MemoryOptimization;
-// SSA;
+ SSA;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
@@ -5530,7 +5553,7 @@ const AlignmentOpcode=20;
  begin
   if assigned(Block) then begin
 
-   AStringList.Add('  @'+LowerCase(IntToHex(TPACCPtrUInt(Block),SizeOf(TPACCPtrUInt) shl 1))+':');
+   AStringList.Add('  @b'+IntToStr(Block.Index)+':');
 
    Phi:=Block.Phi;
    if assigned(Phi) then begin
@@ -5555,7 +5578,7 @@ const AlignmentOpcode=20;
      end else begin
       Line:=Line+', ';
      end;
-     Line:=Line+'@'+LowerCase(IntToHex(TPACCPtrUInt(Phi.Blocks[OperandIndex]),SizeOf(TPACCPtrUInt) shl 1))+' ';
+     Line:=Line+'@b'+IntToStr(Phi.Blocks[OperandIndex].Index)+' ';
      ProcessOperand(Phi.Operands[OperandIndex]);
     end;
     AStringList.Add(Line);
@@ -5607,7 +5630,7 @@ const AlignmentOpcode=20;
     Line:=Line+' => [';
     for SuccessorIndex:=0 to Block.Successors.Count-1 do begin
      Successor:=Block.Successors[SuccessorIndex];
-     Line:=Line+'@'+LowerCase(IntToHex(TPACCPtrUInt(Successor),SizeOf(TPACCPtrUInt) shl 1));
+     Line:=Line+'@b'+IntToStr(Successor.Index);
      if (SuccessorIndex+1)<Block.Successors.Count then begin
       Line:=Line+', ';
      end;
