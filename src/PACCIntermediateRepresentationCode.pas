@@ -613,6 +613,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        function CompareDominance(Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock):boolean;
        function CodeTypeMerge(var ResultType_:TPACCIntermediateRepresentationCodeType;const Type_:TPACCIntermediateRepresentationCodeType):boolean;
        procedure SSA;
+       procedure SSACheck;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -5420,6 +5421,11 @@ begin
 {$endif}
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.SSACheck;
+begin
+
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
 begin
 {$ifdef IRDebug}
@@ -5432,6 +5438,7 @@ begin
  MemoryOptimization;
  SSA;
  FillUse;
+ SSACheck;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
