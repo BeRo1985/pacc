@@ -3,7 +3,7 @@ unit PACCIntermediateRepresentationCode;
 
 interface
 
-uses TypInfo,SysUtils,Classes,Math,PUCU,PasMP,PACCTypes,PACCGlobals,PACCPointerHashMap,PACCAbstractSyntaxTree;
+uses TypInfo,SysUtils,Classes,Math,PUCU,PasMP,PACCTypes,PACCGlobals,PACCPointerHashMap,PACCInt64HashMap,PACCAbstractSyntaxTree;
 
 // A intermediate representation instruction set for 32-bit and 64-bit targets (sorry not for 8-bit and 16-bit targets, at least not yet,
 // at least that would be a task of somebody else then, to write a corresponding patch for it and submit it, because I myself as
@@ -271,8 +271,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircokTEMPORARY,
        pircokCONSTANT,
        pircokCALL,
-       pircokINTEGER,
-       pircokFLOAT,
        pircokVARIABLE,
        pircokLABEL,
        pircokFUNCTION,
@@ -290,12 +288,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        );
        pircokCONSTANT:(
         Constant:TPACCInt32;
-       );
-       pircokINTEGER:(
-        IntegerValue:TPACCInt64;
-       );
-       pircokFLOAT:(
-        FloatValue:TPACCDouble;
        );
        pircokVARIABLE:(
         Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
@@ -372,6 +364,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
      PPACCIntermediateRepresentationCodeConstant=^TPACCIntermediateRepresentationCodeConstant;
      TPACCIntermediateRepresentationCodeConstant=class
       public
+       Index:TPACCInt32;
        Kind:TPACCIntermediateRepresentationCodeConstantKind;
        Data:TPACCIntermediateRepresentationCodeConstantData;
        Label_:TPACCAbstractSyntaxTreeNodeLabel;
@@ -593,7 +586,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        function CreateLinkTemporary(const ToTemporaryIndex:TPACCInt32):TPACCInt32;
        function CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
        function CreateIntegerValueOperand(const Value:TPACCInt64):TPACCIntermediateRepresentationCodeOperand;
-       function CreateFloatValueOperand(const Value:TPACCDouble):TPACCIntermediateRepresentationCodeOperand;
+       function CreateFloatValueOperand(const Value:TPACCFloat):TPACCIntermediateRepresentationCodeOperand;
+       function CreateDoubleValueOperand(const Value:TPACCDouble):TPACCIntermediateRepresentationCodeOperand;
        function CreateVariableOperand(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeOperand;
        function CreateLabelOperand(const Label_:TPACCAbstractSyntaxTreeNodeLabel):TPACCIntermediateRepresentationCodeOperand;
        function CreateFunctionOperand(const TheFunction:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration):TPACCIntermediateRepresentationCodeOperand;
@@ -710,6 +704,12 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        TemporaryReferenceCounter:TPACCUInt32;
 
        Constants:TPACCIntermediateRepresentationCodeConstantList;
+
+       IntegerConstantHashMap:TPACCInt64HashMap;
+
+       FloatConstantHashMap:TPACCInt64HashMap;
+
+       DoubleConstantHashMap:TPACCInt64HashMap;
 
        VariableTemporaryHashMap:TPACCPointerHashMap;
 
@@ -928,6 +928,7 @@ end;
 constructor TPACCIntermediateRepresentationCodeConstant.Create;
 begin
  inherited Create;
+ Index:=-1;
  Kind:=pircckNONE;
  Data.Kind:=pirccdkINTEGER;
  Data.IntegerValue:=0;
@@ -1306,6 +1307,12 @@ begin
 
  Constants:=TPACCIntermediateRepresentationCodeConstantList.Create;
 
+ IntegerConstantHashMap:=TPACCInt64HashMap.Create;
+
+ FloatConstantHashMap:=TPACCInt64HashMap.Create;
+
+ DoubleConstantHashMap:=TPACCInt64HashMap.Create;
+
  VariableTemporaryHashMap:=TPACCPointerHashMap.Create;
 
 end;
@@ -1317,6 +1324,9 @@ begin
  VariableTemporaryHashMap.Free;
  Temporaries.Free;
  Constants.Free;
+ IntegerConstantHashMap.Free;
+ FloatConstantHashMap.Free;
+ DoubleConstantHashMap.Free;
  RPO:=nil;
  inherited Destroy;
 end;
@@ -1500,17 +1510,57 @@ begin
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateIntegerValueOperand(const Value:TPACCInt64):TPACCIntermediateRepresentationCodeOperand;
+var Constant:TPACCIntermediateRepresentationCodeConstant;
 begin
+ Constant:=IntegerConstantHashMap[Value];
+ if not assigned(Constant) then begin
+  Constant:=TPACCIntermediateRepresentationCodeConstant.Create;
+  TPACCInstance(fInstance).AllocatedObjects.Add(Constant);
+  Constant.Index:=Constants.Add(Constant);
+  Constant.Kind:=pircckDATA;
+  Constant.Data.Kind:=pirccdkINTEGER;
+  Constant.Data.IntegerValue:=Value;
+  IntegerConstantHashMap[Value]:=Constant;
+ end;
  result.Flags:=[];
- result.Kind:=pircokINTEGER;
- result.IntegerValue:=Value;
+ result.Kind:=pircokCONSTANT;
+ result.Constant:=Constant.Index;
 end;
 
-function TPACCIntermediateRepresentationCodeFunction.CreateFloatValueOperand(const Value:TPACCDouble):TPACCIntermediateRepresentationCodeOperand;
+function TPACCIntermediateRepresentationCodeFunction.CreateFloatValueOperand(const Value:TPACCFloat):TPACCIntermediateRepresentationCodeOperand;
+var Constant:TPACCIntermediateRepresentationCodeConstant;
 begin
+ Constant:=FloatConstantHashMap[TPACCUInt32(pointer(@Value)^)];
+ if not assigned(Constant) then begin
+  Constant:=TPACCIntermediateRepresentationCodeConstant.Create;
+  TPACCInstance(fInstance).AllocatedObjects.Add(Constant);
+  Constant.Index:=Constants.Add(Constant);
+  Constant.Kind:=pircckDATA;
+  Constant.Data.Kind:=pirccdkFLOAT;
+  Constant.Data.FloatValue:=Value;
+  FloatConstantHashMap[TPACCUInt32(pointer(@Value)^)]:=Constant;
+ end;
  result.Flags:=[];
- result.Kind:=pircokFLOAT;
- result.FloatValue:=Value;
+ result.Kind:=pircokCONSTANT;
+ result.Constant:=Constant.Index;
+end;
+
+function TPACCIntermediateRepresentationCodeFunction.CreateDoubleValueOperand(const Value:TPACCDouble):TPACCIntermediateRepresentationCodeOperand;
+var Constant:TPACCIntermediateRepresentationCodeConstant;
+begin
+ Constant:=DoubleConstantHashMap[TPACCInt64(pointer(@Value)^)];
+ if not assigned(Constant) then begin
+  Constant:=TPACCIntermediateRepresentationCodeConstant.Create;
+  TPACCInstance(fInstance).AllocatedObjects.Add(Constant);
+  Constant.Index:=Constants.Add(Constant);
+  Constant.Kind:=pircckDATA;
+  Constant.Data.Kind:=pirccdkDOUBLE;
+  Constant.Data.DoubleValue:=Value;
+  DoubleConstantHashMap[TPACCInt64(pointer(@Value)^)]:=Constant;
+ end;
+ result.Flags:=[];
+ result.Kind:=pircokCONSTANT;
+ result.Constant:=Constant.Index;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateVariableOperand(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeOperand;
@@ -1761,7 +1811,7 @@ begin
   EmitInstruction(pircoADD,pirctFLOAT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(InputTemporary),CreateFloatValueOperand(1)],Node.SourceLocation);
  end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
   OutputTemporary:=CreateTemporary(pirctDOUBLE);
-  EmitInstruction(pircoADD,pirctDOUBLE,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(InputTemporary),CreateFloatValueOperand(1)],Node.SourceLocation);
+  EmitInstruction(pircoADD,pirctDOUBLE,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(InputTemporary),CreateDoubleValueOperand(1)],Node.SourceLocation);
  end else if Node.Type_^.Kind=tkPOINTER then begin
   if assigned(Node.Type_^.ChildType) then begin
    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
@@ -1796,7 +1846,7 @@ begin
   EmitInstruction(pircoSUB,pirctFLOAT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(InputTemporary),CreateFloatValueOperand(1)],Node.SourceLocation);
  end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
   OutputTemporary:=CreateTemporary(pirctDOUBLE);
-  EmitInstruction(pircoSUB,pirctDOUBLE,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(InputTemporary),CreateFloatValueOperand(1)],Node.SourceLocation);
+  EmitInstruction(pircoSUB,pirctDOUBLE,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(InputTemporary),CreateDoubleValueOperand(1)],Node.SourceLocation);
  end else if Node.Type_^.Kind=tkPOINTER then begin
   if assigned(Node.Type_^.ChildType) then begin
    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
@@ -2521,7 +2571,7 @@ begin
   EmitInstruction(pircoSETF,pirctFLOAT,CreateTemporaryOperand(OutputTemporary),[CreateFloatValueOperand(TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value)],Node.SourceLocation);
  end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
   OutputTemporary:=CreateTemporary(pirctDOUBLE);
-  EmitInstruction(pircoSETD,pirctDOUBLE,CreateTemporaryOperand(OutputTemporary),[CreateFloatValueOperand(TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value)],Node.SourceLocation);
+  EmitInstruction(pircoSETD,pirctDOUBLE,CreateTemporaryOperand(OutputTemporary),[CreateDoubleValueOperand(TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value)],Node.SourceLocation);
  end else begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-22-16-04-0000',@Node.SourceLocation,true);
  end;
@@ -2546,7 +2596,7 @@ begin
    EmitInstruction(pircoSTF,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateFloatValueOperand(InputValue)],Node.SourceLocation);
   end;
   tkDOUBLE,tkLDOUBLE:begin
-   EmitInstruction(pircoSTD,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateFloatValueOperand(InputValue)],Node.SourceLocation);
+   EmitInstruction(pircoSTD,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateDoubleValueOperand(InputValue)],Node.SourceLocation);
   end;
   tkPOINTER:begin
    if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
@@ -2568,7 +2618,7 @@ begin
    EmitInstruction(pircoSTF,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateFloatValueOperand(InputValue)],Node.SourceLocation);
   end;
   tkDOUBLE,tkLDOUBLE:begin
-   EmitInstruction(pircoSTD,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateFloatValueOperand(InputValue)],Node.SourceLocation);
+   EmitInstruction(pircoSTD,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateDoubleValueOperand(InputValue)],Node.SourceLocation);
   end;
   else begin
    TPACCInstance(fInstance).AddError('Internal error 2017-01-22-16-36-0000',@Node.SourceLocation,true);
@@ -3392,12 +3442,13 @@ begin
    end else begin
     case FunctionDeclaration.Type_^.ReturnType^.Kind of
      tkBOOL,tkCHAR,tkSHORT,tkINT,tkENUM,tkLONG,tkLLONG,tkPOINTER:begin
-      CurrentBlock.Jump.Operand.Kind:=pircokINTEGER;
-      CurrentBlock.Jump.Operand.IntegerValue:=0;
+      CurrentBlock.Jump.Operand:=CreateIntegerValueOperand(0);
      end;
-     tkFLOAT,tkDOUBLE,tkLDOUBLE:begin
-      CurrentBlock.Jump.Operand.Kind:=pircokFLOAT;
-      CurrentBlock.Jump.Operand.FloatValue:=0;
+     tkFLOAT:begin
+      CurrentBlock.Jump.Operand:=CreateFloatValueOperand(0);
+     end;
+     tkDOUBLE,tkLDOUBLE:begin
+      CurrentBlock.Jump.Operand:=CreateDoubleValueOperand(0);
      end;
      else begin
       TPACCInstance(fInstance).AddError('Internal error 2017-01-22-14-50-0000',@Node.SourceLocation,true);
@@ -4358,11 +4409,8 @@ begin
    pircokTEMPORARY:begin
     result:=Operand.Temporary=OtherOperand.Temporary;
    end;
-   pircokINTEGER:begin
-    result:=Operand.IntegerValue=OtherOperand.IntegerValue;
-   end;
-   pircokFLOAT:begin
-    result:=Operand.FloatValue=OtherOperand.FloatValue;
+   pircokCONSTANT:begin
+    result:=Operand.Constant=OtherOperand.Constant;
    end;
    pircokVARIABLE:begin
     result:=Operand.Variable=OtherOperand.Variable;
@@ -5966,13 +6014,13 @@ begin
  result:='[';
  Index:=-1;
  while BitSet.IterateToNextBit(Index) do begin
-  result:=result+' tmp('+IntToStr(Index)+')';
+  result:=result+' temporary('+IntToStr(Index)+')';
  end;
  result:=result+' ]';
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.DumpTo(const AStringList:TStringList);
-const AlignmentOpcode=20;
+const AlignmentOpcode=4;
  procedure ProcessBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
  var InstructionIndex,OperandIndex,SuccessorIndex:TPACCInt32;
      Instruction:TPACCIntermediateRepresentationCodeInstruction;
@@ -5980,21 +6028,46 @@ const AlignmentOpcode=20;
      Line:TPACCRawByteString;
      Successor:TPACCIntermediateRepresentationCodeBlock;
   procedure ProcessOperand(const Operand:TPACCIntermediateRepresentationCodeOperand);
+  var Constant:TPACCIntermediateRepresentationCodeConstant;
   begin
    case Operand.Kind of
     pircokNONE:begin
     end;
     pircokTEMPORARY:begin
-     Line:=Line+'tmp('+IntToStr(Operand.Temporary)+')';
+     Line:=Line+'temporary('+IntToStr(Operand.Temporary)+')';
     end;
     pircokCALL:begin
      Assert(false);
     end;
-    pircokINTEGER:begin
-     Line:=Line+'integer('+IntToStr(Operand.IntegerValue)+')';
-    end;
-    pircokFLOAT:begin
-     Line:=Line+'float('+ConvertDoubleToString(Operand.FloatValue,omStandard)+')';
+    pircokCONSTANT:begin
+     Constant:=Constants[Operand.Constant];
+     case Constant.Kind of
+      pircckNONE:begin
+       Line:=Line+'constant(none())';
+      end;
+      pircckDATA:begin
+       case Constant.Data.Kind of
+        pirccdkINTEGER:begin
+         Line:=Line+'constant(data(integer('+IntToStr(Constant.Data.IntegerValue)+')))';
+        end;
+        pirccdkFLOAT:begin
+         Line:=Line+'constant(data(float('+ConvertDoubleToString(Constant.Data.FloatValue,omStandard)+')))';
+        end;
+        pirccdkDOUBLE:begin
+         Line:=Line+'constant(data(double('+ConvertDoubleToString(Constant.Data.DoubleValue,omStandard)+')))';
+        end;
+       end;
+      end;
+      pircckLABEL:begin
+       Line:=Line+'constant(label('+LowerCase(IntToHex(TPACCPtrUInt(Constant.Label_),SizeOf(TPACCPtrUInt) shl 1))+'))';
+      end;
+      pircckVARIABLE:begin
+       Line:=Line+'constant(variable('+Constant.Variable.VariableName+'))';
+      end;
+      else begin
+       TPACCInstance(fInstance).AddError('Internal error 2017-01-28-23-27-0000',nil,true);
+      end;
+     end;
     end;
     pircokVARIABLE:begin
      Line:=Line+'variable('+Operand.Variable.VariableName+')';
@@ -6022,7 +6095,7 @@ const AlignmentOpcode=20;
      pircokNONE:begin
      end;
      pircokTEMPORARY:begin
-      Line:=Line+'tmp('+IntToStr(Phi.To_.Temporary)+') ='+CodeTypeChars[Phi.Type_]+' ';
+      Line:=Line+'temporary('+IntToStr(Phi.To_.Temporary)+') ='+CodeTypeChars[Phi.Type_]+' ';
      end;
      else begin
       TPACCInstance(fInstance).AddError('Internal error 2017-01-28-01-01-0000',nil,true);
@@ -6051,7 +6124,7 @@ const AlignmentOpcode=20;
      pircokNONE:begin
      end;
      pircokTEMPORARY:begin
-      Line:=Line+'tmp('+IntToStr(Instruction.To_.Temporary)+') ='+CodeTypeChars[Instruction.Type_]+' ';
+      Line:=Line+'temporary('+IntToStr(Instruction.To_.Temporary)+') ='+CodeTypeChars[Instruction.Type_]+' ';
      end;
      else begin
       TPACCInstance(fInstance).AddError('Internal error 2017-01-28-00-38-0000',@Instruction.SourceLocation,true);
@@ -6129,7 +6202,7 @@ begin
      if Index>0 then begin
       Line:=Line+', ';
      end;
-     Line:=Line+CodeTypeChars[DataTypeToCodeType(Parameter.Type_)]+' tmp('+IntToStr(Temporary.Index)+')';
+     Line:=Line+CodeTypeChars[DataTypeToCodeType(Parameter.Type_)]+' temporary('+IntToStr(Temporary.Index)+')';
     end;
    end;
   end;
