@@ -598,6 +598,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitIFStatement(const Node:TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator);
        procedure EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
        procedure EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements);
+       function AreEqualOperands(const Operand,OtherOperand:TPACCIntermediateRepresentationCodeOperand):boolean;
        procedure DeleteBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
        procedure FillRPO;
        procedure FillPredecessors;
@@ -4218,6 +4219,37 @@ begin
  end;
 end;
 
+function TPACCIntermediateRepresentationCodeFunction.AreEqualOperands(const Operand,OtherOperand:TPACCIntermediateRepresentationCodeOperand):boolean;
+begin
+ result:=Operand.Kind=OtherOperand.Kind;
+ if result then begin
+  case Operand.Kind of
+   pircokNONE:begin
+   end;
+   pircokTEMPORARY:begin
+    result:=Operand.Temporary=OtherOperand.Temporary;
+   end;
+   pircokINTEGER:begin
+    result:=Operand.IntegerValue=OtherOperand.IntegerValue;
+   end;
+   pircokFLOAT:begin
+    result:=Operand.FloatValue=OtherOperand.FloatValue;
+   end;
+   pircokVARIABLE:begin
+    result:=Operand.Variable=OtherOperand.Variable;
+   end;
+   pircokLABEL:begin
+    result:=Operand.Label_=OtherOperand.Label_;
+   end;
+   pircokFUNCTION:begin
+    result:=Operand.Function_=OtherOperand.Function_;
+   end;
+   pircokCOUNT:begin
+   end;
+  end;
+ end;
+end;           
+
 procedure TPACCIntermediateRepresentationCodeFunction.DeleteBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
 var Index,SubIndex,SubSubIndex:TPACCInt32;
     Successor:TPACCIntermediateRepresentationCodeBlock;
@@ -5422,6 +5454,21 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.SSACheck;
+ function PhiCheck(const Phi:TPACCIntermediateRepresentationCodePhi;const Block:TPACCIntermediateRepresentationCodeBlock;const Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
+ var OtherBlock:TPACCIntermediateRepresentationCodeBlock;
+     OperandIndex:TPACCInt32;
+ begin
+  result:=false;
+  for OperandIndex:=0 to Phi.CountOperands-1 do begin
+   if AreEqualOperands(Phi.Operands[OperandIndex],Operand) then begin
+    OtherBlock:=Phi.Blocks[OperandIndex];
+    if (Block<>OtherBlock) and not CompareSDominance(Block,OtherBlock) then begin
+     result:=true;
+     break;
+    end;
+   end;
+  end;
+ end;
 begin
 
 end;
