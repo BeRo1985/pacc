@@ -5423,6 +5423,10 @@ end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
 begin
+{$ifdef IRDebug}
+ writeln('> After initial intermediate representation code generation:');
+ DumpToConsole;
+{$endif}
  FillRPO;
  FillPredecessors;
  FillUse;
