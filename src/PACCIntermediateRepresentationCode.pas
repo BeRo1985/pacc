@@ -4840,7 +4840,7 @@ var Phis:array of TPACCInt32;
    end;
   end;
  end;
-var Index,SubIndex,OtherIndex,TemporaryIndex:TPACCInt32;
+var Index,SubIndex,OtherIndex,TemporaryIndex,InstructionIndex:TPACCInt32;
     Block,Successor:TPACCIntermediateRepresentationCodeBlock;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
     TemporaryBitSetU,TemporaryBitSetV:TPACCIntermediateRepresentationCodeBitSet;
@@ -4872,8 +4872,11 @@ begin
   repeat
 
    for Index:=CountBlocks-1 downto 0 do begin
+
     Block:=RPO[Index];
+
     TemporaryBitSetU.Assign(Block.Out_);
+
     for SubIndex:=0 to Block.Successors.Count-1 do begin
      Successor:=Block.Successors[SubIndex];
      if assigned(Successor) then begin
@@ -4881,77 +4884,78 @@ begin
       Block.Out_.Union(TemporaryBitSetV);
      end;
     end;
-   end;
 
-   Changed:=Changed or not Block.Out_.EqualsTo(TemporaryBitSetU);
+    Changed:=Changed or not Block.Out_.EqualsTo(TemporaryBitSetU);
 
-   FillChar(Phis[0],length(Phis)*SizeOf(TPACCInt32),#0);
-   FillChar(CountLive[0],length(CountLive)*SizeOf(TPACCInt32),#0);
-   Block.In_.Assign(Block.Out_);
-   Index:=-1;
-   while Block.In_.IterateToNextBit(Index) do begin
-    PhiFix(Index);
-    inc(CountLive[CodeTypeBaseClass[Temporaries[Index].Type_]]);
-   end;
-
-   if Block.Jump.Operand.Kind=pircokCALL then begin
-    if (Block.In_.Count=0) and (CountLive[0]=0) and (CountLive[1]=0) then begin
-     Block.In_.Union(ReturnRegisters(Block.Jump.Operand,CountLive[0],CountLive[1]));
-    end else begin
-     TPACCInstance(fInstance).AddError('Internal error 2017-01-25-16-45-0000',nil,true);
+    FillChar(Phis[0],length(Phis)*SizeOf(TPACCInt32),#0);
+    FillChar(CountLive[0],length(CountLive)*SizeOf(TPACCInt32),#0);
+    Block.In_.Assign(Block.Out_);
+    TemporaryIndex:=-1;
+    while Block.In_.IterateToNextBit(TemporaryIndex) do begin
+     PhiFix(TemporaryIndex);
+     inc(CountLive[CodeTypeBaseClass[Temporaries[TemporaryIndex].Type_]]);
     end;
-   end else begin
-    BSet(Block.Jump.Operand,Block);
-   end;
 
-   Block.CountLive[0]:=CountLive[0];
-   Block.CountLive[1]:=CountLive[1];
-
-   for Index:=Block.Instructions.Count-1 downto 0 do begin
-    Instruction:=Block.Instructions[Index];
-    if (Instruction.Opcode=pircoCALL) and (length(Instruction.Operands)>0) and (Instruction.Operands[0].Kind=pircokCALL) then begin
-     TemporaryCountLive[0]:=0;
-     TemporaryCountLive[1]:=0;
-     Block.In_.Subtraction(ReturnRegisters(Block.Jump.Operand,TemporaryCountLive[0],TemporaryCountLive[1]));
-     for OtherIndex:=0 to 1 do begin
-      dec(CountLive[OtherIndex],TemporaryCountLive[OtherIndex]);
-     end;
-     if (CountLive[0]+IntegerRegisterToSave(Block.Jump.Operand))>Block.CountLive[0] then begin
-      Block.CountLive[0]:=CountLive[0]+IntegerRegisterToSave(Block.Jump.Operand);
-     end;
-     if (CountLive[1]+FloatRegisterToSave(Block.Jump.Operand))>Block.CountLive[1] then begin
-      Block.CountLive[1]:=CountLive[1]+FloatRegisterToSave(Block.Jump.Operand);
-     end;
-     Block.In_.Union(ArgumentRegisters(Block.Jump.Operand,TemporaryCountLive[0],TemporaryCountLive[1]));
-     for OtherIndex:=0 to 1 do begin
-      inc(CountLive[OtherIndex],TemporaryCountLive[OtherIndex]);
-     end;
-    end;
-    if Instruction.To_.Kind<>pircokNONE then begin
-     if Instruction.To_.Kind=pircokTEMPORARY then begin
-      TemporaryIndex:=Instruction.To_.Temporary;
-      if Block.In_.GetBit(TemporaryIndex) then begin
-       dec(CountLive[CodeTypeBaseClass[Temporaries[TemporaryIndex].Type_]]);
-      end;
-      Block.Gen_.SetBit(TemporaryIndex,true);
-      Block.In_.SetBit(TemporaryIndex,false);
-      Phis[PhiTmp(TemporaryIndex)]:=0;
+    if Block.Jump.Operand.Kind=pircokCALL then begin
+     if (Block.In_.Count=0) and (CountLive[0]=0) and (CountLive[1]=0) then begin
+      Block.In_.Union(ReturnRegisters(Block.Jump.Operand,CountLive[0],CountLive[1]));
      end else begin
-      TPACCInstance(fInstance).AddError('Internal error 2017-01-25-17-34-0000',nil,true);
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-25-16-45-0000',nil,true);
+     end;
+    end else begin
+     BSet(Block.Jump.Operand,Block);
+    end;
+
+    Block.CountLive[0]:=CountLive[0];
+    Block.CountLive[1]:=CountLive[1];
+
+    for InstructionIndex:=Block.Instructions.Count-1 downto 0 do begin
+     Instruction:=Block.Instructions[InstructionIndex];
+     if (Instruction.Opcode=pircoCALL) and (length(Instruction.Operands)>0) and (Instruction.Operands[0].Kind=pircokCALL) then begin
+      TemporaryCountLive[0]:=0;
+      TemporaryCountLive[1]:=0;
+      Block.In_.Subtraction(ReturnRegisters(Block.Jump.Operand,TemporaryCountLive[0],TemporaryCountLive[1]));
+      for OtherIndex:=0 to 1 do begin
+       dec(CountLive[OtherIndex],TemporaryCountLive[OtherIndex]);
+      end;
+      if (CountLive[0]+IntegerRegisterToSave(Block.Jump.Operand))>Block.CountLive[0] then begin
+       Block.CountLive[0]:=CountLive[0]+IntegerRegisterToSave(Block.Jump.Operand);
+      end;
+      if (CountLive[1]+FloatRegisterToSave(Block.Jump.Operand))>Block.CountLive[1] then begin
+       Block.CountLive[1]:=CountLive[1]+FloatRegisterToSave(Block.Jump.Operand);
+      end;
+      Block.In_.Union(ArgumentRegisters(Block.Jump.Operand,TemporaryCountLive[0],TemporaryCountLive[1]));
+      for OtherIndex:=0 to 1 do begin
+       inc(CountLive[OtherIndex],TemporaryCountLive[OtherIndex]);
+      end;
+     end;
+     if Instruction.To_.Kind<>pircokNONE then begin
+      if Instruction.To_.Kind=pircokTEMPORARY then begin
+       TemporaryIndex:=Instruction.To_.Temporary;
+       if Block.In_.GetBit(TemporaryIndex) then begin
+        dec(CountLive[CodeTypeBaseClass[Temporaries[TemporaryIndex].Type_]]);
+       end;
+       Block.Gen_.SetBit(TemporaryIndex,true);
+       Block.In_.SetBit(TemporaryIndex,false);
+       Phis[PhiTmp(TemporaryIndex)]:=0;
+      end else begin
+       TPACCInstance(fInstance).AddError('Internal error 2017-01-25-17-34-0000',nil,true);
+      end;
+     end;
+     for OtherIndex:=0 to length(Instruction.Operands)-1 do begin
+      case Instruction.Operands[OtherIndex].Kind of
+       pircokNONE:begin
+       end;
+       else begin
+        BSet(Instruction.Operands[OtherIndex],Block);
+       end;
+      end;
+     end;
+     for OtherIndex:=0 to 1 do begin
+      Block.CountLive[OtherIndex]:=max(Block.CountLive[OtherIndex],CountLive[OtherIndex]);
      end;
     end;
-    for OtherIndex:=0 to length(Instruction.Operands)-1 do begin
-     case Instruction.Operands[OtherIndex].Kind of
-      pircokNONE:begin
-      end;
-      else begin
-       BSet(Instruction.Operands[OtherIndex],Block);
-      end;
-     end;
-    end;
-    for OtherIndex:=0 to 1 do begin
-     Block.CountLive[OtherIndex]:=max(Block.CountLive[OtherIndex],CountLive[OtherIndex]);
-    end;
+
    end;
 
    if Changed then begin
@@ -4960,6 +4964,7 @@ begin
    end else begin
     break;
    end;
+   
   until false;
 
 {$ifdef IRDebug}
