@@ -296,6 +296,31 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
      TPACCIntermediateRepresentationCodeOperands=array of TPACCIntermediateRepresentationCodeOperand;
 
+     PPACCIntermediateRepresentationCodeAddressKind=^TPACCIntermediateRepresentationCodeAddressKind;
+     TPACCIntermediateRepresentationCodeAddressKind=
+      (
+       pircakNONE,
+       pircakFUNCTION,
+       pircakLABEL,
+       pircakVARIABLE
+      );
+
+     PPACCIntermediateRepresentationCodeAddress=^TPACCIntermediateRepresentationCodeAddress;
+     TPACCIntermediateRepresentationCodeAddress=record
+      case Kind:TPACCIntermediateRepresentationCodeAddressKind of
+       pircakNONE:(
+       );
+       pircakFUNCTION:(
+        Function_:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration;
+       );
+       pircakLABEL:(
+        Label_:TPACCAbstractSyntaxTreeNodeLabel;
+       );
+       pircakVARIABLE:(
+        Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+       );
+     end;
+
      PPACCIntermediateRepresentationCodeAliasKind=^TPACCIntermediateRepresentationCodeAliasKind;
      TPACCIntermediateRepresentationCodeAliasKind=
       (
@@ -303,9 +328,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircakSTACKLOCAL,
        pircakCONSTANT,
        pircakSTACKESCAPE,
-       pircakLABEL,
-       pircakVARIABLE,
-       pircakFUNCTION,
+       pircakADDRESS,
        pircakUNKNOWN
       );
 
@@ -314,9 +337,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       public
        Kind:TPACCIntermediateRepresentationCodeAliasKind;
        Base:TPACCIntermediateRepresentationCodeOperand;
-       Label_:TPACCAbstractSyntaxTreeNodeLabel;
-       Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
-       Function_:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration;
+       Address:TPACCIntermediateRepresentationCodeAddress;
        Offset:TPACCInt64;
        constructor Create;
        destructor Destroy; override;
@@ -328,9 +349,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       (
        pircckNONE,
        pircckDATA,
-       pircckLABEL,
-       pircckVARIABLE,
-       pircckFUNCTION,
+       pircckADDRESS,
        pircckCOUNT
       );
 
@@ -362,9 +381,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Index:TPACCInt32;
        Kind:TPACCIntermediateRepresentationCodeConstantKind;
        Data:TPACCIntermediateRepresentationCodeConstantData;
-       Label_:TPACCAbstractSyntaxTreeNodeLabel;
-       Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
-       Function_:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration;
+       Address:TPACCIntermediateRepresentationCodeAddress;
        Local:boolean;
        constructor Create;
        destructor Destroy; override;
@@ -908,9 +925,7 @@ begin
  inherited Create;
  Kind:=pircakBOTTOM;
  Base.Kind:=pircokNONE;
- Label_:=nil;
- Variable:=nil;
- Function_:=nil;
+ Address.Kind:=pircakNONE;
  Offset:=0;
 end;
 
@@ -923,9 +938,7 @@ procedure TPACCIntermediateRepresentationCodeAlias.Assign(const From:TPACCInterm
 begin
  Kind:=From.Kind;
  Base:=From.Base;
- Label_:=From.Label_;
- Variable:=From.Variable;
- Function_:=From.Function_;
+ Address:=From.Address;
  Offset:=From.Offset;
 end;
 
@@ -936,9 +949,7 @@ begin
  Kind:=pircckNONE;
  Data.Kind:=pirccdkINTEGER;
  Data.IntegerValue:=0;
- Label_:=nil;
- Variable:=nil;
- Function_:=nil;
+ Address.Kind:=pircakNONE;
  Local:=false;
 end;
 
@@ -951,9 +962,7 @@ procedure TPACCIntermediateRepresentationCodeConstant.Assign(const From:TPACCInt
 begin
  Kind:=From.Kind;
  Data:=From.Data;
- Label_:=From.Label_;
- Variable:=From.Variable;
- Function_:=From.Function_;
+ Address:=From.Address;
  Local:=From.Local;
 end;
 
@@ -1591,8 +1600,9 @@ begin
    Constant:=TPACCIntermediateRepresentationCodeConstant.Create;
    TPACCInstance(fInstance).AllocatedObjects.Add(Constant);
    Constant.Index:=Constants.Add(Constant);
-   Constant.Kind:=pircckVARIABLE;
-   Constant.Variable:=Variable;
+   Constant.Kind:=pircckADDRESS;
+   Constant.Address.Kind:=pircakVARIABLE;
+   Constant.Address.Variable:=Variable;
    VariableConstantHashMap[Variable]:=Constant;
   end;
   result.Flags:=[];
@@ -1609,8 +1619,9 @@ begin
   Constant:=TPACCIntermediateRepresentationCodeConstant.Create;
   TPACCInstance(fInstance).AllocatedObjects.Add(Constant);
   Constant.Index:=Constants.Add(Constant);
-  Constant.Kind:=pircckLABEL;
-  Constant.Label_:=Label_;
+  Constant.Kind:=pircckADDRESS;
+  Constant.Address.Kind:=pircakLABEL;
+  Constant.Address.Label_:=Label_;
   LabelConstantHashMap[Label_]:=Constant;
  end;
  result.Flags:=[];
@@ -1626,8 +1637,9 @@ begin
   Constant:=TPACCIntermediateRepresentationCodeConstant.Create;
   TPACCInstance(fInstance).AllocatedObjects.Add(Constant);
   Constant.Index:=Constants.Add(Constant);
-  Constant.Kind:=pircckFUNCTION;
-  Constant.Function_:=TheFunction;
+  Constant.Kind:=pircckADDRESS;
+  Constant.Address.Kind:=pircakFUNCTION;
+  Constant.Address.Function_:=TheFunction;
   FunctionConstantHashMap[TheFunction]:=Constant;
  end;
  result.Flags:=[];
@@ -5825,13 +5837,9 @@ begin
   pircokCONSTANT:begin
    Constant:=Constants[Operand.Constant];
    case Constant.Kind of
-    pircckVARIABLE:begin
-     Alias.Kind:=pircakVARIABLE;
-     Alias.Variable:=Constant.Variable;
-    end;
-    pircckLABEL:begin
-     Alias.Kind:=pircakLABEL;
-     Alias.Label_:=Constant.Label_;
+    pircckADDRESS:begin
+     Alias.Kind:=pircakADDRESS;
+     Alias.Address:=Constant.Address;
     end;
     else begin
      Alias.Kind:=pircakCONSTANT;
@@ -6094,14 +6102,21 @@ const AlignmentOpcode=4;
         end;
        end;
       end;
-      pircckLABEL:begin
-       Line:=Line+'constant(label('+LowerCase(IntToHex(TPACCPtrUInt(Constant.Label_),SizeOf(TPACCPtrUInt) shl 1))+'))';
-      end;
-      pircckVARIABLE:begin
-       Line:=Line+'constant(variable('+Constant.Variable.VariableName+'))';
-      end;
-      pircckFUNCTION:begin
-       Line:=Line+'constant(function('+Constant.Function_.FunctionName+'))';
+      pircckADDRESS:begin
+       case Constant.Address.Kind of
+        pircakNONE:begin
+         Line:=Line+'constant(address(none()))';
+        end;
+        pircakFUNCTION:begin
+         Line:=Line+'constant(address(function('+Constant.Address.Function_.FunctionName+')))';
+        end;
+        pircakLABEL:begin
+         Line:=Line+'constant(address(label('+LowerCase(IntToHex(TPACCPtrUInt(Constant.Address.Label_),SizeOf(TPACCPtrUInt) shl 1))+')))';
+        end;
+        pircakVARIABLE:begin
+         Line:=Line+'constant(address(variable('+Constant.Address.Variable.VariableName+')))';
+        end;
+       end;
       end;
       else begin
        TPACCInstance(fInstance).AddError('Internal error 2017-01-28-23-27-0000',nil,true);
