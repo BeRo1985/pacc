@@ -5858,12 +5858,15 @@ procedure TPACCIntermediateRepresentationCodeFunction.FillAlias;
  var Alias:TPACCIntermediateRepresentationCodeAlias;
  begin
   case Operand.Kind of
+   pircokNONE:begin
+    // Do nothing
+   end;
    pircokTEMPORARY:begin
     Alias:=Temporaries[Operand.Temporary].Alias;
-    if Alias.Kind=pircakBOTTOM then begin
+    if Alias.Kind<>pircakBOTTOM then begin
      if Alias.Kind=pircakSTACKLOCAL then begin
       Alias.Kind:=pircakSTACKESCAPE;
-     end;                  
+     end;
     end else begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-28-23-02-0000',nil,true);
     end;
@@ -5945,7 +5948,7 @@ begin
      Alias0.Free;
     end;
    end;
-   if ((Instruction.To_.Kind=pircokNONE) or (Alias.Kind=pircakUNKNOWN)) then begin
+   if (Instruction.To_.Kind=pircokNONE) or ((not assigned(Alias)) or (Alias.Kind=pircakUNKNOWN)) then begin
     for InstructionOperandIndex:=IfThen(Instruction.Opcode in [pircoLDUCI..pircoLDD,pircoSTIC..pircoSTD],1,0) to length(Instruction.Operands)-1 do begin
      Escape(Instruction.Operands[InstructionOperandIndex]);
     end;
