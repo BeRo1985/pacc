@@ -5431,6 +5431,7 @@ begin
  FillUse;
  MemoryOptimization;
  SSA;
+ FillUse;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
