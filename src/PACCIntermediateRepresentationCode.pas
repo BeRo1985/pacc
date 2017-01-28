@@ -218,15 +218,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircoCMPOD, // Ordered double
        pircoCMPNOD, // Not ordered double
 
-       pircoALLOCI, // Allocate int(typically 4)
-       pircoALLOCL, // Allocate long (typically 8)
-       pircoALLOCIS, // Allocate int-SIMD-friendly (typically 16)
-       pircoALLOCLS, // Allocate long-SIMD-friendly (typically 32)
-
-       pircoALLOCF, // Allocate float (typically 4)
-       pircoALLOCD, // Allocate double (typically 8)
-       pircoALLOCFS, // Allocate float-SIMD-friendly (typically 16)
-       pircoALLOCDS, // Allocate double-SIMD-friendly (typically 32)
+       pircoALLOC, // Allocate with size and alignment as operands
 
        pircoPARI, // Get function parameter int
        pircoPARL, // Get function parameter long
@@ -5177,9 +5169,10 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
-var Index:TPACCInt32;
+var Index,Size,Alignment:TPACCInt32;
     Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
     StringList:TStringList;
+    Type_:PPACCType;
 begin
 
  FunctionDeclaration:=AFunctionNode;
@@ -5209,7 +5202,29 @@ begin
   for Index:=0 to FunctionDeclaration.LocalVariables.Count-1 do begin
    Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(FunctionDeclaration.LocalVariables[Index]);
    if assigned(Variable) then begin
-    CreateVariableTemporary(Variable);
+    Type_:=Variable.Type_;
+    Alignment:=Variable.Type_^.Alignment;
+    Size:=1;
+    case Type_^.Kind of
+     tkARRAY:begin
+      while assigned(Type_) and (Type_^.Kind=tkARRAY) do begin
+       Size:=Size*Type_^.ArrayLength;
+       Type_:=Type_^.ChildType;
+      end;
+      if Type_^.Kind=tkSTRUCT then begin
+       Type_:=Variable.Type_;
+       Size:=Type_^.Size;
+       Type_:=TPACCInstance(fInstance).TypeCHAR;
+      end else begin
+       Size:=Size*Type_^.Size;
+      end;
+     end;
+     tkSTRUCT:begin
+      Size:=Type_^.Size;
+      Type_:=TPACCInstance(fInstance).TypeCHAR;
+     end;
+    end;
+    EmitInstruction(pircoALLOC,DataTypeToCodeType(Type_),CreateTemporaryOperand(CreateVariableTemporary(Variable)),[CreateIntegerValueOperand(Size),CreateIntegerValueOperand(Alignment)],AFunctionNode.SourceLocation);
    end;
   end;
  end;
@@ -6019,14 +6034,7 @@ begin
  OpcodeNames[pircoCMPNED]:='cmpned';
  OpcodeNames[pircoCMPOD]:='cmpod';
  OpcodeNames[pircoCMPNOD]:='cmpnod';
- OpcodeNames[pircoALLOCI]:='alloci';
- OpcodeNames[pircoALLOCL]:='allocl';
- OpcodeNames[pircoALLOCIS]:='allocis';
- OpcodeNames[pircoALLOCLS]:='allocls';
- OpcodeNames[pircoALLOCF]:='allocf';
- OpcodeNames[pircoALLOCD]:='allocd';
- OpcodeNames[pircoALLOCFS]:='allocfs';
- OpcodeNames[pircoALLOCDS]:='allocds';
+ OpcodeNames[pircoALLOC]:='alloc';
  OpcodeNames[pircoPARI]:='pari';
  OpcodeNames[pircoPARL]:='parl';
  OpcodeNames[pircoPARF]:='parf';

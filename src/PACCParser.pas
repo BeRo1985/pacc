@@ -1147,7 +1147,7 @@ var CurrentState:TState;
     ElementSize:=Type_^.ChildType^.Size;
     SawClosedBrace:=false;
     Index:=0;
-    while Flexible and (Index<Type_^.ArrayLength) do begin
+    while Flexible or (Index<Type_^.ArrayLength) do begin
      if CurrentState.Token^.TokenType=TOK_RBRA then begin
       if HasBrace then begin
        NextToken;
