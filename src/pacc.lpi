@@ -31,7 +31,7 @@
         <PackageName Value="LCL"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="27">
+    <Units Count="31">
       <Unit0>
         <Filename Value="pacc.dpr"/>
         <IsPartOfProject Value="True"/>
@@ -140,6 +140,22 @@
         <Filename Value="PACCLinker_COFF_PE.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit26>
+      <Unit27>
+        <Filename Value="PACCIntermediateRepresentationCode.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit27>
+      <Unit28>
+        <Filename Value="PACCControlFlowGraph.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit28>
+      <Unit29>
+        <Filename Value="PACCInt64HashMap.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit29>
+      <Unit30>
+        <Filename Value="PACCLinker_ELF_ELF.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit30>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

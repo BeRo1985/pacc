@@ -512,22 +512,22 @@ const ET_NONE=0;
       DF_BIND_NOW=$8; 
       DF_STATIC_TLS=$10;
 
-      VER_DEF_NONE=0; // No version
-      VER_DEF_CURRENT=1; // Current version
-      VER_DEF_NUM=2; // Given version number
+      VER_DEF_NONE=0; // No version
+      VER_DEF_CURRENT=1; // Current version
+      VER_DEF_NUM=2; // Given version number
 
-      // Legal values for vd_flags (version information flags)
-      VER_FLG_BASE=1; // Version definition of file itself
-      VER_FLG_WEAK=2; // Weak version identifier
+      // Legal values for vd_flags (version information flags)
+      VER_FLG_BASE=1; // Version definition of file itself
+      VER_FLG_WEAK=2; // Weak version identifier
 
-      // Legal values for vn_version (version revision)
-      VER_NEED_NONE=0; // No version
-      VER_NEED_CURRENT=1; // Current version
-      VER_NEED_NUM=2; // Given version number
+      // Legal values for vn_version (version revision)
+      VER_NEED_NONE=0; // No version
+      VER_NEED_CURRENT=1; // Current version
+      VER_NEED_NUM=2; // Given version number
 
-      // Legal values for a_type (entry type)
-      AT_NULL=0; // End of vector
-      AT_IGNORE=1; // Entry should be ignored
+      // Legal values for a_type (entry type)
+      AT_NULL=0; // End of vector
+      AT_IGNORE=1; // Entry should be ignored
       AT_EXECFD=2; // File descriptor of program
       AT_PHDR=3; // Program headers for program
       AT_PHENT=4; // Size of program header entry
@@ -549,8 +549,8 @@ const ET_NONE=0;
       // This entry gives some information about the FPU initialization performed by the kernel.
       AT_FPUCW=17; //  Used FPU control word.
 
-      EHDR32_SIZE=52;
-      EHDR64_SIZE=64;
+      EHDR32_SIZE=52;
+      EHDR64_SIZE=64;
       EHDR_MAXSIZE=64;
 
       SHDR32_SIZE=40;
@@ -573,8 +573,8 @@ const ET_NONE=0;
       RELOC32_ALIGN=4;
       RELOC64_ALIGN=8;
 
-type PELFHalf=^TELFHalf;
-     TELFHalf=TPACCUInt16;
+type PELFHalf=^TELFHalf;
+     TELFHalf=TPACCUInt16;
 
      PELFWord=^TELFWord;
      TELFWord=TPACCUInt32;
@@ -880,7 +880,8 @@ type PELFIdent=^TELFIdent;
 
      PELF64Dyn=^TELF64Dyn;
      TELF64Dyn=packed record
-      case d_tag:TELFSXWord of
+      d_tag:TELFSXWord;
+      case TELFWord of
        0:(
         d_val:TELFXWord;
        );
@@ -964,7 +965,8 @@ type PELFIdent=^TELFIdent;
 
      PELF64AuxV=^TELF64AuxV;
      TELF64AuxV=packed record
-      case a_int:TPACCInt64 of
+      a_int:TPACCInt64;
+      case TPACCInt32 of
        0:(
         a_val:TPACCInt64;
        );
@@ -2488,14 +2490,14 @@ begin
       end;
 
       if assigned(OutputImageSection) then begin
-       OutputImageSection.sh_addralign:=Max(OutputImageSection.sh_addralign,ImageSection.sh_addralign);
+       OutputImageSection.sh_addralign:=Math.Max(TPACCInt64(OutputImageSection.sh_addralign),TPACCInt64(ImageSection.sh_addralign));
       end else begin
        OutputImageSection:=TPACCLinker_ELF_ELF_Section.Create(self);
        OutputImageSection.Index_:=OutputImage.Sections.Add(OutputImageSection);
        OutputImageSection.Name:=ImageSection.Name;
        OutputImageSection.sh_type:=ImageSection.sh_type;
        OutputImageSection.sh_flags:=ImageSection.sh_flags;
-       OutputImageSection.sh_addralign:=Max(1,ImageSection.sh_addralign);
+       OutputImageSection.sh_addralign:=Math.Max(1,ImageSection.sh_addralign);
        OutputImageSection.sh_entsize:=ImageSection.sh_entsize;
        OutputImageSection.sh_link:=0;
        OutputImageSection.sh_info:=0;
