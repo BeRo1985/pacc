@@ -1320,6 +1320,7 @@ var CurrentState:TState;
   Name:='_$TEMP$'+IntToStr(TPasMPInterlocked.Increment(TempVariableCounter));
   result:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkLVAR,Type_,CurrentState.Token^.SourceLocation,Name,0);
   TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(result).LocalVariableInitialization:=ParseDeclarationInitializer(Type_);
+  TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(result).MustOnStack:=true;
   Assert(assigned(LocalScope));
   LocalScope[Name]:=result;
   if assigned(LocalVariables) then begin
@@ -3669,6 +3670,7 @@ var CurrentState:TState;
          end else begin
           TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Variable).Index:=-1;
          end;
+         TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Variable).MustOnStack:=not (TPACCInstance(Instance).IsArithmeticType(CurrentType) or (CurrentType^.Kind=tkPOINTER));
         end;
         if CurrentState.Token^.TokenType=TOK_ASSIGN then begin
          NextToken;
