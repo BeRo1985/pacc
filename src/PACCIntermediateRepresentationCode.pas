@@ -498,6 +498,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
      TPACCIntermediateRepresentationCodeBinaryOpHook=procedure(var OutputTemporary:TPACCInt32;const InputLeftTemporary,InputRightTemporary:TPACCInt32;const OpNode:TPACCAbstractSyntaxTreeNode) of object;
 
+     TPACCIntermediateRepresentationCodeFunctionLoopIterationHook=procedure(const Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock) of object;
+
      TPACCIntermediateRepresentationCodeFunction=class
       private
 
@@ -615,6 +617,9 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        function CodeTypeMerge(var ResultType_:TPACCIntermediateRepresentationCodeType;const Type_:TPACCIntermediateRepresentationCodeType):boolean;
        procedure SSA;
        procedure SSACheck;
+       procedure LoopIteration(const Hook:TPACCIntermediateRepresentationCodeFunctionLoopIterationHook);
+       procedure FillLoopMultLoop(const Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock);
+       procedure FillLoop;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -5548,7 +5553,58 @@ begin
   end;
   Block:=Block.Link;
  end;
-  
+
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.LoopIteration(const Hook:TPACCIntermediateRepresentationCodeFunctionLoopIterationHook);
+ procedure LoopMark(const Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock);
+ var PredecessorIndex:TPACCInt32;
+     Predecessor:TPACCIntermediateRepresentationCodeBlock;
+ begin
+  if (Block.ID<=OtherBlock.ID) and (Block.ID<>OtherBlock.Visit) then begin
+   OtherBlock.Visit:=Block.ID;
+   Hook(Block,OtherBlock);
+   for PredecessorIndex:=0 to OtherBlock.Predecessors.Count-1 do begin
+    Predecessor:=OtherBlock.Predecessors[PredecessorIndex];
+    LoopMark(Block,Predecessor);
+   end;
+  end;
+ end;
+var Index,PredecessorIndex:TPACCInt32;
+    Block,Predecessor:TPACCIntermediateRepresentationCodeBlock;
+begin
+ Block:=StartBlock;
+ while assigned(Block) do begin
+  Block.Visit:=-1;
+  Block:=Block.Link;
+ end;
+ for Index:=0 to CountBlocks-1 do begin
+  Block:=RPO[Index];
+  for PredecessorIndex:=0 to Block.Predecessors.Count-1 do begin
+   Predecessor:=Block.Predecessors[PredecessorIndex];
+   if Predecessor.ID>=Index then begin
+    LoopMark(Block,Predecessor);
+   end;
+  end;
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.FillLoopMultLoop(const Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock);
+begin
+ if assigned(Block) then begin
+ end;
+ OtherBlock.Loop:=OtherBlock.Loop*10;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.FillLoop;
+var Block:TPACCIntermediateRepresentationCodeBlock;
+begin
+ Block:=StartBlock;
+ while assigned(Block) do begin
+  Block.Loop:=1;
+  Block:=Block.Link;
+ end;
+ LoopIteration(FillLoopMultLoop);
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
@@ -5564,6 +5620,7 @@ begin
  SSA;
  FillUse;
  SSACheck;
+ FillLoop;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
