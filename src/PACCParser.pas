@@ -1009,6 +1009,9 @@ var CurrentState:TState;
      result:=TPACCInstance(Instance).TypeConversion(result);
     end else begin
      EnsureLValue(result);
+     if result.Kind in [astnkLVAR,astnkGVAR] then begin
+      TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(result).MustOnStack:=true;
+     end;
      result:=TPACCAbstractSyntaxTreeNodeUnaryOperator.Create(TPACCInstance(Instance),astnkADDR,TPACCInstance(Instance).NewPointerType(result.Type_),RelevantSourceLocation,result);
     end;
    end;

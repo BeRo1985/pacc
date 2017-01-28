@@ -163,6 +163,7 @@ type PPACCAbstractSyntaxTreeNodeKind=^TPACCAbstractSyntaxTreeNodeKind;
        Index:TPACCInt;
        LocalOffset:TPACCInt;
        LocalVariableInitialization:TPACCAbstractSyntaxTreeNodeList;
+       MustOnStack:boolean;
        constructor Create(const AInstance:TObject;const AKind:TPACCAbstractSyntaxTreeNodeKind;const AType:PPACCType;const ASourceLocation:TPACCSourceLocation;const AVariableName:TPACCRawByteString;const ALocalOffset:TPACCInt); reintroduce;
        destructor Destroy; override;
      end;
@@ -451,6 +452,7 @@ begin
  VariableName:=AVariableName;
  LocalOffset:=ALocalOffset;
  LocalVariableInitialization:=nil;
+ MustOnStack:=false;
 end;
 
 destructor TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Destroy;
