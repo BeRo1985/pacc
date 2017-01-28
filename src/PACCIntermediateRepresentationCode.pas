@@ -220,6 +220,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        pircoALLOC, // Allocate with size and alignment as operands
 
+       pircoLVAR, // Local variable with size and alignment as operands
+
        pircoPARI, // Get function parameter int
        pircoPARL, // Get function parameter long
        pircoPARF, // Get function parameter float
@@ -624,6 +626,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitAssignSrc(const Node:TPACCAbstractSyntaxTreeNode;var OutputTemporary:TPACCInt32);
        procedure EmitIntegerValue(const Node:TPACCAbstractSyntaxTreeNodeIntegerValue;var OutputTemporary:TPACCInt32);
        procedure EmitFloatValue(const Node:TPACCAbstractSyntaxTreeNodeFloatValue;var OutputTemporary:TPACCInt32);
+       procedure EmitStoreIntegerValueToVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;const InputValue:TPACCInt64);
+       procedure EmitStoreFloatValueToVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;const InputValue:TPACCDouble);
        procedure EmitStoreToVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;const InputTemporary:TPACCInt32);
        procedure EnsureLVarInit(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;const SourceLocation:TPACCSourceLocation);
        procedure EmitVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;var OutputTemporary:TPACCInt32);
@@ -2363,8 +2367,22 @@ begin
     EmitInstruction(pircoMEMCPYL,pirctNONE,EmptyOperand,[CreateTemporaryOperand(AssignLValueTemporary),CreateTemporaryOperand(VariableTemporary),CreateIntegerValueOperand(Node.Left.Type_^.Size)],Node.SourceLocation);
    end;
   end else begin
-   EmitExpression(Node.Right,OutputTemporary);
-   EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Left),OutputTemporary);
+   if (Node.Left.Kind in [astnkLVAR,astnkGVAR]) and
+      (Node.Left.Type_^.Kind in (PACCIntermediateRepresentationCodeINTTypeKinds+
+                                 PACCIntermediateRepresentationCodeLONGTypeKinds+
+                                 PACCIntermediateRepresentationCodeFLOATTypeKinds+
+                                 PACCIntermediateRepresentationCodeDOUBLETypeKinds)) and
+      (Node.Right.Kind=astnkINTEGER) then begin
+    EmitStoreIntegerValueToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Left),TPACCAbstractSyntaxTreeNodeIntegerValue(Node.Right).Value);
+   end else if (Node.Left.Kind in [astnkLVAR,astnkGVAR]) and
+               (Node.Left.Type_^.Kind in (PACCIntermediateRepresentationCodeFLOATTypeKinds+
+                                          PACCIntermediateRepresentationCodeDOUBLETypeKinds)) and
+               (Node.Right.Kind=astnkFLOAT) then begin
+    EmitStoreFloatValueToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Left),TPACCAbstractSyntaxTreeNodeFloatValue(Node.Right).Value);
+   end else begin
+    EmitExpression(Node.Right,OutputTemporary);
+    EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Left),OutputTemporary);
+   end;
   end;
  end else begin
   AssignLValueTemporary:=-1;
@@ -2431,6 +2449,55 @@ begin
   EmitInstruction(pircoSETD,pirctDOUBLE,CreateTemporaryOperand(OutputTemporary),[CreateFloatValueOperand(TPACCAbstractSyntaxTreeNodeFloatValue(Node).Value)],Node.SourceLocation);
  end else begin
   TPACCInstance(fInstance).AddError('Internal error 2017-01-22-16-04-0000',@Node.SourceLocation,true);
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.EmitStoreIntegerValueToVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;const InputValue:TPACCInt64);
+begin
+ case Node.Type_^.Kind of
+  tkBOOL,tkCHAR:begin
+   EmitInstruction(pircoSTIC,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateIntegerValueOperand(InputValue)],Node.SourceLocation);
+  end;
+  tkSHORT:begin
+   EmitInstruction(pircoSTIS,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateIntegerValueOperand(InputValue)],Node.SourceLocation);
+  end;
+  tkINT,tkENUM:begin
+   EmitInstruction(pircoSTII,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateIntegerValueOperand(InputValue)],Node.SourceLocation);
+  end;
+  tkLONG,tkLLONG:begin
+   EmitInstruction(pircoSTLL,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateIntegerValueOperand(InputValue)],Node.SourceLocation);
+  end;
+  tkFLOAT:begin
+   EmitInstruction(pircoSTF,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateFloatValueOperand(InputValue)],Node.SourceLocation);
+  end;
+  tkDOUBLE,tkLDOUBLE:begin
+   EmitInstruction(pircoSTD,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateFloatValueOperand(InputValue)],Node.SourceLocation);
+  end;
+  tkPOINTER:begin
+   if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
+    EmitInstruction(pircoSTII,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateIntegerValueOperand(InputValue)],Node.SourceLocation);
+   end else begin
+    EmitInstruction(pircoSTLL,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateIntegerValueOperand(InputValue)],Node.SourceLocation);
+   end;
+  end;
+  else begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-22-16-36-0000',@Node.SourceLocation,true);
+  end;
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.EmitStoreFloatValueToVariable(const Node:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;const InputValue:TPACCDouble);
+begin
+ case Node.Type_^.Kind of
+  tkFLOAT:begin
+   EmitInstruction(pircoSTF,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateFloatValueOperand(InputValue)],Node.SourceLocation);
+  end;
+  tkDOUBLE,tkLDOUBLE:begin
+   EmitInstruction(pircoSTD,pirctNONE,EmptyOperand,[CreateVariableOperand(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)),CreateFloatValueOperand(InputValue)],Node.SourceLocation);
+  end;
+  else begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-22-16-36-0000',@Node.SourceLocation,true);
+  end;
  end;
 end;
 
@@ -3443,8 +3510,16 @@ begin
       (Node.DeclarationVariable.Type_^.Kind=tkPOINTER)) then begin
    if Node.DeclarationVariable.Kind in [astnkLVAR,astnkGVAR] then begin
     EnsureLVarInit(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable),Node.SourceLocation);
-    EmitExpression(TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[0]).InitializionValue,ValueTemporary);
-    EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable),ValueTemporary);
+    if assigned(TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[0]).InitializionValue) and
+       (TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[0]).InitializionValue.Kind=astnkINTEGER) then begin
+     EmitStoreIntegerValueToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable),TPACCAbstractSyntaxTreeNodeIntegerValue(TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[0]).InitializionValue).Value);
+    end else if assigned(TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[0]).InitializionValue) and
+                (TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[0]).InitializionValue.Kind=astnkFLOAT) then begin
+     EmitStoreFloatValueToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable),TPACCAbstractSyntaxTreeNodeFloatValue(TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[0]).InitializionValue).Value);
+    end else begin
+     EmitExpression(TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[0]).InitializionValue,ValueTemporary);
+     EmitStoreToVariable(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable),ValueTemporary);
+    end;
    end else begin
     EmitLValue(Node.DeclarationVariable,VariableTemporary);
     EmitExpression(TPACCAbstractSyntaxTreeNodeInitializer(Node.DeclarationInitialization[0]).InitializionValue,ValueTemporary);
@@ -5158,28 +5233,38 @@ begin
    Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(FunctionDeclaration.LocalVariables[Index]);
    if assigned(Variable) then begin
     Type_:=Variable.Type_;
-    Alignment:=Variable.Type_^.Alignment;
-    Size:=1;
-    case Type_^.Kind of
-     tkARRAY:begin
-      while assigned(Type_) and (Type_^.Kind=tkARRAY) do begin
-       Size:=Size*Type_^.ArrayLength;
-       Type_:=Type_^.ChildType;
+    if Type_.Kind in (PACCIntermediateRepresentationCodeINTTypeKinds+
+                      PACCIntermediateRepresentationCodeLONGTypeKinds+
+                      PACCIntermediateRepresentationCodeFLOATTypeKinds+
+                      PACCIntermediateRepresentationCodeDOUBLETypeKinds+
+                      [tkPOINTER]) then begin
+     Alignment:=Variable.Type_^.Alignment;
+     Size:=1;
+     EmitInstruction(pircoLVAR,DataTypeToCodeType(Type_),CreateTemporaryOperand(CreateVariableTemporary(Variable)),[CreateIntegerValueOperand(Size),CreateIntegerValueOperand(Alignment)],AFunctionNode.SourceLocation);
+    end else begin
+     Alignment:=Variable.Type_^.Alignment;
+     Size:=1;
+     case Type_^.Kind of
+      tkARRAY:begin
+       while assigned(Type_) and (Type_^.Kind=tkARRAY) do begin
+        Size:=Size*Type_^.ArrayLength;
+        Type_:=Type_^.ChildType;
+       end;
+       if Type_^.Kind=tkSTRUCT then begin
+        Type_:=Variable.Type_;
+        Size:=Type_^.Size;
+        Type_:=TPACCInstance(fInstance).TypeCHAR;
+       end else begin
+        Size:=Size*Type_^.Size;
+       end;
       end;
-      if Type_^.Kind=tkSTRUCT then begin
-       Type_:=Variable.Type_;
+      tkSTRUCT:begin
        Size:=Type_^.Size;
        Type_:=TPACCInstance(fInstance).TypeCHAR;
-      end else begin
-       Size:=Size*Type_^.Size;
       end;
      end;
-     tkSTRUCT:begin
-      Size:=Type_^.Size;
-      Type_:=TPACCInstance(fInstance).TypeCHAR;
-     end;
+     EmitInstruction(pircoALLOC,DataTypeToCodeType(Type_),CreateTemporaryOperand(CreateVariableTemporary(Variable)),[CreateIntegerValueOperand(Size),CreateIntegerValueOperand(Alignment)],AFunctionNode.SourceLocation);
     end;
-    EmitInstruction(pircoALLOC,DataTypeToCodeType(Type_),CreateTemporaryOperand(CreateVariableTemporary(Variable)),[CreateIntegerValueOperand(Size),CreateIntegerValueOperand(Alignment)],AFunctionNode.SourceLocation);
    end;
   end;
  end;
@@ -5990,6 +6075,7 @@ begin
  OpcodeNames[pircoCMPOD]:='cmpod';
  OpcodeNames[pircoCMPNOD]:='cmpnod';
  OpcodeNames[pircoALLOC]:='alloc';
+ OpcodeNames[pircoLVAR]:='lvar';
  OpcodeNames[pircoPARI]:='pari';
  OpcodeNames[pircoPARL]:='parl';
  OpcodeNames[pircoPARF]:='parf';
