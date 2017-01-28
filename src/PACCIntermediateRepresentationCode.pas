@@ -271,8 +271,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircokTEMPORARY,
        pircokCONSTANT,
        pircokCALL,
-       pircokVARIABLE,
-       pircokLABEL,
        pircokFUNCTION,
        pircokCOUNT
      );
@@ -288,12 +286,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        );
        pircokCONSTANT:(
         Constant:TPACCInt32;
-       );
-       pircokVARIABLE:(
-        Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
-       );
-       pircokLABEL:(
-        Label_:TPACCAbstractSyntaxTreeNodeLabel;
        );
        pircokFUNCTION:(
         Function_:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration;
@@ -313,6 +305,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircakSTACKESCAPE,
        pircakLABEL,
        pircakVARIABLE,
+       pircakFUNCTION,
        pircakUNKNOWN
       );
 
@@ -323,6 +316,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Base:TPACCIntermediateRepresentationCodeOperand;
        Label_:TPACCAbstractSyntaxTreeNodeLabel;
        Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+       Function_:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration;
        Offset:TPACCInt64;
        constructor Create;
        destructor Destroy; override;
@@ -336,6 +330,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircckDATA,
        pircckLABEL,
        pircckVARIABLE,
+       pircckFUNCTION,
        pircckCOUNT
       );
 
@@ -369,6 +364,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Data:TPACCIntermediateRepresentationCodeConstantData;
        Label_:TPACCAbstractSyntaxTreeNodeLabel;
        Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+       Function_:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration;
        Local:boolean;
        constructor Create;
        destructor Destroy; override;
@@ -711,6 +707,12 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        DoubleConstantHashMap:TPACCInt64HashMap;
 
+       LabelConstantHashMap:TPACCPointerHashMap;
+
+       VariableConstantHashMap:TPACCPointerHashMap;
+
+       FunctionConstantHashMap:TPACCPointerHashMap;
+
        VariableTemporaryHashMap:TPACCPointerHashMap;
 
        constructor Create(const AInstance:TObject); reintroduce;
@@ -908,6 +910,7 @@ begin
  Base.Kind:=pircokNONE;
  Label_:=nil;
  Variable:=nil;
+ Function_:=nil;
  Offset:=0;
 end;
 
@@ -922,6 +925,7 @@ begin
  Base:=From.Base;
  Label_:=From.Label_;
  Variable:=From.Variable;
+ Function_:=From.Function_;
  Offset:=From.Offset;
 end;
 
@@ -934,6 +938,7 @@ begin
  Data.IntegerValue:=0;
  Label_:=nil;
  Variable:=nil;
+ Function_:=nil;
  Local:=false;
 end;
 
@@ -948,6 +953,7 @@ begin
  Data:=From.Data;
  Label_:=From.Label_;
  Variable:=From.Variable;
+ Function_:=From.Function_;
  Local:=From.Local;
 end;
 
@@ -1315,6 +1321,12 @@ begin
 
  VariableTemporaryHashMap:=TPACCPointerHashMap.Create;
 
+ LabelConstantHashMap:=TPACCPointerHashMap.Create;
+
+ VariableConstantHashMap:=TPACCPointerHashMap.Create;
+
+ FunctionConstantHashMap:=TPACCPointerHashMap.Create;
+
 end;
 
 destructor TPACCIntermediateRepresentationCodeFunction.Destroy;
@@ -1327,6 +1339,9 @@ begin
  IntegerConstantHashMap.Free;
  FloatConstantHashMap.Free;
  DoubleConstantHashMap.Free;
+ LabelConstantHashMap.Free;
+ VariableConstantHashMap.Free;
+ FunctionConstantHashMap.Free;
  RPO:=nil;
  inherited Destroy;
 end;
@@ -1564,30 +1579,60 @@ begin
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateVariableOperand(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeOperand;
+var Constant:TPACCIntermediateRepresentationCodeConstant;
 begin
  if Variable.Kind=astnkLVAR then begin
   // Local variable, so convert into a temporary
   result:=CreateTemporaryOperand(CreateVariableTemporary(Variable));
  end else begin
   // Global variable
+  Constant:=VariableConstantHashMap[Variable];
+  if not assigned(Constant) then begin
+   Constant:=TPACCIntermediateRepresentationCodeConstant.Create;
+   TPACCInstance(fInstance).AllocatedObjects.Add(Constant);
+   Constant.Index:=Constants.Add(Constant);
+   Constant.Kind:=pircckVARIABLE;
+   Constant.Variable:=Variable;
+   VariableConstantHashMap[Variable]:=Constant;
+  end;
   result.Flags:=[];
-  result.Kind:=pircokVARIABLE;
-  result.Variable:=Variable;
+  result.Kind:=pircokCONSTANT;
+  result.Constant:=Constant.Index;
  end;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateLabelOperand(const Label_:TPACCAbstractSyntaxTreeNodeLabel):TPACCIntermediateRepresentationCodeOperand;
+var Constant:TPACCIntermediateRepresentationCodeConstant;
 begin
+ Constant:=LabelConstantHashMap[Label_];
+ if not assigned(Constant) then begin
+  Constant:=TPACCIntermediateRepresentationCodeConstant.Create;
+  TPACCInstance(fInstance).AllocatedObjects.Add(Constant);
+  Constant.Index:=Constants.Add(Constant);
+  Constant.Kind:=pircckLABEL;
+  Constant.Label_:=Label_;
+  LabelConstantHashMap[Label_]:=Constant;
+ end;
  result.Flags:=[];
- result.Kind:=pircokLABEL;
- result.Label_:=Label_;
+ result.Kind:=pircokCONSTANT;
+ result.Constant:=Constant.Index;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateFunctionOperand(const TheFunction:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration):TPACCIntermediateRepresentationCodeOperand;
+var Constant:TPACCIntermediateRepresentationCodeConstant;
 begin
+ Constant:=FunctionConstantHashMap[TheFunction];
+ if not assigned(Constant) then begin
+  Constant:=TPACCIntermediateRepresentationCodeConstant.Create;
+  TPACCInstance(fInstance).AllocatedObjects.Add(Constant);
+  Constant.Index:=Constants.Add(Constant);
+  Constant.Kind:=pircckFUNCTION;
+  Constant.Function_:=TheFunction;
+  FunctionConstantHashMap[TheFunction]:=Constant;
+ end;
  result.Flags:=[];
- result.Kind:=pircokFUNCTION;
- result.Function_:=TheFunction;
+ result.Kind:=pircokCONSTANT;
+ result.Constant:=Constant.Index;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.SetOperandFlags(const Operand:TPACCIntermediateRepresentationCodeOperand;const IncludeFlags,ExcludeFlags:TPACCIntermediateRepresentationCodeOperandFlags):TPACCIntermediateRepresentationCodeOperand;
@@ -4412,15 +4457,6 @@ begin
    pircokCONSTANT:begin
     result:=Operand.Constant=OtherOperand.Constant;
    end;
-   pircokVARIABLE:begin
-    result:=Operand.Variable=OtherOperand.Variable;
-   end;
-   pircokLABEL:begin
-    result:=Operand.Label_=OtherOperand.Label_;
-   end;
-   pircokFUNCTION:begin
-    result:=Operand.Function_=OtherOperand.Function_;
-   end;
    pircokCOUNT:begin
    end;
   end;
@@ -6064,22 +6100,16 @@ const AlignmentOpcode=4;
       pircckVARIABLE:begin
        Line:=Line+'constant(variable('+Constant.Variable.VariableName+'))';
       end;
+      pircckFUNCTION:begin
+       Line:=Line+'constant(function('+Constant.Function_.FunctionName+'))';
+      end;
       else begin
        TPACCInstance(fInstance).AddError('Internal error 2017-01-28-23-27-0000',nil,true);
       end;
      end;
     end;
-    pircokVARIABLE:begin
-     Line:=Line+'variable('+Operand.Variable.VariableName+')';
-    end;
-    pircokLABEL:begin
-     Line:=Line+'label('+LowerCase(IntToHex(TPACCPtrUInt(Operand.Label_),SizeOf(TPACCPtrUInt) shl 1))+')';
-    end;
-    pircokFUNCTION:begin
-     Assert(false);
-    end;
     else begin
-//       TPACCInstance(fInstance).AddError('Internal error 2017-01-28-00-38-0000',@Instruction.SourceLocation,true);
+//   TPACCInstance(fInstance).AddError('Internal error 2017-01-28-00-38-0000',@Instruction.SourceLocation,true);
     end;
    end
   end;
