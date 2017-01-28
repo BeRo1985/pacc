@@ -5331,7 +5331,9 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
        if Phi.To_.Kind=pircokTEMPORARY then begin
         TemporaryIndex:=Phi.To_.Temporary;
         Temporary:=Temporaries[TemporaryIndex];
-        if (TemporaryIndex+1)=Temporary.Visit then begin
+        TemporaryIndex:=Temporary.Visit;
+        if TemporaryIndex<>0 then begin
+         dec(TemporaryIndex);
          Index:=Phi.CountOperands;
          inc(Phi.CountOperands);
          if length(Phi.Operands)<Phi.CountOperands then begin
