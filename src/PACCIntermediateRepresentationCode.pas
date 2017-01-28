@@ -603,7 +603,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure FillRPO;
        procedure FillPredecessors;
        procedure FillUse;
-       procedure MemoryOptimization;
+       procedure PromoteUniformMemoryStackSlotsToTemporaries;
        procedure LiveOn(var BitSet:TPACCIntermediateRepresentationCodeBitSet;const Block,Successor:TPACCIntermediateRepresentationCodeBlock);
        function ReturnRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;var CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
        function ArgumentRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;var CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
@@ -4526,7 +4526,7 @@ begin
 
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.MemoryOptimization;
+procedure TPACCIntermediateRepresentationCodeFunction.PromoteUniformMemoryStackSlotsToTemporaries;
 var InstructionIndex,TemporaryIndex,UseIndex,Size:TPACCInt32;
     Block:TPACCIntermediateRepresentationCodeBlock;
     Instruction,ByInstruction:TPACCIntermediateRepresentationCodeInstruction;
@@ -4783,7 +4783,7 @@ begin
   end;
  end;
 {$ifdef IRDebug}
- writeln('> After memory optimization:');
+ writeln('> After uniform memory stack slots to temporaries promotion:');
  DumpToConsole;
 {$endif}
 end;
@@ -5560,7 +5560,7 @@ begin
  FillRPO;
  FillPredecessors;
  FillUse;
- MemoryOptimization;
+ PromoteUniformMemoryStackSlotsToTemporaries;
  SSA;
  FillUse;
  SSACheck;
