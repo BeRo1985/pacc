@@ -36,7 +36,8 @@ uses
   PACCTarget_x86_32 in 'PACCTarget_x86_32.pas',
   PACCTarget_x86_64_SystemV in 'PACCTarget_x86_64_SystemV.pas',
   PACCInstance in 'PACCInstance.pas',
-  PACCIntermediateRepresentationCode in 'PACCIntermediateRepresentationCode.pas';
+  PACCIntermediateRepresentationCode in 'PACCIntermediateRepresentationCode.pas',
+  PACCInt64HashMap in 'PACCInt64HashMap.pas';
 
 var ParameterIndex,CountParameters,Index:TPACCInt32;
     Parameter:TPUCUUTF8String;
