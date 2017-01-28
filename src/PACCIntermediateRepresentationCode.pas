@@ -598,7 +598,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitIFStatement(const Node:TPACCAbstractSyntaxTreeNodeIFStatementOrTernaryOperator);
        procedure EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
        procedure EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements);
-       function AreEqualOperands(const Operand,OtherOperand:TPACCIntermediateRepresentationCodeOperand):boolean;
+       function AreOperandsEqual(const Operand,OtherOperand:TPACCIntermediateRepresentationCodeOperand):boolean;
        procedure DeleteBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
        procedure FillRPO;
        procedure FillPredecessors;
@@ -4219,7 +4219,7 @@ begin
  end;
 end;
 
-function TPACCIntermediateRepresentationCodeFunction.AreEqualOperands(const Operand,OtherOperand:TPACCIntermediateRepresentationCodeOperand):boolean;
+function TPACCIntermediateRepresentationCodeFunction.AreOperandsEqual(const Operand,OtherOperand:TPACCIntermediateRepresentationCodeOperand):boolean;
 begin
  result:=Operand.Kind=OtherOperand.Kind;
  if result then begin
@@ -5460,7 +5460,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSACheck;
  begin
   result:=false;
   for OperandIndex:=0 to Phi.CountOperands-1 do begin
-   if AreEqualOperands(Phi.Operands[OperandIndex],Operand) then begin
+   if AreOperandsEqual(Phi.Operands[OperandIndex],Operand) then begin
     OtherBlock:=Phi.Blocks[OperandIndex];
     if (Block<>OtherBlock) and not CompareSDominance(Block,OtherBlock) then begin
      result:=true;
@@ -5469,8 +5469,61 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSACheck;
    end;
   end;
  end;
+var TemporaryIndex,UseIndex:TPACCInt32;
+    Temporary:TPACCIntermediateRepresentationCodeTemporary;
+    Block,UseInBlock:TPACCIntermediateRepresentationCodeBlock;
+    Phi:TPACCIntermediateRepresentationCodePhi;
+    Operand:TPACCIntermediateRepresentationCodeOperand;
+    Use:TPACCIntermediateRepresentationCodeUse;
+ procedure Error;
+ begin
+  if Temporary.Visit<>0 then begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-28-19-20-0001, a SSA temporary (#'+IntToStr(Temporary.Index)+') violates SSA invariant',nil,true);
+  end else begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-28-19-20-0000, a SSA temporary (#'+IntToStr(Temporary.Index)+') is used undefined',nil,true);
+  end;
+ end;
 begin
 
+ for TemporaryIndex:=0 to Temporaries.Count-1 do begin
+  Temporary:=Temporaries[TemporaryIndex];
+  if Temporary.CountDefinitions>1 then begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-28-19-17-0000, a SSA temporary (#'+IntToStr(Temporary.Index)+') is defined more than once',nil,true);
+  end else if (Temporary.CountDefinitions=0) and (Temporary.Uses_.Count>0) then begin
+   Error;
+  end;
+ end;
+
+ Block:=StartBlock;
+ while assigned(Block) do begin
+  Phi:=Block.Phi;
+  while assigned(Phi) do begin
+   Operand:=Phi.To_;
+   if Operand.Kind=pircokTEMPORARY then begin
+    TemporaryIndex:=Operand.Temporary;
+    Temporary:=Temporaries[TemporaryIndex];
+    for UseIndex:=0 to Temporary.Uses_.Count-1 do begin
+     Use:=Temporary.Uses_[UseIndex];
+     UseInBlock:=RPO[Use.BlockID];
+     if Use.Kind=pircukPHI then begin
+      if PhiCheck(Use.By.Phi,Block,Operand) then begin
+       Error;
+      end;
+     end else begin
+      if (Block<>UseInBlock) and not CompareSDominance(Block,UseInBlock) then begin
+       Error;
+      end;
+     end;
+    end;
+   end else begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-28-19-23-0000',nil,true);
+   end;
+   Phi:=Phi.Link;
+  end;
+  Block:=Block.Link;
+ end;
+ 
+  
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
