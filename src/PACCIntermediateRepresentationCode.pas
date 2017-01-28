@@ -269,6 +269,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       (
        pircokNONE,
        pircokTEMPORARY,
+       pircokCONSTANT,
        pircokCALL,
        pircokINTEGER,
        pircokFLOAT,
@@ -286,6 +287,9 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        );
        pircokTEMPORARY:(
         Temporary:TPACCInt32;
+       );
+       pircokCONSTANT:(
+        Constant:TPACCInt32;
        );
        pircokINTEGER:(
         IntegerValue:TPACCInt64;
@@ -315,7 +319,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircakSTACKLOCAL,
        pircakCONSTANT,
        pircakSTACKESCAPE,
-       pircakSYMBOL,
+       pircakLABEL,
+       pircakVARIABLE,
        pircakUNKNOWN
       );
 
@@ -325,9 +330,66 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Kind:TPACCIntermediateRepresentationCodeAliasKind;
        Base:TPACCIntermediateRepresentationCodeOperand;
        Label_:TPACCAbstractSyntaxTreeNodeLabel;
+       Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
        Offset:TPACCInt64;
        constructor Create;
        destructor Destroy; override;
+       procedure Assign(const From:TPACCIntermediateRepresentationCodeAlias);
+     end;
+
+     PPACCIntermediateRepresentationCodeConstantKind=^TPACCIntermediateRepresentationCodeConstantKind;
+     TPACCIntermediateRepresentationCodeConstantKind=
+      (
+       pircckNONE,
+       pircckDATA,
+       pircckLABEL,
+       pircckVARIABLE,
+       pircckCOUNT
+      );
+
+     PPACCIntermediateRepresentationCodeConstantDataKind=^TPACCIntermediateRepresentationCodeConstantDataKind;
+     TPACCIntermediateRepresentationCodeConstantDataKind=
+      (
+       pirccdkINTEGER,
+       pirccdkFLOAT,
+       pirccdkDOUBLE
+      );
+
+     PPACCIntermediateRepresentationCodeConstantData=^TPACCIntermediateRepresentationCodeConstantData;
+     TPACCIntermediateRepresentationCodeConstantData=record
+      case Kind:TPACCIntermediateRepresentationCodeConstantDataKind of
+       pirccdkINTEGER:(
+        IntegerValue:TPACCInt64;
+       );
+       pirccdkFLOAT:(
+        FloatValue:TPACCFloat;
+       );
+       pirccdkDOUBLE:(
+        DoubleValue:TPACCDouble;
+       );
+     end;
+
+     PPACCIntermediateRepresentationCodeConstant=^TPACCIntermediateRepresentationCodeConstant;
+     TPACCIntermediateRepresentationCodeConstant=class
+      public
+       Kind:TPACCIntermediateRepresentationCodeConstantKind;
+       Data:TPACCIntermediateRepresentationCodeConstantData;
+       Label_:TPACCAbstractSyntaxTreeNodeLabel;
+       Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+       Local:boolean;
+       constructor Create;
+       destructor Destroy; override;
+       procedure Assign(const From:TPACCIntermediateRepresentationCodeConstant);
+     end;
+
+     TPACCIntermediateRepresentationCodeConstantList=class(TList)
+      private
+       function GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeConstant;
+       procedure SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeConstant);
+      public
+       constructor Create;
+       destructor Destroy; override;
+       property Items[const AIndex:TPACCInt]:TPACCIntermediateRepresentationCodeConstant read GetItem write SetItem; default;
      end;
 
      PPACCIntermediateRepresentationCodeTemporaryKind=^TPACCIntermediateRepresentationCodeTemporaryKind;
@@ -620,6 +682,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure LoopIteration(const Hook:TPACCIntermediateRepresentationCodeFunctionLoopIterationHook);
        procedure FillLoopMultLoop(const Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock);
        procedure FillLoop;
+       procedure GetAlias(const Alias:TPACCIntermediateRepresentationCodeAlias;const Operand:TPACCIntermediateRepresentationCodeOperand);
+       procedure FillAlias;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -644,6 +708,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Temporaries:TPACCIntermediateRepresentationCodeTemporaryList;
 
        TemporaryReferenceCounter:TPACCUInt32;
+
+       Constants:TPACCIntermediateRepresentationCodeConstantList;
 
        VariableTemporaryHashMap:TPACCPointerHashMap;
 
@@ -838,15 +904,70 @@ end;
 constructor TPACCIntermediateRepresentationCodeAlias.Create;
 begin
  inherited Create;
- Kind:=pircakUNKNOWN;
+ Kind:=pircakBOTTOM;
  Base.Kind:=pircokNONE;
  Label_:=nil;
+ Variable:=nil;
  Offset:=0;
 end;
 
 destructor TPACCIntermediateRepresentationCodeAlias.Destroy;
 begin
  inherited Destroy;
+end;
+
+procedure TPACCIntermediateRepresentationCodeAlias.Assign(const From:TPACCIntermediateRepresentationCodeAlias);
+begin
+ Kind:=From.Kind;
+ Base:=From.Base;
+ Label_:=From.Label_;
+ Variable:=From.Variable;
+ Offset:=From.Offset;
+end;
+
+constructor TPACCIntermediateRepresentationCodeConstant.Create;
+begin
+ inherited Create;
+ Kind:=pircckNONE;
+ Data.Kind:=pirccdkINTEGER;
+ Data.IntegerValue:=0;
+ Label_:=nil;
+ Variable:=nil;
+ Local:=false;
+end;
+
+destructor TPACCIntermediateRepresentationCodeConstant.Destroy;
+begin
+ inherited Destroy;
+end;
+
+procedure TPACCIntermediateRepresentationCodeConstant.Assign(const From:TPACCIntermediateRepresentationCodeConstant);
+begin
+ Kind:=From.Kind;
+ Data:=From.Data;
+ Label_:=From.Label_;
+ Variable:=From.Variable;
+ Local:=From.Local;
+end;
+
+constructor TPACCIntermediateRepresentationCodeConstantList.Create;
+begin
+ inherited Create;
+end;
+
+destructor TPACCIntermediateRepresentationCodeConstantList.Destroy;
+begin
+ inherited Destroy;
+end;
+
+function TPACCIntermediateRepresentationCodeConstantList.GetItem(const AIndex:TPACCInt):TPACCIntermediateRepresentationCodeConstant;
+begin
+ result:=pointer(inherited Items[AIndex]);
+end;
+
+procedure TPACCIntermediateRepresentationCodeConstantList.SetItem(const AIndex:TPACCInt;const AItem:TPACCIntermediateRepresentationCodeConstant);
+begin
+ inherited Items[AIndex]:=pointer(AItem);
 end;
 
 constructor TPACCIntermediateRepresentationCodeTemporary.Create;
@@ -1183,6 +1304,8 @@ begin
 
  TemporaryReferenceCounter:=0;
 
+ Constants:=TPACCIntermediateRepresentationCodeConstantList.Create;
+
  VariableTemporaryHashMap:=TPACCPointerHashMap.Create;
 
 end;
@@ -1193,6 +1316,7 @@ begin
  BlockLabelHashMap.Free;
  VariableTemporaryHashMap.Free;
  Temporaries.Free;
+ Constants.Free;
  RPO:=nil;
  inherited Destroy;
 end;
@@ -5605,6 +5729,137 @@ begin
   Block:=Block.Link;
  end;
  LoopIteration(FillLoopMultLoop);
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.GetAlias(const Alias:TPACCIntermediateRepresentationCodeAlias;const Operand:TPACCIntermediateRepresentationCodeOperand);
+var Constant:TPACCIntermediateRepresentationCodeConstant;
+begin
+ case Operand.Kind of
+  pircokTEMPORARY:begin
+   Alias.Assign(Temporaries[Operand.Temporary].Alias);
+  end;
+  pircokCONSTANT:begin
+   Constant:=Constants[Operand.Constant];
+   case Constant.Kind of
+    pircckVARIABLE:begin
+     Alias.Kind:=pircakVARIABLE;
+     Alias.Variable:=Constant.Variable;
+    end;
+    pircckLABEL:begin
+     Alias.Kind:=pircakLABEL;
+     Alias.Label_:=Constant.Label_;
+    end;
+    else begin
+     Alias.Kind:=pircakCONSTANT;
+    end;
+   end;
+   Alias.Offset:=Constant.Data.IntegerValue;
+  end;
+  else begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-28-22-47-0000',nil,true);
+  end;
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.FillAlias;
+ procedure Escape(const Operand:TPACCIntermediateRepresentationCodeOperand);
+ var Alias:TPACCIntermediateRepresentationCodeAlias;
+ begin
+  case Operand.Kind of
+   pircokTEMPORARY:begin
+    Alias:=Temporaries[Operand.Temporary].Alias;
+    if Alias.Kind=pircakBOTTOM then begin
+     if Alias.Kind=pircakSTACKLOCAL then begin
+      Alias.Kind:=pircakSTACKESCAPE;
+     end;                  
+    end else begin
+     TPACCInstance(fInstance).AddError('Internal error 2017-01-28-23-02-0000',nil,true);
+    end;
+   end;
+   pircokCONSTANT:begin
+    // Do nothing
+   end;
+   else begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-28-23-00-0000',nil,true);
+   end;
+  end;
+ end;
+var Index,InstructionIndex:TPACCInt32;
+    Block:TPACCIntermediateRepresentationCodeBlock;
+    Phi:TPACCIntermediateRepresentationCodePhi;
+    Instruction:TPACCIntermediateRepresentationCodeInstruction;
+    Alias,Alias0,Alias1:TPACCIntermediateRepresentationCodeAlias;
+begin
+ for Index:=0 to CountBlocks-1 do begin
+
+ 	Block:=RPO[Index];
+
+  Phi:=Block.Phi;
+  while assigned(Phi) do begin
+   if Phi.To_.Kind=pircokTEMPORARY then begin
+    Alias:=Temporaries[Phi.To_.Temporary].Alias;
+    if Alias.Kind=pircakBOTTOM then begin
+     Alias.Kind:=pircakUNKNOWN;
+     Alias.Base:=Phi.To_;
+     Alias.Offset:=0;
+    end else begin
+     TPACCInstance(fInstance).AddError('Internal error 2017-01-28-22-22-0000',nil,true);
+    end;
+   end else begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-28-22-19-0000',nil,true);
+   end;
+   Phi:=Phi.Link;
+  end;
+
+  for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+   Instruction:=Block.Instructions[InstructionIndex];
+   Alias:=nil;
+   if Instruction.To_.Kind<>pircokNONE then begin
+    if Instruction.To_.Kind=pircokTEMPORARY then begin
+     Alias:=Temporaries[Instruction.To_.Temporary].Alias;
+     if Alias.Kind=pircakBOTTOM then begin
+      if Instruction.Opcode=pircoALLOC then begin
+       Alias.Kind:=pircakSTACKLOCAL;
+      end else begin
+       Alias.Kind:=pircakUNKNOWN;
+      end;
+      Alias.Base:=Instruction.To_;
+      Alias.Offset:=0;
+     end else begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-28-22-24-0000',@Instruction.SourceLocation,true);
+     end;
+    end else begin
+     TPACCInstance(fInstance).AddError('Internal error 2017-01-28-22-23-0000',@Instruction.SourceLocation,true);
+    end;
+   end;
+   if Instruction.Opcode=pircoADD then begin
+    Alias0:=TPACCIntermediateRepresentationCodeAlias.Create;
+    try
+     Alias1:=TPACCIntermediateRepresentationCodeAlias.Create;
+     try
+      GetAlias(Alias0,Instruction.Operands[0]);
+      GetAlias(Alias1,Instruction.Operands[1]);
+      if Alias0.Kind=pircakCONSTANT then begin
+       Alias.Assign(Alias1);
+       inc(Alias.Offset,Alias0.Offset);
+      end else if Alias1.Kind=pircakCONSTANT then begin
+       Alias.Assign(Alias0);
+       inc(Alias.Offset,Alias1.Offset);
+      end;
+     finally
+      Alias1.Free;
+     end;
+    finally
+     Alias0.Free;
+    end;
+   end;
+   if ((Instruction.To_.Kind=pircokNONE) or (Alias.Kind=pircakUNKNOWN)) and
+      not (Instruction.Opcode in [pircoLDUCI..pircoLDD,pircoSTIC..pircoSTD]) then begin
+    Escape(Instruction.Operands[0]);
+   end;
+  end;
+  Escape(Block.Jump.Operand);
+ end;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
