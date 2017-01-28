@@ -642,6 +642,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        destructor Destroy; override;
 
        procedure DumpTo(const AStringList:TStringList);
+       procedure DumpToConsole;
 
       published
 
@@ -4763,6 +4764,10 @@ begin
    end;
   end;
  end;
+{$ifdef IRDebug}
+ writeln('> After memory optimization:');
+ DumpToConsole;
+{$endif}
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.LiveOn(var BitSet:TPACCIntermediateRepresentationCodeBitSet;const Block,Successor:TPACCIntermediateRepresentationCodeBlock);
@@ -5410,6 +5415,10 @@ begin
  FillLive;
  FillMissingPhiInstructions;
  Rename;
+{$ifdef IRDebug}
+ writeln('> After SSA construction:');
+ DumpToConsole;
+{$endif}
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
@@ -5500,14 +5509,6 @@ begin
  end;
 
  PostProcess;
-
- StringList:=TStringList.Create;
- try
-  DumpTo(StringList);
-  writeln(StringList.Text);
- finally
-  StringList.Free;
- end;
 
 end;
 
@@ -5684,6 +5685,18 @@ begin
  end;
 
  AStringList.Add('}');
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.DumpToConsole;
+var StringList:TStringList;
+begin
+ StringList:=TStringList.Create;
+ try
+  DumpTo(StringList);
+  writeln(StringList.Text);
+ finally
+  StringList.Free;
+ end;
 end;
 
 constructor TPACCIntermediateRepresentationCodeFunctionList.Create;
