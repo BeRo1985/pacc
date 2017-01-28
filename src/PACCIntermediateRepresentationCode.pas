@@ -54,10 +54,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircoSETF, // Set float
        pircoSETD, // Set double
 
-       pircoMOVI, // Move from int to int
-       pircoMOVL, // Move from long to long
-       pircoMOVF, // Move from float to float
-       pircoMOVD, // Move from double to double
+       pircoCOPY, // Copy
+       pircoCAST, // Cast
 
        pircoSWAPI, // Swap between int and int
        pircoSWAPL, // Swap between long and long
@@ -2189,23 +2187,23 @@ begin
    EmitExpression(LValueNode,TemporaryA);
    if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
     OutputTemporary:=CreateTemporary(pirctINT);
-    EmitInstruction(pircoMOVI,pirctINT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
+    EmitInstruction(pircoCOPY,pirctINT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
    end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
     OutputTemporary:=CreateTemporary(pirctLONG);
-    EmitInstruction(pircoMOVL,pirctLONG,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
+    EmitInstruction(pircoCOPY,pirctLONG,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
    end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
     OutputTemporary:=CreateTemporary(pirctFLOAT);
-    EmitInstruction(pircoMOVF,pirctFLOAT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
+    EmitInstruction(pircoCOPY,pirctFLOAT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
    end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
     OutputTemporary:=CreateTemporary(pirctDOUBLE);
-    EmitInstruction(pircoMOVD,pirctDOUBLE,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
+    EmitInstruction(pircoCOPY,pirctDOUBLE,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
    end else if Node.Type_^.Kind=tkPOINTER then begin
     if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
      OutputTemporary:=CreateTemporary(pirctINT);
-     EmitInstruction(pircoMOVI,pirctINT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
+     EmitInstruction(pircoCOPY,pirctINT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
     end else begin
      OutputTemporary:=CreateTemporary(pirctLONG);
-     EmitInstruction(pircoMOVL,pirctLONG,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
+     EmitInstruction(pircoCOPY,pirctLONG,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
     end;
    end;
    UnaryOpHook(TemporaryB,TemporaryA,Node);
@@ -2221,23 +2219,23 @@ begin
    EmitLoad(TemporaryA,LValueTemporary,LValueNode.Type_,Node.SourceLocation);
    if Node.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds then begin
     OutputTemporary:=CreateTemporary(pirctINT);
-    EmitInstruction(pircoMOVI,pirctINT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
+    EmitInstruction(pircoCOPY,pirctINT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
    end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds then begin
     OutputTemporary:=CreateTemporary(pirctLONG);
-    EmitInstruction(pircoMOVL,pirctLONG,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
+    EmitInstruction(pircoCOPY,pirctLONG,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
    end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
     OutputTemporary:=CreateTemporary(pirctFLOAT);
-    EmitInstruction(pircoMOVF,pirctFLOAT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
+    EmitInstruction(pircoCOPY,pirctFLOAT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
    end else if Node.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
     OutputTemporary:=CreateTemporary(pirctDOUBLE);
-    EmitInstruction(pircoMOVD,pirctDOUBLE,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
+    EmitInstruction(pircoCOPY,pirctDOUBLE,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
    end else if Node.Type_^.Kind=tkPOINTER then begin
     if TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt then begin
      OutputTemporary:=CreateTemporary(pirctINT);
-     EmitInstruction(pircoMOVI,pirctINT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
+     EmitInstruction(pircoCOPY,pirctINT,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
     end else begin
      OutputTemporary:=CreateTemporary(pirctLONG);
-     EmitInstruction(pircoMOVL,pirctLONG,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
+     EmitInstruction(pircoCOPY,pirctLONG,CreateTemporaryOperand(OutputTemporary),[CreateTemporaryOperand(TemporaryA)],Node.SourceLocation);
     end;
    end;
    UnaryOpHook(TemporaryB,TemporaryA,Node);
@@ -4516,6 +4514,7 @@ var InstructionIndex,TemporaryIndex,UseIndex,Size:TPACCInt32;
     Temporary:TPACCIntermediateRepresentationCodeTemporary;
     CodeType:TPACCIntermediateRepresentationCodeType;
     Use:TPACCIntermediateRepresentationCodeUse;
+    Skip:boolean;
 begin
  Block:=StartBlock;
  if assigned(Block) then begin
@@ -4523,6 +4522,7 @@ begin
    Instruction:=Block.Instructions[InstructionIndex];
    if Instruction.Opcode=pircoALLOC then begin
     if Instruction.To_.Kind=pircokTEMPORARY then begin
+     Skip:=false;
      TemporaryIndex:=Instruction.To_.Temporary;
      Temporary:=Temporaries[TemporaryIndex];
      if Temporary.CountDefinitions=1 then begin
@@ -4534,10 +4534,219 @@ begin
         ByInstruction:=Use.By.Instruction;
         if assigned(ByInstruction) then begin
          case ByInstruction.Opcode of
-          pircoLDUCI..pircoLDD:begin
-           
+          pircoLDUCI,pircoLDSCI,pircoLDUCL,pircoLDSCL:begin
+           if (Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfChar) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfChar;
+            continue;
+           end;
           end;
-          pircoSTIC..pircoSTD:begin
+          pircoLDUSI,pircoLDSSI,pircoLDUSL,pircoLDSSL:begin
+           if (Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfShort) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfShort;
+            continue;
+           end;
+          end;
+          pircoLDUII,pircoLDSII,pircoLDUIL,pircoLDSIL:begin
+           if (Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfInt) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfInt;
+            continue;
+           end;
+          end;
+          pircoLDULL,pircoLDSLL:begin
+           if (Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfLong) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfLong;
+            continue;
+           end;
+          end;
+          pircoLDF:begin
+           if (Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfFloat) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfFloat;
+            continue;
+           end;
+          end;
+          pircoLDD:begin
+           if (Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfDouble) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfDouble;
+            continue;
+           end;
+          end;
+          pircoSTIC:begin
+           if ((Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfChar)) and
+              (CodeType in [pirctNONE,pirctINT]) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfChar;
+            CodeType:=pirctINT;
+            continue;
+           end;
+          end;
+          pircoSTIS:begin
+           if ((Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfShort)) and
+              (CodeType in [pirctNONE,pirctINT]) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfShort;
+            CodeType:=pirctINT;
+            continue;
+           end;
+          end;
+          pircoSTII:begin
+           if ((Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfInt)) and
+              (CodeType in [pirctNONE,pirctINT]) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfInt;
+            CodeType:=pirctINT;
+            continue;
+           end;
+          end;
+          pircoSTLC:begin
+           if ((Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfChar)) and
+              (CodeType in [pirctNONE,pirctLONG]) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfChar;
+            CodeType:=pirctLONG;
+            continue;
+           end;
+          end;
+          pircoSTLS:begin
+           if ((Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfShort)) and
+              (CodeType in [pirctNONE,pirctLONG]) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfShort;
+            CodeType:=pirctLONG;
+            continue;
+           end;
+          end;
+          pircoSTLI:begin
+           if ((Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfInt)) and
+              (CodeType in [pirctNONE,pirctLONG]) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfInt;
+            CodeType:=pirctLONG;
+            continue;
+           end;
+          end;
+          pircoSTLL:begin
+           if ((Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfLong)) and
+              (CodeType in [pirctNONE,pirctLONG]) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfLong;
+            CodeType:=pirctLONG;
+            continue;
+           end;
+          end;
+          pircoSTF:begin
+           if ((Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfFloat)) and
+              (CodeType in [pirctNONE,pirctFLOAT]) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfFloat;
+            CodeType:=pirctFLOAT;
+            continue;
+           end;
+          end;
+          pircoSTD:begin
+           if ((Size<0) or (Size=TPACCInstance(fInstance).Target.SizeOfDouble)) and
+              (CodeType in [pirctNONE,pirctDOUBLE]) then begin
+            Size:=TPACCInstance(fInstance).Target.SizeOfDouble;
+            CodeType:=pirctDOUBLE;
+            continue;
+           end;
+          end;
+         end;
+        end;
+       end;
+       Skip:=true;
+       break;
+      end;
+      if not Skip then begin
+       Instruction.Opcode:=pircoNOP;
+       Instruction.To_:=EmptyOperand;
+       Instruction.Operands:=nil;
+       dec(Temporary.CountDefinitions);
+       for UseIndex:=Temporary.Uses_.Count-1 downto 0 do begin
+        Use:=Temporary.Uses_[UseIndex];
+        if assigned(Use) and (Use.Kind=pircukINS) then begin
+         ByInstruction:=Use.By.Instruction;
+         if assigned(ByInstruction) then begin
+          case ByInstruction.Opcode of
+           pircoLDUCI..pircoLDD:begin
+            if CodeType=pirctNONE then begin
+             TPACCInstance(fInstance).AddError('Internal error 2017-01-28-14-01-0000',@Instruction.SourceLocation,true);
+            end;
+            case ByInstruction.Opcode of
+             pircoLDUCI:begin
+              ByInstruction.Opcode:=pircoZECI;
+             end;
+             pircoLDUSI:begin
+              ByInstruction.Opcode:=pircoZESI;
+             end;
+             pircoLDUII:begin
+              if ByInstruction.Type_=CodeType then begin
+               ByInstruction.Opcode:=pircoCOPY;
+              end else begin
+               ByInstruction.Opcode:=pircoCAST;
+              end;
+             end;
+             pircoLDSCI:begin
+              ByInstruction.Opcode:=pircoSECI;
+             end;
+             pircoLDSSI:begin
+              ByInstruction.Opcode:=pircoSESI;
+             end;
+             pircoLDSII:begin
+              if ByInstruction.Type_=CodeType then begin
+               ByInstruction.Opcode:=pircoCOPY;
+              end else begin
+               ByInstruction.Opcode:=pircoCAST;
+              end;
+             end;
+             pircoLDUCL:begin
+              ByInstruction.Opcode:=pircoZECL;
+             end;
+             pircoLDUSL:begin
+              ByInstruction.Opcode:=pircoZESL;
+             end;
+             pircoLDUIL:begin
+              ByInstruction.Opcode:=pircoZEIL;
+             end;
+             pircoLDULL:begin
+              if ByInstruction.Type_=CodeType then begin
+               ByInstruction.Opcode:=pircoCOPY;
+              end else begin
+               ByInstruction.Opcode:=pircoCAST;
+              end;
+             end;
+             pircoLDSCL:begin
+              ByInstruction.Opcode:=pircoSECL;
+             end;
+             pircoLDSSL:begin
+              ByInstruction.Opcode:=pircoSESL;
+             end;
+             pircoLDSIL:begin
+              ByInstruction.Opcode:=pircoSEIL;
+             end;
+             pircoLDSLL:begin
+              if ByInstruction.Type_=CodeType then begin
+               ByInstruction.Opcode:=pircoCOPY;
+              end else begin
+               ByInstruction.Opcode:=pircoCAST;
+              end;
+             end;
+             pircoLDF:begin
+              if ByInstruction.Type_=CodeType then begin
+               ByInstruction.Opcode:=pircoCOPY;
+              end else begin
+               ByInstruction.Opcode:=pircoCAST;
+              end;
+             end;
+             pircoLDD:begin
+              if ByInstruction.Type_=CodeType then begin
+               ByInstruction.Opcode:=pircoCOPY;
+              end else begin
+               ByInstruction.Opcode:=pircoCAST;
+              end;
+             end;
+            end;
+           end;
+           pircoSTIC..pircoSTD:begin
+            ByInstruction.Opcode:=pircoCOPY;
+            ByInstruction.Type_:=CodeType;
+            ByInstruction.To_:=ByInstruction.Operands[0];
+            ByInstruction.Operands[0]:=ByInstruction.Operands[1];
+            SetLength(ByInstruction.Operands,1);
+            Temporary.Uses_.Delete(UseIndex);
+            inc(Temporary.CountDefinitions);
+           end;
           end;
          end;
         end;
@@ -5918,10 +6127,8 @@ begin
  OpcodeNames[pircoSETL]:='setl';
  OpcodeNames[pircoSETF]:='setf';
  OpcodeNames[pircoSETD]:='setd';
- OpcodeNames[pircoMOVI]:='movi';
- OpcodeNames[pircoMOVL]:='movl';
- OpcodeNames[pircoMOVF]:='movf';
- OpcodeNames[pircoMOVD]:='movd';
+ OpcodeNames[pircoCOPY]:='copy';
+ OpcodeNames[pircoCAST]:='cast';
  OpcodeNames[pircoSWAPI]:='swapi';
  OpcodeNames[pircoSWAPL]:='swapl';
  OpcodeNames[pircoSWAPF]:='swapf';
