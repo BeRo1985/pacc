@@ -5268,6 +5268,11 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
      FreeStackItem(OldStackItem);
     end;
     StackItems[TemporaryIndex]:=StackItem;
+    if assigned(StackItem) then begin
+     result:=StackItem^.Operand;
+    end else begin
+     result:=CreateIntegerValueOperand(0);
+    end;
    end;
    procedure ProcessOperand(var Operand:TPACCIntermediateRepresentationCodeOperand);
    var TemporaryIndex,LinkTemporaryIndex:TPACCInt32;
