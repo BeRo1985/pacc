@@ -332,6 +332,14 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircakUNKNOWN
       );
 
+     PPACCIntermediateRepresentationCodeAliasCaseKind=^TPACCIntermediateRepresentationCodeAliasCaseKind;
+     TPACCIntermediateRepresentationCodeAliasCaseKind=
+      (
+       pircackNOALIAS,
+       pircackMAYALIAS,
+       pircackMUSTALIAS
+      );
+
      PPACCIntermediateRepresentationCodeAlias=^TPACCIntermediateRepresentationCodeAlias;
      TPACCIntermediateRepresentationCodeAlias=class
       public
@@ -691,6 +699,12 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure FillLoop;
        procedure GetAlias(const Alias:TPACCIntermediateRepresentationCodeAlias;const Operand:TPACCIntermediateRepresentationCodeOperand);
        procedure FillAlias;
+       function AliasCaseKind(const OperandP:TPACCIntermediateRepresentationCodeOperand;
+                              const StackP:TPACCInt64;
+                              const OperandQ:TPACCIntermediateRepresentationCodeOperand;
+                              const StackQ:TPACCInt64;
+                              out Delta:TPACCInt64):TPACCIntermediateRepresentationCodeAliasCaseKind;
+       function Escapes(const Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
        procedure LoadOptimization;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
@@ -5960,6 +5974,24 @@ begin
  end;
 end;
 
+function TPACCIntermediateRepresentationCodeFunction.AliasCaseKind(const OperandP:TPACCIntermediateRepresentationCodeOperand;
+                                                                   const StackP:TPACCInt64;
+                                                                   const OperandQ:TPACCIntermediateRepresentationCodeOperand;
+                                                                   const StackQ:TPACCInt64;
+                                                                   out Delta:TPACCInt64):TPACCIntermediateRepresentationCodeAliasCaseKind;
+begin
+ result:=pircackNOALIAS;
+end;
+
+function TPACCIntermediateRepresentationCodeFunction.Escapes(const Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
+begin
+ if Operand.Kind=pircokTEMPORARY then begin
+  result:=Temporaries[Operand.Temporary].Alias.Kind<>pircakSTACKLOCAL;
+ end else begin
+  result:=true;
+ end;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.LoadOptimization;
 type PLocationKind=^TLocationKind;
      TLocationKind=
@@ -6126,6 +6158,10 @@ var CountInserts,InsertNumber:TPACCInt32;
    end;
   end;
  end;
+ function GetMask(const Width:TPACCUInt64):TPACCUInt64;
+ begin
+  result:=((1 shl ((Width shl 3)-1)) shl 1)-1;
+ end;                              
  procedure DoMask(const CodeType:TPACCIntermediateRepresentationCodeType;
                   var Operand:TPACCIntermediateRepresentationCodeOperand;
                   const Mask:TPACCUInt64;
@@ -6151,7 +6187,7 @@ var CountInserts,InsertNumber:TPACCInt32;
    Opcode:=pircoNOP;
    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-01-31-0000',nil,true);
   end;
-  All:=Mask=((((TPACCUInt64(Slice.Size) shl 3)-1) shl 1)-1);
+  All:=Mask=GetMask(Slice.Size);
   if All then begin
    CodeType:=Slice.CodeType;
   end else begin
@@ -6164,6 +6200,58 @@ var CountInserts,InsertNumber:TPACCInt32;
   result:=InsertInstruction(CodeType,Opcode,[Slice.Operand],Location);
   if not All then begin
    DoMask(CodeType,result,Mask,Location);
+  end;
+ end;
+ function Def(const Slice:TSlice;
+              const Mask:TPACCUInt64;
+              const Block:TPACCIntermediateRepresentationCodeBlock;
+              Instruction:TPACCIntermediateRepresentationCodeInstruction;
+              const InstructionLocation:TLocation):TPACCIntermediateRepresentationCodeOperand;
+ var OldCountInserts,OldCountTemporaries,InstructionIndex,StartInstructionIndex:TPACCInt32;
+     Predecessor:TPACCIntermediateRepresentationCodeBlock;
+     CodeType:TPACCIntermediateRepresentationCodeType;
+     MaskSize:TPACCUInt64;
+  function DoLoad:TPACCIntermediateRepresentationCodeOperand;
+  begin
+   CountInserts:=OldCountInserts;
+   Temporaries.Count:=OldCountTemporaries;
+   if InstructionLocation.Kind=lkLOAD then begin
+    result:=Load(Slice,Mask,InstructionLocation);
+   end else begin
+    result:=EmptyOperand;
+   end;
+  end;
+ begin
+  if CompareDominance(Block,InstructionLocation.Block) then begin
+
+   OldCountInserts:=CountInserts;
+   OldCountTemporaries:=Temporaries.Count;
+
+   if assigned(Instruction) then begin
+    StartInstructionIndex:=Block.Instructions.IndexOf(Instruction);
+   end else begin
+    StartInstructionIndex:=Block.Instructions.Count;
+   end;
+
+   if Slice.Size>TPACCInstance(fInstance).Target.SizeOfInt then begin
+    CodeType:=pirctLONG;
+   end else begin
+    CodeType:=pirctINT;
+   end;
+   MaskSize:=GetMask(Slice.Size);
+
+   for InstructionIndex:=StartInstructionIndex-1 downto 0 do begin
+
+    Instruction:=Block.Instructions[InstructionIndex];
+
+    if AreOperandsEqual(Instruction.To_,Slice.Operand) or Escapes(Slice.Operand) then begin
+     
+    end;
+
+   end;
+
+  end else begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-29-16-31-0000',nil,true);
   end;
  end;
 begin
