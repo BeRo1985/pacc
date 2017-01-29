@@ -5996,28 +5996,40 @@ begin
 
    if (AliasP.Kind in [pircakSTACKLOCAL,pircakSTACKESCAPE]) and
       (AliasQ.Kind in [pircakSTACKLOCAL,pircakSTACKESCAPE]) then begin
+    // if both are offsets of the same stack slot and if they are overlapping, then they are aliasing
     if Overlapping and AreOperandsEqual(AliasP.Base,AliasQ.Base) then begin
      result:=pircackMUSTALIAS;
     end else begin
      result:=pircackNOALIAS;
     end;
-   end else begin
-    if (AliasP.Kind=pircakADDRESS) and (AliasQ.Kind=pircakADDRESS) then begin
-     if (AliasP.Address.Kind=AliasQ.Address.Kind) and
-        (((AliasP.Address.Kind=pircakFUNCTION) and (AliasP.Address.Function_=AliasQ.Address.Function_)) or
-         ((AliasP.Address.Kind=pircakLABEL) and (AliasP.Address.Label_=AliasQ.Address.Label_)) or
-         ((AliasP.Address.Kind=pircakVARIABLE) and (AliasP.Address.Variable=AliasQ.Address.Variable))) then begin
-      if Overlapping then begin
-       result:=pircackMUSTALIAS;
-      end else begin
-       result:=pircackNOALIAS;
-      end;
+   end else if (AliasP.Kind=pircakADDRESS) and (AliasQ.Kind=pircakADDRESS) then begin
+    if (AliasP.Address.Kind=AliasQ.Address.Kind) and
+       (((AliasP.Address.Kind=pircakFUNCTION) and (AliasP.Address.Function_=AliasQ.Address.Function_)) or
+        ((AliasP.Address.Kind=pircakLABEL) and (AliasP.Address.Label_=AliasQ.Address.Label_)) or
+        ((AliasP.Address.Kind=pircakVARIABLE) and (AliasP.Address.Variable=AliasQ.Address.Variable))) then begin
+     // they are conservatively aliasing if the addresses are different, or they are aliasing for sure if they are overlapping
+     if Overlapping then begin
+      result:=pircackMUSTALIAS;
      end else begin
-      result:=pircackMAYALIAS;
+      result:=pircackNOALIAS;
      end;
+    end else begin
+     result:=pircackMAYALIAS;
+    end;
+   end else if ((AliasP.Kind=pircakCONSTANT) and (AliasQ.Kind=pircakCONSTANT)) or
+               ((AliasP.Kind=AliasQ.Kind) and AreOperandsEqual(AliasP.Base,AliasQ.Base)) then begin
+    // if they have the same base, we can rely on the offsets only
+    if Overlapping then begin
+     result:=pircackMUSTALIAS;
     end else begin
      result:=pircackNOALIAS;
     end;
+   end else if ((AliasP.Kind=pircakUNKNOWN) and (AliasQ.Kind<>pircakSTACKLOCAL)) or
+               ((AliasQ.Kind=pircakUNKNOWN) and (AliasP.Kind<>pircakSTACKLOCAL)) then begin
+    // if one of the two is unknown, then there may be aliasing unless the other is provably local
+    result:=pircackMUSTALIAS;
+   end else begin
+    result:=pircackNOALIAS;
    end;
 
   finally
