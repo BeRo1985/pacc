@@ -6736,14 +6736,15 @@ var Operands:TPACCIntermediateRepresentationCodeOperands;
    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-21-08-0000',nil,true);
   end;
  end;
-var Index,InstructionIndex:TPACCInt32;
+var Index,InstructionIndex,TemporaryIndex,UseIndex:TPACCInt32;
     OperandListItem0,OperandListItem1:POperandListItem;
     OperandListItemList:PPOperandListItem;
-    Use0,Use1:TPACCIntermediateRepresentationCodeUse;
+    Use:TPACCIntermediateRepresentationCodeUse;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
     Phi:TPACCIntermediateRepresentationCodePhi;
     ParentPhi:PPACCIntermediateRepresentationCodePhi;
     Block:TPACCIntermediateRepresentationCodeBlock;
+    Temporary:TPACCIntermediateRepresentationCodeTemporary;
 begin
  Operands:=nil;
  try
@@ -6777,6 +6778,24 @@ begin
    repeat
     OperandListItem1:=OperandListItem0;
     if assigned(OperandListItem0) then begin
+     TemporaryIndex:=OperandListItem0.Temporary;
+     Temporary:=Temporaries[TemporaryIndex];
+     for UseIndex:=0 to Temporary.Uses_.Count-1 do begin
+      Use:=Temporary.Uses_[UseIndex];
+      case Use.Kind of
+       pircukPHI:begin
+        VisitPhi(Use.By.Phi,@OperandListItemList);
+       end;
+       pircukINSTRUCTION:begin
+        VisitInstruction(Use.By.Instruction,@OperandListItemList);
+       end;
+       pircukJUMP:begin
+       end;
+       else begin
+        TPACCInstance(fInstance).AddError('Internal error 2017-01-29-21-24-0000',nil,true);
+       end;
+      end;
+     end;
      OperandListItem0:=OperandListItem0^.Link;
     end else begin
      break;
