@@ -6874,6 +6874,57 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.ConstantFolding;
+const Bottom=-2;
+      Top=-1;
+type PEdge=^TEdge;
+     TEdge=record
+      Destination:TPACCInt32;
+      Dead:TPACCInt32;
+      Work:PEdge;
+     end;
+var Values:array of TPACCInt32;
+    FlowWork:PEdge;
+    Edges:array[0..1] of PEdge;
+    UseWork:TPACCIntermediateRepresentationCodeUse;
+    CountUse:TPACCInt32;
+ function IsZero(const Constant:TPACCIntermediateRepresentationCodeConstant;const Wide:boolean):boolean;
+ begin
+  if Constant.Kind<>pircckDATA then begin
+   result:=false;
+  end else if Wide then begin
+   result:=Constant.Data.IntegerValue=0;
+  end else begin
+   result:=(Constant.Data.IntegerValue and $ffffffff)=0;
+  end;
+ end;
+ function LatticeValue(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCInt32;
+ begin
+  case Operand.Kind of
+   pircokTEMPORARY:begin
+    result:=Values[Operand.Temporary];
+   end;
+   pircokCONSTANT:begin
+    result:=Operand.Temporary;
+   end;
+   else begin
+    result:=0;
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-22-00-0000',nil,true);
+   end;
+  end;
+ end;
+ function LatticeMerge(const v,m:TPACCInt32):TPACCInt32;
+ begin
+  if m=Top then begin
+   result:=v;
+  end else if (v=Top) or (v=m) then begin
+   result:=m;
+  end else begin
+   result:=Bottom;
+  end;
+ end;
+ procedure Update(const TemporaryIndex,Merge:TPACCInt32);
+ begin
+ end;
 begin
 {$ifdef IRDebug}
  writeln('> After constant folding:');
