@@ -6589,7 +6589,56 @@ begin
        inc(InstructionIndex);
        if (Instruction.Opcode in [pircoLDUCI..pircoLDD]) and
           (length(Instruction.Operands)>1) then begin
-
+        case Instruction.Opcode of
+         pircoLDUCI:begin
+          Instruction.Opcode:=pircoZECI;
+         end;
+         pircoLDUSI:begin
+          Instruction.Opcode:=pircoZESI;
+         end;
+         pircoLDUII:begin
+          Instruction.Opcode:=pircoCOPY;
+         end;
+         pircoLDSCI:begin
+          Instruction.Opcode:=pircoSECI;
+         end;
+         pircoLDSSI:begin
+          Instruction.Opcode:=pircoSESI;
+         end;
+         pircoLDSII:begin
+          Instruction.Opcode:=pircoCOPY;
+         end;
+         pircoLDUCL:begin
+          Instruction.Opcode:=pircoZECL;
+         end;
+         pircoLDUSL:begin
+          Instruction.Opcode:=pircoZESL;
+         end;
+         pircoLDUIL:begin
+          Instruction.Opcode:=pircoZEIL;
+         end;
+         pircoLDULL:begin
+          Instruction.Opcode:=pircoCOPY;
+         end;
+         pircoLDSCL:begin
+          Instruction.Opcode:=pircoSECL;
+         end;
+         pircoLDSSL:begin
+          Instruction.Opcode:=pircoSESL;
+         end;
+         pircoLDSIL:begin
+          Instruction.Opcode:=pircoSEIL;
+         end;
+         pircoLDSLL:begin
+          Instruction.Opcode:=pircoCOPY;
+         end;
+         pircoLDF:begin
+          Instruction.Opcode:=pircoCOPY;
+         end;
+         pircoLDD:begin
+          Instruction.Opcode:=pircoCOPY;
+         end;
+        end;
         SetLength(Instruction.Operands,1);
        end;
       end else begin
@@ -6599,7 +6648,9 @@ begin
      Instructions.Add(Instruction);
     until false;
     Block.Instructions.Clear;
-    Block.Instructions.Assign(Instructions,laCopy);
+    for InstructionIndex:=0 to Instructions.Count-1 do begin
+     Block.Instructions.Add(Instructions[InstructionIndex]);
+    end;
    finally
     Instructions.Free;
    end;
