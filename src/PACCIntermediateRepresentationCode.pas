@@ -6265,13 +6265,17 @@ var CountInserts,InsertNumber:TPACCInt32;
               Instruction:TPACCIntermediateRepresentationCodeInstruction;
               const InstructionLocation:TLocation):TPACCIntermediateRepresentationCodeOperand;
  var OldCountInserts,OldCountTemporaries,InstructionIndex,StartInstructionIndex,
-     Size:TPACCInt32;
+     Size,InsertIndex:TPACCInt32;
      Predecessor:TPACCIntermediateRepresentationCodeBlock;
-     CodeType:TPACCIntermediateRepresentationCodeType;
-     MaskSize:TPACCUInt64;
+     CodeType,OtherCodeType:TPACCIntermediateRepresentationCodeType;
+     MaskSize,OtherMask:TPACCUInt64;
      Offset:TPACCInt64;
      IsLoad:boolean;
      Operand0,Operand1:TPACCIntermediateRepresentationCodeOperand;
+     Opcode:TPACCIntermediateRepresentationCodeOpcode;
+     Insert_:PInsert;
+     Phi:TPACCIntermediateRepresentationCodePhi;
+     Location:TLocation;
   function DoLoad:TPACCIntermediateRepresentationCodeOperand;
   begin
    CountInserts:=OldCountInserts;
@@ -6302,16 +6306,15 @@ var CountInserts,InsertNumber:TPACCInt32;
    MaskSize:=GetMask(Slice.Size);
 
    for InstructionIndex:=StartInstructionIndex-1 downto 0 do begin
-
     Instruction:=Block.Instructions[InstructionIndex];
-
     if AreOperandsEqual(Instruction.To_,Slice.Operand) or Escapes(Slice.Operand) then begin
      result:=DoLoad;
      exit;
     end;
-
     IsLoad:=false;
-
+    Size:=0;
+    Operand0:=EmptyOperand;
+    Operand1:=EmptyOperand;
     case Instruction.Opcode of
      pircoLDUCI..pircoLDD:begin
       IsLoad:=true;
@@ -6328,23 +6331,115 @@ var CountInserts,InsertNumber:TPACCInt32;
       continue;
      end;
     end;
-
     case AliasCaseKind(Slice.Operand,Slice.Size,Operand1,Size,Offset) of
      pircackNOALIAS:begin
      end;
      pircackMAYALIAS:begin
+      if not IsLoad then begin
+       result:=DoLoad;
+       exit;
+      end;
      end;
      pircackMUSTALIAS:begin
+      if Offset<0 then begin
+       Offset:=-Offset;
+       OtherMask:=(GetMask(Size) shl (Offset shl 3)) and MaskSize;
+       Opcode:=pircoSHL;
+      end else begin
+       OtherMask:=(GetMask(Size) shr (Offset shl 3)) and MaskSize;
+       Opcode:=pircoSHR;
+      end;
+      if (OtherMask and Mask)<>0 then begin
+       if Offset<>0 then begin
+        if (Opcode=pircoSHR) and ((Offset+Slice.Size)>TPACCInstance(fInstance).Target.SizeOfInt) then begin
+         OtherCodeType:=pirctLONG;
+        end else begin
+         OtherCodeType:=CodeType;
+        end;
+        Cast(Operand0,OtherCodeType,InstructionLocation);
+        Operand1:=CreateIntegerValueOperand(Offset shl 3);
+        Operand0:=InsertInstruction(OtherCodeType,Opcode,[Operand0,Operand1],InstructionLocation);
+       end;
+       if ((OtherMask and Mask)<>OtherMask) or ((Offset+Size)<Slice.Size) then begin
+        DoMask(Codetype,Operand0,OtherMask and Mask,InstructionLocation);
+       end;
+       if (Mask and not OtherMask)<>0 then begin
+        Operand1:=Def(Slice,Mask and not OtherMask,Block,Instruction,InstructionLocation);
+        if Operand1.Kind=pircokNONE then begin
+         result:=DoLoad;
+         exit;
+        end;
+        Operand0:=InsertInstruction(CodeType,pircoOR,[Operand0,Operand1],InstructionLocation);
+       end;
+       if Mask=MaskSize then begin
+        Cast(Operand0,Slice.CodeType,InstructionLocation);
+       end;
+       result:=Operand0;
+       exit;
+      end;
      end;
      else begin
       TPACCInstance(fInstance).AddError('Internal error 2017-01-29-18-02-0000',@Instruction.SourceLocation,true);
      end;
     end;
+   end;
 
+   for InsertIndex:=0 to CountInserts-1 do begin
+    Insert_:=@Inserts[InsertIndex];
+    if Insert_^.IsPhi and
+       (Insert_^.BlockID=Block.ID) and
+       AreOperandsEqual(Insert_^.New.Slice.Operand,Slice.Operand) and
+       (Insert_^.New.Slice.Size=Slice.Size) then begin
+     Operand0:=Insert_^.New.Phi.To_;
+     if Mask<>MaskSize then begin
+      DoMask(CodeType,Operand0,Mask,InstructionLocation);
+     end else begin
+      Cast(Operand0,Slice.CodeType,InstructionLocation);
+     end;
+     result:=Operand0;
+     exit;
+    end;
+   end;
 
+   Phi:=Block.Phi;
+   while assigned(Phi) do begin
+    if AreOperandsEqual(Phi.To_,Slice.Operand) then begin
+     // scanning predecessors in that case would be unsafe
+     result:=DoLoad;
+     exit;
+    end;
+    Phi:=Phi.Link;
+   end;
+
+   case Block.Predecessors.Count of
+    0:begin
+     result:=DoLoad;
+    end;
+    1:begin
+     Predecessor:=Block.Predecessors[0];
+     if Predecessor.Loop>=InstructionLocation.Block.Loop then begin
+      Location:=InstructionLocation;
+      if Predecessor.Successors.Count>1 then begin
+       Location.Kind:=lkNOLOAD;
+      end;
+      Operand1:=Def(Slice,Mask,Predecessor,nil,Location);
+      if Operand1.Kind=pircokNONE then begin
+       result:=DoLoad;
+      end else begin
+       result:=Operand1;
+      end;
+     end else begin
+      result:=EmptyOperand;
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-29-19-22-0000',nil,true);
+     end;
+    end;
+    else begin
+     result:=EmptyOperand;
+    end;
    end;
 
   end else begin
+   result:=EmptyOperand;
    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-16-31-0000',nil,true);
   end;
  end;
