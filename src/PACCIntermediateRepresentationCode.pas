@@ -6139,29 +6139,23 @@ var CountInserts,InsertNumber:TPACCInt32;
      All:boolean;
      CodeType:TPACCIntermediateRepresentationCodeType;
  begin
-  case Slice.Size of
-   1:begin
-    Opcode:=pircoLDUCI;
-   end;
-   2:begin
+  if Slice.Size=TPACCInstance(fInstance).Target.SizeOfChar then begin
+   Opcode:=pircoLDUCI;
+  end else if Slice.Size=TPACCInstance(fInstance).Target.SizeOfShort then begin
     Opcode:=pircoLDUSI;
-   end;
-   4:begin
-    Opcode:=pircoLDUII;
-   end;
-   8:begin
-    Opcode:=pircoLDULL;
-   end;
-   else begin
-    Opcode:=pircoNOP;
-    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-01-31-0000',nil,true);
-   end;
+  end else if Slice.Size=TPACCInstance(fInstance).Target.SizeOfInt then begin
+   Opcode:=pircoLDUII;
+  end else if Slice.Size=TPACCInstance(fInstance).Target.SizeOfLong then begin
+   Opcode:=pircoLDULL;
+  end else begin
+   Opcode:=pircoNOP;
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-29-01-31-0000',nil,true);
   end;
   All:=Mask=((((TPACCUInt64(Slice.Size) shl 3)-1) shl 1)-1);
   if All then begin
    CodeType:=Slice.CodeType;
   end else begin
-   if Slice.Size>4 then begin
+   if Slice.Size>TPACCInstance(fInstance).Target.SizeOfInt then begin
     CodeType:=pirctLONG;
    end else begin
     CodeType:=pirctINT;
