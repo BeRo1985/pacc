@@ -6961,7 +6961,7 @@ var Values:array of TPACCInt32;
    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-22-15-0000',nil,true);
   end;
  end;
- procedure VisitInstruction(Instruction:TPACCIntermediateRepresentationCodeInstruction;const n:TPACCInt32);
+ procedure VisitInstruction(Instruction:TPACCIntermediateRepresentationCodeInstruction);
  var Value,Left,Right:TPACCInt32;
      ConstantLeft,ConstantRight,Constant:TPACCIntermediateRepresentationCodeConstant;
      Address:TPACCIntermediateRepresentationCodeAddress;
@@ -7640,6 +7640,9 @@ var Values:array of TPACCInt32;
    end;
    Update(Instruction.To_.Temporary,Value);
   end;
+ end;
+ procedure VisitJump(Block:TPACCIntermediateRepresentationCodeBlock;const n:TPACCInt32);
+ begin
  end;
 begin
  Edges:=nil;
