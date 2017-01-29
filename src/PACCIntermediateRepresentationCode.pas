@@ -6674,7 +6674,7 @@ begin
  FillRPO;
  FillPredecessors;
  FillUse;
- //PromoteUniformMemoryStackSlotsToTemporaries;
+ PromoteUniformMemoryStackSlotsToTemporaries;
  SSA;
  FillUse;
  SSACheck;
