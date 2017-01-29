@@ -705,7 +705,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
                               const SizeQ:TPACCInt64;
                               out Delta:TPACCInt64):TPACCIntermediateRepresentationCodeAliasCaseKind;
        function Escapes(const Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
-       procedure LoadOptimization;
+       procedure LoadElimination;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -5532,8 +5532,14 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
     LastStackItem:=StackItem;
    end;
    function GetStack(const TemporaryIndex:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
-   var StackItem,OldStackItem:PStackItem;
+   var OldSize:TPACCInt32;
+       StackItem,OldStackItem:PStackItem;
    begin
+    OldSize:=length(StackItems);
+    if OldSize<=TemporaryIndex then begin
+     SetLength(StackItems,(TemporaryIndex+1)*2);
+     FillChar(StackItems[OldSize],(length(StackItems)-OldSize)*SizeOf(PStackItem),#0);
+    end;
     StackItem:=StackItems[TemporaryIndex];
     while assigned(StackItem) and not CompareDominance(StackItem^.Block,Block) do begin
      OldStackItem:=StackItem;
@@ -5555,6 +5561,9 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
      LinkTemporaryIndex:=CreateLinkTemporary(TemporaryIndex);
      Temporaries[LinkTemporaryIndex].Visit:=TemporaryIndex+1;
      Operand:=CreateTemporaryOperand(LinkTemporaryIndex);
+     if length(StackItems)<=TemporaryIndex then begin
+      StackItems[TemporaryIndex]:=NewStackItem(Operand,StackItems[TemporaryIndex]);
+     end;
      StackItems[TemporaryIndex]:=NewStackItem(Operand,StackItems[TemporaryIndex]);
     end;
    end;
@@ -5582,8 +5591,8 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
        Instruction.Operands[InstructionOperandIndex]:=GetStack(TemporaryIndex);
       end;
      end;
-     ProcessDefinition(Instruction.To_);
     end;
+    ProcessDefinition(Instruction.To_);
    end;
 
    if Block.Jump.Operand.Kind=pircokTEMPORARY then begin
@@ -6049,7 +6058,7 @@ begin
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.LoadOptimization;
+procedure TPACCIntermediateRepresentationCodeFunction.LoadElimination;
 type PLocationKind=^TLocationKind;
      TLocationKind=
       (
@@ -6482,14 +6491,47 @@ var CountInserts,InsertNumber:TPACCInt32;
    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-16-31-0000',nil,true);
   end;
  end;
+var InstructionIndex,Size:TPACCInt32;
+    Block:TPACCIntermediateRepresentationCodeBlock;
+    Instruction:TPACCIntermediateRepresentationCodeInstruction;
+    Slice:TSlice;
+    Location:TLocation;
 begin
  Inserts:=nil;
  CountInserts:=0;
  InsertNumber:=0;
  try
+
+  Block:=StartBlock;
+  while assigned(Block) do begin
+   for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+    Instruction:=Block.Instructions[InstructionIndex];
+    if Instruction.Opcode in [pircoLDUCI..pircoLDD] then begin
+     if length(Instruction.Operands)=1 then begin
+      Size:=LoadSize(Instruction);
+      Slice.Operand:=Instruction.Operands[0];
+      Slice.Size:=Size;
+      Slice.CodeType:=Instruction.Type_;
+      Location.Kind:=lkROOT;
+      Location.Offset:=InstructionIndex;
+      Location.Block:=Block;
+      SetLength(Instruction.Operands,2);
+      Instruction.Operands[1]:=Def(Slice,GetMask(Size),Block,Instruction,Location);
+     end else begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-29-19-51-0000',@Instruction.SourceLocation,true);
+     end;
+    end;
+   end;
+   Block:=Block.Link;
+  end;
+
  finally
   Inserts:=nil;
  end;
+{$ifdef IRDebug}
+ writeln('> After load elimination:');
+ DumpToConsole;
+{$endif}
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
@@ -6501,13 +6543,13 @@ begin
  FillRPO;
  FillPredecessors;
  FillUse;
- PromoteUniformMemoryStackSlotsToTemporaries;
+ //PromoteUniformMemoryStackSlotsToTemporaries;
  SSA;
  FillUse;
  SSACheck;
  FillLoop;
  AliasingAnalysis;
- LoadOptimization;
+ LoadElimination;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
