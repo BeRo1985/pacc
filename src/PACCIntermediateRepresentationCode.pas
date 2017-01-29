@@ -186,6 +186,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
       (
        pircjkNONE,
        pircjkRET,  // Return
+       pircjkRETC, // Return char
+       pircjkRETS, // Return short
        pircjkRETI, // Return int
        pircjkRETL, // Return long
        pircjkRETF, // Return float
@@ -3448,7 +3450,13 @@ begin
   end;
   if CurrentBlock.Jump.Kind=pircjkNONE then begin
    case FunctionDeclaration.Type_^.ReturnType^.Kind of
-    tkBOOL,tkCHAR,tkSHORT,tkINT,tkENUM:begin
+    tkBOOL,tkCHAR:begin
+     CurrentBlock.Jump.Kind:=pircjkRETC;
+    end;
+    tkSHORT:begin
+     CurrentBlock.Jump.Kind:=pircjkRETS;
+    end;
+    tkINT,tkENUM:begin
      CurrentBlock.Jump.Kind:=pircjkRETI;
     end;
     tkLONG,tkLLONG:begin
@@ -8497,6 +8505,8 @@ begin
  FillChar(JumpKindNames,SizeOf(JumpKindNames),#0);
  JumpKindNames[pircjkNONE]:='none';
  JumpKindNames[pircjkRET]:='ret';
+ JumpKindNames[pircjkRETC]:='retc';
+ JumpKindNames[pircjkRETS]:='rets';
  JumpKindNames[pircjkRETI]:='reti';
  JumpKindNames[pircjkRETL]:='retl';
  JumpKindNames[pircjkRETF]:='retf';
