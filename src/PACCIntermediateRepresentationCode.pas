@@ -6713,6 +6713,20 @@ var Operands:TPACCIntermediateRepresentationCodeOperands;
   end;
   Update(Phi.To_,Operand0,ParentOperandListItem);
  end;
+ procedure VisitInstruction(const Instruction:TPACCIntermediateRepresentationCodeInstruction;const ParentOperandListItem:PPPOperandListItem);
+ var Operand:TPACCIntermediateRepresentationCodeOperand;
+ begin
+  if Instruction.Opcode=pircoCOPY then begin
+   Operand:=CopyOf(Instruction.Operands[0]);
+   Update(Instruction.To_,Operand,ParentOperandListItem);
+  end else if Instruction.To_.Kind<>pircokNONE then begin
+   if Instruction.To_.Kind=pircokTEMPORARY then begin
+    Update(Instruction.To_,Instruction.To_,ParentOperandListItem);
+   end else begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-21-05-0000',@Instruction.SourceLocation,true);
+   end;
+  end;
+ end;
 begin
 {$ifdef IRDebug}
  writeln('> After copy elimination:');
