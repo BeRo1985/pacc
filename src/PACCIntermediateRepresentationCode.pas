@@ -6265,7 +6265,7 @@ var CountInserts,InsertNumber:TPACCInt32;
               Instruction:TPACCIntermediateRepresentationCodeInstruction;
               const InstructionLocation:TLocation):TPACCIntermediateRepresentationCodeOperand;
  var OldCountInserts,OldCountTemporaries,InstructionIndex,StartInstructionIndex,
-     Size,InsertIndex:TPACCInt32;
+     Size,InsertIndex,PredecessorIndex:TPACCInt32;
      Predecessor:TPACCIntermediateRepresentationCodeBlock;
      CodeType,OtherCodeType:TPACCIntermediateRepresentationCodeType;
      MaskSize,OtherMask:TPACCUInt64;
@@ -6434,7 +6434,46 @@ var CountInserts,InsertNumber:TPACCInt32;
      end;
     end;
     else begin
-     result:=EmptyOperand;
+     result:=CreateTemporaryOperand(CreateTemporary(Slice.CodeType));
+     Phi:=TPACCIntermediateRepresentationCodePhi.Create;
+     InsertIndex:=CountInserts;
+     inc(CountInserts);
+     if length(Inserts)<CountInserts then begin
+      SetLength(Inserts,CountInserts*2);
+     end;
+     Insert_:=@Inserts[InsertIndex];
+     FillChar(Insert_^,SizeOf(TInsert),#0);
+     Insert_^.IsPhi:=true;
+     Insert_^.BlockID:=Block.ID;
+     Insert_^.New.Slice:=Slice;
+     Insert_^.New.Phi:=Phi;
+     Phi.To_:=result;
+     Phi.Type_:=CodeType;
+     Phi.CountOperands:=Block.Predecessors.Count;
+     SetLength(Phi.Operands,Phi.CountOperands);
+     SetLength(Phi.Blocks,Phi.CountOperands);
+     for PredecessorIndex:=0 to Block.Predecessors.Count-1 do begin
+      Predecessor:=Block.Predecessors[PredecessorIndex];
+      if (Predecessor.Successors.Count<2) and
+         (InstructionLocation.Kind<>lkNOLOAD) and
+         (Predecessor.Loop<InstructionLocation.Block.Loop) then begin
+       Location.Kind:=lkLOAD;
+      end else begin
+       Location.Kind:=lkNOLOAD;
+      end;
+      Location.Block:=Block;
+      Location.Offset:=Block.Instructions.Count;
+      Operand1:=Def(Slice,Mask,Predecessor,nil,Location);
+      if Operand1.Kind=pircokNONE then begin
+       result:=DoLoad;
+       exit;
+      end;
+      Phi.Operands[PredecessorIndex]:=Operand1;
+      Phi.Blocks[PredecessorIndex]:=Predecessor;
+     end;
+     if Mask<>MaskSize then begin
+      DoMask(CodeType,Operand0,Mask,InstructionLocation);
+     end;
     end;
    end;
 
