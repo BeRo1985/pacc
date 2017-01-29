@@ -6681,6 +6681,9 @@ begin
  FillLoop;
  AliasingAnalysis;
  LoadElimination;
+ FillUse;
+ SSACheck;
+ 
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
