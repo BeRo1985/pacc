@@ -6058,48 +6058,73 @@ begin
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.LoadElimination;
-type PLocationKind=^TLocationKind;
-     TLocationKind=
+type PPACCIntermediateRepresentationCodeFunctionLoadEliminationLocationKind=^TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocationKind;
+     TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocationKind=
       (
        lkROOT,
        lkLOAD,
        lkNOLOAD
       );
-     PLocation=^TLocation;
-     TLocation=record
-      Kind:TLocationKind;
+
+     PPACCIntermediateRepresentationCodeFunctionLoadEliminationLocation=^TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocation;
+     TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocation=record
+      Kind:TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocationKind;
       Offset:TPACCInt64;
       Block:TPACCIntermediateRepresentationCodeBlock;
      end;
-     PSlice=^TSlice;
-     TSlice=record
+
+     PPACCIntermediateRepresentationCodeFunctionLoadEliminationSlice=^TPACCIntermediateRepresentationCodeFunctionLoadEliminationSlice;
+     TPACCIntermediateRepresentationCodeFunctionLoadEliminationSlice=record
       Operand:TPACCIntermediateRepresentationCodeOperand;
       Size:TPACCInt32;
       CodeType:TPACCIntermediateRepresentationCodeType;
      end;
-     PInsertNew=^TInsertNew;
-     TInsertNew=record
+
+     PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsertNew=^TPACCIntermediateRepresentationCodeFunctionLoadEliminationInsertNew;
+     TPACCIntermediateRepresentationCodeFunctionLoadEliminationInsertNew=record
       case TPACCInt32 of
        0:(
         Instruction:TPACCIntermediateRepresentationCodeInstruction;
        );
        1:(
-        Slice:TSlice;
+        Slice:TPACCIntermediateRepresentationCodeFunctionLoadEliminationSlice;
         Phi:TPACCIntermediateRepresentationCodePhi;
        );
      end;
-     PInsert=^TInsert;
-     TInsert=record
+
+     PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert=^TPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert;
+     TPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert=record
       IsPhi:boolean;
       Number:TPACCInt32;
       BlockID:TPACCInt32;
       Offset:TPACCInt64;
-      New:TInsertNew;
+      New:TPACCIntermediateRepresentationCodeFunctionLoadEliminationInsertNew;
      end;
-     TInserts=array of TInsert;
+
+     TPACCIntermediateRepresentationCodeFunctionLoadEliminationInserts=array of TPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert;
+
+function TPACCIntermediateRepresentationCodeFunctionLoadEliminationCompareInsert(const a,b:pointer):TPACCInt32;
+begin
+ result:=PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert(a)^.BlockID-PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert(b)^.BlockID;
+ if result=0 then begin
+  if PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert(a)^.IsPhi and PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert(b)^.IsPhi then begin
+   result:=0;
+  end else if PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert(a)^.IsPhi then begin
+   result:=-1;
+  end else if PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert(b)^.IsPhi then begin
+   result:=1;
+  end else begin
+   result:=PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert(a)^.Offset-PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert(b)^.Offset;
+   if result=0 then begin
+    result:=PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert(a)^.Number-PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert(b)^.Number;
+   end;
+  end;
+ end;
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.LoadElimination;
 var CountInserts,InsertNumber:TPACCInt32;
-    Inserts:TInserts;
+    Inserts:TPACCIntermediateRepresentationCodeFunctionLoadEliminationInserts;
  function LoadSize(const Instruction:TPACCIntermediateRepresentationCodeInstruction):TPACCInt32;
  begin
   case Instruction.Opcode of
@@ -6157,9 +6182,9 @@ var CountInserts,InsertNumber:TPACCInt32;
  function InsertInstruction(const CodeType:TPACCIntermediateRepresentationCodeType;
                             const Opcode:TPACCIntermediateRepresentationCodeOpcode;
                             const Operands:array of TPACCIntermediateRepresentationCodeOperand;
-                            const Location:TLocation):TPACCIntermediateRepresentationCodeOperand;
+                            const Location:TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocation):TPACCIntermediateRepresentationCodeOperand;
  var Index:TPACCInt32;
-     Insert_:PInsert;
+     Insert_:PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert;
      Instruction:TPACCIntermediateRepresentationCodeInstruction;
  begin
   Index:=CountInserts;
@@ -6168,7 +6193,7 @@ var CountInserts,InsertNumber:TPACCInt32;
    SetLength(Inserts,CountInserts*2);
   end;
   Insert_:=@Inserts[Index];
-  FillChar(Insert_^,SizeOf(TInsert),#0);
+  FillChar(Insert_^,SizeOf(TPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert),#0);
   Insert_^.IsPhi:=false;
   Insert_^.Number:=InsertNumber;
   inc(InsertNumber);
@@ -6194,7 +6219,7 @@ var CountInserts,InsertNumber:TPACCInt32;
  end;
  procedure Cast(var Operand:TPACCIntermediateRepresentationCodeOperand;
                 const CodeType:TPACCIntermediateRepresentationCodeType;
-                const Location:TLocation);
+                const Location:TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocation);
  var Temporary:TPACCIntermediateRepresentationCodeTemporary;
      TemporaryCodeType:TPACCIntermediateRepresentationCodeType;
  begin
@@ -6231,12 +6256,12 @@ var CountInserts,InsertNumber:TPACCInt32;
  procedure DoMask(const CodeType:TPACCIntermediateRepresentationCodeType;
                   var Operand:TPACCIntermediateRepresentationCodeOperand;
                   const Mask:TPACCUInt64;
-                  const Location:TLocation);
+                  const Location:TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocation);
  begin
   Cast(Operand,CodeType,Location);
   Operand:=InsertInstruction(CodeType,pircoAND,[CreateIntegerValueOperand(Mask)],Location);
  end;
- function Load(const Slice:TSlice;const Mask:TPACCUInt64;const Location:TLocation):TPACCIntermediateRepresentationCodeOperand;
+ function Load(const Slice:TPACCIntermediateRepresentationCodeFunctionLoadEliminationSlice;const Mask:TPACCUInt64;const Location:TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocation):TPACCIntermediateRepresentationCodeOperand;
  var Opcode:TPACCIntermediateRepresentationCodeOpcode;
      All:boolean;
      CodeType:TPACCIntermediateRepresentationCodeType;
@@ -6268,11 +6293,11 @@ var CountInserts,InsertNumber:TPACCInt32;
    DoMask(CodeType,result,Mask,Location);
   end;
  end;
- function Def(const Slice:TSlice;
+ function Def(const Slice:TPACCIntermediateRepresentationCodeFunctionLoadEliminationSlice;
               const Mask:TPACCUInt64;
               const Block:TPACCIntermediateRepresentationCodeBlock;
               Instruction:TPACCIntermediateRepresentationCodeInstruction;
-              const InstructionLocation:TLocation):TPACCIntermediateRepresentationCodeOperand;
+              const InstructionLocation:TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocation):TPACCIntermediateRepresentationCodeOperand;
  var OldCountInserts,OldCountTemporaries,InstructionIndex,StartInstructionIndex,
      Size,InsertIndex,PredecessorIndex:TPACCInt32;
      Predecessor:TPACCIntermediateRepresentationCodeBlock;
@@ -6282,9 +6307,9 @@ var CountInserts,InsertNumber:TPACCInt32;
      IsLoad:boolean;
      Operand0,Operand1:TPACCIntermediateRepresentationCodeOperand;
      Opcode:TPACCIntermediateRepresentationCodeOpcode;
-     Insert_:PInsert;
+     Insert_:PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert;
      Phi:TPACCIntermediateRepresentationCodePhi;
-     Location:TLocation;
+     Location:TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocation;
   function DoLoad:TPACCIntermediateRepresentationCodeOperand;
   begin
    CountInserts:=OldCountInserts;
@@ -6451,7 +6476,7 @@ var CountInserts,InsertNumber:TPACCInt32;
       SetLength(Inserts,CountInserts*2);
      end;
      Insert_:=@Inserts[InsertIndex];
-     FillChar(Insert_^,SizeOf(TInsert),#0);
+     FillChar(Insert_^,SizeOf(TPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert),#0);
      Insert_^.IsPhi:=true;
      Insert_^.BlockID:=Block.ID;
      Insert_^.New.Slice:=Slice;
@@ -6494,8 +6519,8 @@ var CountInserts,InsertNumber:TPACCInt32;
 var InstructionIndex,Size:TPACCInt32;
     Block:TPACCIntermediateRepresentationCodeBlock;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
-    Slice:TSlice;
-    Location:TLocation;
+    Slice:TPACCIntermediateRepresentationCodeFunctionLoadEliminationSlice;
+    Location:TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocation;
 begin
  Inserts:=nil;
  CountInserts:=0;
@@ -6525,6 +6550,8 @@ begin
    Block:=Block.Link;
   end;
 
+  UntypedDirectIntroSort(@Inserts[0],0,CountInserts-1,SizeOf(TPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert),TPACCIntermediateRepresentationCodeFunctionLoadEliminationCompareInsert);
+    
  finally
   Inserts:=nil;
  end;
