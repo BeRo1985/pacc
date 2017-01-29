@@ -6668,13 +6668,14 @@ end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.CopyElimination;
 type PPPOperandListItem=^PPOperandListItem;
-     PPOperandListItem=^POperandListItem; 
+     PPOperandListItem=^POperandListItem;
      POperandListItem=^TOperandListItem;
      TOperandListItem=record
       Temporary:TPACCInt32;
       Link:POperandListItem;
      end;
 var Operands:TPACCIntermediateRepresentationCodeOperands;
+    AllocatedOperandListItems:TList;
  function CopyOf(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCIntermediateRepresentationCodeOperand;
  begin
   if Operand.Kind=pircokTEMPORARY then begin
@@ -6735,7 +6736,63 @@ var Operands:TPACCIntermediateRepresentationCodeOperands;
    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-21-08-0000',nil,true);
   end;
  end;
+var Index,InstructionIndex:TPACCInt32;
+    OperandListItem0,OperandListItem1:POperandListItem;
+    OperandListItemList:PPOperandListItem;
+    Use0,Use1:TPACCIntermediateRepresentationCodeUse;
+    Instruction:TPACCIntermediateRepresentationCodeInstruction;
+    Phi:TPACCIntermediateRepresentationCodePhi;
+    ParentPhi:PPACCIntermediateRepresentationCodePhi;
+    Block:TPACCIntermediateRepresentationCodeBlock;
 begin
+ Operands:=nil;
+ try
+  SetLength(Operands,Temporaries.Count);
+  if Temporaries.Count>0 then begin
+   FillChar(Operands[0],Temporaries.Count*SizeOf(TPACCIntermediateRepresentationCodeOperand),#0);
+   for Index:=0 to length(Operands)-1 do begin
+    Operands[Index].Kind:=pircokNONE; 
+   end;
+  end;
+
+  AllocatedOperandListItems:=TList.Create;
+  try
+
+   OperandListItem0:=nil;
+   OperandListItemList:=@OperandListItem0;
+
+   Block:=StartBlock;
+   while assigned(Block) do begin
+    Phi:=Block.Phi;
+    while assigned(Phi) do begin
+     VisitPhi(Phi,@OperandListItemList);
+     Phi:=Phi.Link;
+    end;
+    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+     VisitInstruction(Block.Instructions[InstructionIndex],@OperandListItemList);
+    end;
+    Block:=Block.Link;
+   end;
+
+   repeat
+    OperandListItem1:=OperandListItem0;
+    if assigned(OperandListItem0) then begin
+     OperandListItem0:=OperandListItem0^.Link;
+    end else begin
+     break;
+    end;
+   until false;
+
+  finally
+   for Index:=0 to AllocatedOperandListItems.Count-1 do begin
+    FreeMem(AllocatedOperandListItems[Index]);
+   end;
+   AllocatedOperandListItems.Free;
+  end;
+
+ finally
+  Operands:=nil;
+ end;
 {$ifdef IRDebug}
  writeln('> After copy elimination:');
  DumpToConsole;
