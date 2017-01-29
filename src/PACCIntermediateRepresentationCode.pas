@@ -7203,22 +7203,121 @@ var Values:array of TPACCInt32;
             OutputValue:=0;
            end;
           end;
-          pircoCMPLEF,
-          pircoCMPLTF,
-          pircoCMPGEF,
-          pircoCMPGTF,
-          pircoCMPEQF,
-          pircoCMPNEF,
-          pircoCMPOF,
-          pircoCMPNOF,
-          pircoCMPLED,
-          pircoCMPLTD,
-          pircoCMPGED,
-          pircoCMPGTD,
-          pircoCMPEQD,
-          pircoCMPNED,
-          pircoCMPOD,
+          pircoCMPLEF:begin
+           if ConstantLeft.Data.FloatValue<=ConstantRight.Data.FloatValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPLTF:begin
+           if ConstantLeft.Data.FloatValue<ConstantRight.Data.FloatValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPGEF:begin
+           if ConstantLeft.Data.FloatValue>=ConstantRight.Data.FloatValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPGTF:begin
+           if ConstantLeft.Data.FloatValue>ConstantRight.Data.FloatValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPEQF:begin
+           if ConstantLeft.Data.FloatValue=ConstantRight.Data.FloatValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPNEF:begin
+           if ConstantLeft.Data.FloatValue<>ConstantRight.Data.FloatValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPOF:begin
+           if (ConstantLeft.Data.FloatValue<ConstantRight.Data.FloatValue) or
+              (ConstantLeft.Data.FloatValue>=ConstantRight.Data.FloatValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPNOF:begin
+           if (ConstantLeft.Data.FloatValue<ConstantRight.Data.FloatValue) or
+              (ConstantLeft.Data.FloatValue>=ConstantRight.Data.FloatValue) then begin
+            OutputValue:=0;
+           end else begin
+            OutputValue:=1;
+           end;
+          end;
+          pircoCMPLED:begin
+           if ConstantLeft.Data.DoubleValue<=ConstantRight.Data.DoubleValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPLTD:begin
+           if ConstantLeft.Data.DoubleValue<ConstantRight.Data.DoubleValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPGED:begin
+           if ConstantLeft.Data.DoubleValue>=ConstantRight.Data.DoubleValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPGTD:begin
+           if ConstantLeft.Data.DoubleValue>ConstantRight.Data.DoubleValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPEQD:begin
+           if ConstantLeft.Data.DoubleValue=ConstantRight.Data.DoubleValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPNED:begin
+           if ConstantLeft.Data.DoubleValue<>ConstantRight.Data.DoubleValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPOD:begin
+           if (ConstantLeft.Data.DoubleValue<ConstantRight.Data.DoubleValue) or
+              (ConstantLeft.Data.DoubleValue>=ConstantRight.Data.DoubleValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
           pircoCMPNOD:begin
+           if (ConstantLeft.Data.DoubleValue<ConstantRight.Data.DoubleValue) or
+              (ConstantLeft.Data.DoubleValue>=ConstantRight.Data.DoubleValue) then begin
+            OutputValue:=0;
+           end else begin
+            OutputValue:=1;
+           end;
           end;
           else begin
            OutputValue:=0;
