@@ -16,7 +16,7 @@ uses TypInfo,SysUtils,Classes,Math,PUCU,PasMP,PACCTypes,PACCGlobals,PACCPointerH
 //   1. Integer temporary slots (which includes pointer stuff)
 //   2. Floating point temporary slots
 
-// A integer temporary slot of type INT is on 32-bit targets 32-bit wide, and  on 64-bit targets 64-bit wide, but where only the lowest
+// A integer temporary slot of type INT is on 32-bit targets 32-bit wide, and on 64-bit targets 64-bit wide, but where only the lowest
 // 32-bits are used
 
 // A integer temporary slot of type LONG are on 32-bit targets virtual-mapped to two 32-bit integer temporaries of type INT, and
@@ -691,6 +691,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure FillLoop;
        procedure GetAlias(const Alias:TPACCIntermediateRepresentationCodeAlias;const Operand:TPACCIntermediateRepresentationCodeOperand);
        procedure FillAlias;
+       procedure LoadOptimization;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -996,9 +997,10 @@ begin
  Name:='';
  Type_:=pirctNONE;
  Uses_:=TPACCIntermediateRepresentationCodeUseList.Create;
- CountDefinitions:=0;
+ Uses_.Add(nil);
+ CountDefinitions:=1;
  Cost:=0;
- Slot:=0;
+ Slot:=-1;
  Phi:=0;
  Visit:=0;
  MappedTo[0]:=-1;
@@ -5958,6 +5960,182 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.LoadOptimization;
+type PLocationKind=^TLocationKind;
+     TLocationKind=
+      (
+       lkROOT,
+       lkLOAD,
+       lkNOLOAD
+      );
+     PLocation=^TLocation;
+     TLocation=record
+      Kind:TLocationKind;
+      Offset:TPACCInt64;
+      Block:TPACCIntermediateRepresentationCodeBlock;
+     end;
+     PSlice=^TSlice;
+     TSlice=record
+      Operand:TPACCIntermediateRepresentationCodeOperand;
+      Size:TPACCInt32;
+      CodeType:TPACCIntermediateRepresentationCodeType;
+     end;
+     PInsertNew=^TInsertNew;
+     TInsertNew=record
+      case TPACCInt32 of
+       0:(
+        Instruction:TPACCIntermediateRepresentationCodeInstruction;
+       );
+       1:(
+        Slice:TSlice;
+        Phi:TPACCIntermediateRepresentationCodePhi;
+       );
+     end;
+     PInsert=^TInsert;
+     TInsert=record
+      IsPhi:boolean;
+      Number:TPACCInt32;
+      BlockID:TPACCInt32;
+      Offset:TPACCInt64;
+      New:TInsertNew;
+     end;
+     TInserts=array of TInsert;
+var CountInserts,InsertNumber:TPACCInt32;
+    Inserts:TInserts;
+ function LoadSize(const Instruction:TPACCIntermediateRepresentationCodeInstruction):TPACCInt32;
+ begin
+  case Instruction.Opcode of
+   pircoLDUCI,pircoLDSCI,pircoLDUCL,pircoLDSCL:begin
+    result:=TPACCInstance(fInstance).Target.SizeOfChar;
+   end;
+   pircoLDUSI,pircoLDSSI,pircoLDUSL,pircoLDSSL:begin
+    result:=TPACCInstance(fInstance).Target.SizeOfShort;
+   end;
+   pircoLDUII,pircoLDSII,pircoLDUIL,pircoLDSIL:begin
+    result:=TPACCInstance(fInstance).Target.SizeOfInt;
+   end;
+   pircoLDULL,pircoLDSLL:begin
+    result:=TPACCInstance(fInstance).Target.SizeOfLong;
+   end;
+   pircoLDF:begin
+    result:=TPACCInstance(fInstance).Target.SizeOfFloat;
+   end;
+   pircoLDD:begin
+    result:=TPACCInstance(fInstance).Target.SizeOfDouble;
+   end;
+   else begin
+    result:=0;
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-00-59-0000',@Instruction.SourceLocation,true);
+   end;
+  end;
+ end;
+ function StoreSize(const Instruction:TPACCIntermediateRepresentationCodeInstruction):TPACCInt32;
+ begin   
+  case Instruction.Opcode of
+   pircoSTIC,pircoSTLC:begin
+    result:=TPACCInstance(fInstance).Target.SizeOfChar;
+   end;
+   pircoSTIS,pircoSTLS:begin
+    result:=TPACCInstance(fInstance).Target.SizeOfShort;
+   end;
+   pircoSTII,pircoSTLI:begin
+    result:=TPACCInstance(fInstance).Target.SizeOfInt;
+   end;
+   pircoSTLL:begin
+    result:=TPACCInstance(fInstance).Target.SizeOfLong;
+   end;
+   pircoSTF:begin
+    result:=TPACCInstance(fInstance).Target.SizeOfFloat;
+   end;
+   pircoSTD:begin
+    result:=TPACCInstance(fInstance).Target.SizeOfDouble;
+   end;
+   else begin
+    result:=0;
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-00-59-0000',@Instruction.SourceLocation,true);
+   end;
+  end;
+ end;
+ function InsertInstruction(const CodeType:TPACCIntermediateRepresentationCodeType;
+                            const Opcode:TPACCIntermediateRepresentationCodeOpcode;
+                            const Operands:array of TPACCIntermediateRepresentationCodeOperand;
+                            const Location:TLocation):TPACCIntermediateRepresentationCodeOperand;
+ var Index:TPACCInt32;
+     Insert_:PInsert;
+     Instruction:TPACCIntermediateRepresentationCodeInstruction;
+ begin
+  Index:=CountInserts;
+  inc(CountInserts);
+  if length(Inserts)<CountInserts then begin
+   SetLength(Inserts,CountInserts*2);
+  end;
+  Insert_:=@Inserts[Index];
+  FillChar(Insert_^,SizeOf(TInsert),#0);
+  Insert_^.IsPhi:=false;
+  Insert_^.Number:=InsertNumber;
+  inc(InsertNumber);
+  Insert_^.BlockID:=Location.Block.ID;
+  Insert_^.Offset:=Location.Offset;
+  Instruction:=TPACCIntermediateRepresentationCodeInstruction.Create;
+  Insert_^.New.Instruction:=Instruction;
+  TPACCInstance(fInstance).AllocatedObjects.Add(Instruction);
+  Instruction.Opcode:=Opcode;
+  Instruction.Type_:=CodeType;
+  Instruction.To_:=CreateTemporaryOperand(CreateTemporary(CodeType));
+  Instruction.Operands:=nil;
+  if length(Operands)>0 then begin
+   SetLength(Instruction.Operands,length(Operands));
+   for Index:=0 to length(Operands)-1 do begin
+    Instruction.Operands[Index]:=Operands[Index];
+   end;
+  end;
+  Instruction.SourceLocation.Source:=0;
+  Instruction.SourceLocation.Line:=0;
+  Instruction.SourceLocation.Column:=0;
+  result:=Instruction.To_;
+ end;
+ procedure Cast(var Operand:TPACCIntermediateRepresentationCodeOperand;
+                const CodeType:TPACCIntermediateRepresentationCodeType;
+                const Location:TLocation);
+ var Temporary:TPACCIntermediateRepresentationCodeTemporary;
+     TemporaryCodeType:TPACCIntermediateRepresentationCodeType;
+ begin
+  case Operand.Kind of
+   pircokTEMPORARY:begin
+    Temporary:=Temporaries[Operand.Temporary];
+    TemporaryCodeType:=Temporary.Type_;
+    if not ((TemporaryCodeType=CodeType) or ((CodeType=pirctINT) and (TemporaryCodeType=pirctLONG))) then begin
+     if (CodeTypeBaseWidth[CodeType]<>0) or (CodeTypeBaseWidth[TemporaryCodeType]=0) then begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-29-01-20-0000',nil,true);
+     end else if CodeTypeBaseWidth[CodeType]=CodeTypeBaseWidth[TemporaryCodeType] then begin
+      Operand:=InsertInstruction(CodeType,pircoCAST,[Operand],Location);
+     end else if CodeType=pirctLONG then begin
+      if TemporaryCodeType=pirctFLOAT then begin
+       Operand:=InsertInstruction(pirctINT,pircoCAST,[Operand],Location);
+      end;
+      Operand:=InsertInstruction(pirctLONG,pircoZEIL,[Operand],Location);
+     end else begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-29-01-22-0000',nil,true);
+     end;
+    end;
+   end;
+   pircokCONSTANT:begin
+   end;
+   else begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-01-16-0000',nil,true);
+   end;
+  end;
+ end;
+begin
+ Inserts:=nil;
+ CountInserts:=0;
+ InsertNumber:=0;
+ try
+ finally
+  Inserts:=nil;
+ end;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
 begin
 {$ifdef IRDebug}
@@ -5973,6 +6151,7 @@ begin
  SSACheck;
  FillLoop;
  FillAlias;
+ LoadOptimization;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
