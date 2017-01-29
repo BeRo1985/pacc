@@ -6997,6 +6997,9 @@ var Values:array of TPACCInt32;
       Address.Kind:=pircakNONE;
       case Instruction.Type_ of
        pirctINT,pirctLONG:begin
+        if ConstantLeft.Kind<>pircckDATA then begin
+         TPACCInstance(fInstance).AddError('Invalid address operand',@Instruction.SourceLocation,true);
+        end;
         case Instruction.Opcode of
          pircoCAST:begin
           OutputValue:=ConstantLeft.Data.IntegerValue;
@@ -7076,6 +7079,9 @@ var Values:array of TPACCInt32;
         Constants[Value]:=Constant;
        end;
        pirctFLOAT:begin
+        if ConstantLeft.Kind<>pircckDATA then begin
+         TPACCInstance(fInstance).AddError('Invalid address operand',@Instruction.SourceLocation,true);
+        end;
         case Instruction.Opcode of
          pircoCAST:begin
           OutputFloatValue:=ConstantLeft.Data.FloatValue;
@@ -7107,6 +7113,9 @@ var Values:array of TPACCInt32;
         Constant:=Constants[Value];
        end;
        pirctDOUBLE:begin
+        if ConstantLeft.Kind<>pircckDATA then begin
+         TPACCInstance(fInstance).AddError('Invalid address operand',@Instruction.SourceLocation,true);
+        end;
         case Instruction.Opcode of
          pircoCAST:begin
           OutputDoubleValue:=ConstantLeft.Data.DoubleValue;
