@@ -5979,8 +5979,53 @@ function TPACCIntermediateRepresentationCodeFunction.AliasCaseKind(const Operand
                                                                    const OperandQ:TPACCIntermediateRepresentationCodeOperand;
                                                                    const StackQ:TPACCInt64;
                                                                    out Delta:TPACCInt64):TPACCIntermediateRepresentationCodeAliasCaseKind;
+var AliasP,AliasQ:TPACCIntermediateRepresentationCodeAlias;
+    Overlapping:boolean;
 begin
- result:=pircackNOALIAS;
+ AliasP:=TPACCIntermediateRepresentationCodeAlias.Create;
+ try
+  AliasQ:=TPACCIntermediateRepresentationCodeAlias.Create;
+  try
+
+   GetAlias(AliasP,OperandP);
+   GetAlias(AliasQ,OperandQ);
+
+   Delta:=AliasP.Offset-AliasQ.Offset;
+
+   Overlapping:=(AliasP.Offset<(AliasQ.Offset+StackQ)) and (AliasQ.Offset<(AliasP.Offset+StackP));
+
+   if (AliasP.Kind in [pircakSTACKLOCAL,pircakSTACKESCAPE]) and
+      (AliasQ.Kind in [pircakSTACKLOCAL,pircakSTACKESCAPE]) then begin
+    if Overlapping and AreOperandsEqual(AliasP.Base,AliasQ.Base) then begin
+     result:=pircackMUSTALIAS;
+    end else begin
+     result:=pircackNOALIAS;
+    end;
+   end else begin
+    if (AliasP.Kind=pircakADDRESS) and (AliasQ.Kind=pircakADDRESS) then begin
+     if (AliasP.Address.Kind=AliasQ.Address.Kind) and
+        (((AliasP.Address.Kind=pircakFUNCTION) and (AliasP.Address.Function_=AliasQ.Address.Function_)) or
+         ((AliasP.Address.Kind=pircakLABEL) and (AliasP.Address.Label_=AliasQ.Address.Label_)) or
+         ((AliasP.Address.Kind=pircakVARIABLE) and (AliasP.Address.Variable=AliasQ.Address.Variable))) then begin
+      if Overlapping then begin
+       result:=pircackMUSTALIAS;
+      end else begin
+       result:=pircackNOALIAS;
+      end;
+     end else begin
+      result:=pircackMAYALIAS;
+     end;
+    end else begin
+     result:=pircackNOALIAS;
+    end;
+   end;
+
+  finally
+   AliasQ.Free;
+  end;
+ finally
+  AliasP.Free;
+ end;
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.Escapes(const Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
