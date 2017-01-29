@@ -6126,6 +6126,52 @@ var CountInserts,InsertNumber:TPACCInt32;
    end;
   end;
  end;
+ procedure DoMask(const CodeType:TPACCIntermediateRepresentationCodeType;
+                  var Operand:TPACCIntermediateRepresentationCodeOperand;
+                  const Mask:TPACCUInt64;
+                  const Location:TLocation);
+ begin
+  Cast(Operand,CodeType,Location);
+  Operand:=InsertInstruction(CodeType,pircoAND,[CreateIntegerValueOperand(Mask)],Location);
+ end;
+ function Load(const Slice:TSlice;const Mask:TPACCUInt64;const Location:TLocation):TPACCIntermediateRepresentationCodeOperand;
+ var Opcode:TPACCIntermediateRepresentationCodeOpcode;
+     All:boolean;
+     CodeType:TPACCIntermediateRepresentationCodeType;
+ begin
+  case Slice.Size of
+   1:begin
+    Opcode:=pircoLDUCI;
+   end;
+   2:begin
+    Opcode:=pircoLDUSI;
+   end;
+   4:begin
+    Opcode:=pircoLDUII;
+   end;
+   8:begin
+    Opcode:=pircoLDULL;
+   end;
+   else begin
+    Opcode:=pircoNOP;
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-01-31-0000',nil,true);
+   end;
+  end;
+  All:=Mask=((((TPACCUInt64(Slice.Size) shl 3)-1) shl 1)-1);
+  if All then begin
+   CodeType:=Slice.CodeType;
+  end else begin
+   if Slice.Size>4 then begin
+    CodeType:=pirctLONG;
+   end else begin
+    CodeType:=pirctINT;
+   end;
+  end;
+  result:=InsertInstruction(CodeType,Opcode,[Slice.Operand],Location);
+  if not All then begin
+   DoMask(CodeType,result,Mask,Location);
+  end;
+ end;
 begin
  Inserts:=nil;
  CountInserts:=0;
