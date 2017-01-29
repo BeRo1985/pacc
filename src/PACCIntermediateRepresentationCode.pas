@@ -6516,11 +6516,13 @@ var CountInserts,InsertNumber:TPACCInt32;
    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-16-31-0000',nil,true);
   end;
  end;
-var InstructionIndex,Size:TPACCInt32;
+var InstructionIndex,Size,BlockIndex,InsertIndex:TPACCInt32;
     Block:TPACCIntermediateRepresentationCodeBlock;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
     Slice:TPACCIntermediateRepresentationCodeFunctionLoadEliminationSlice;
     Location:TPACCIntermediateRepresentationCodeFunctionLoadEliminationLocation;
+    Insert_:PPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert;
+    Instructions:TPACCIntermediateRepresentationCodeInstructionList;
 begin
  Inserts:=nil;
  CountInserts:=0;
@@ -6542,6 +6544,9 @@ begin
       Location.Block:=Block;
       SetLength(Instruction.Operands,2);
       Instruction.Operands[1]:=Def(Slice,GetMask(Size),Block,Instruction,Location);
+      if Instruction.Operands[1].Kind=pircokNONE then begin
+       SetLength(Instruction.Operands,1);
+      end;
      end else begin
       TPACCInstance(fInstance).AddError('Internal error 2017-01-29-19-51-0000',@Instruction.SourceLocation,true);
      end;
@@ -6550,7 +6555,55 @@ begin
    Block:=Block.Link;
   end;
 
-  UntypedDirectIntroSort(@Inserts[0],0,CountInserts-1,SizeOf(TPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert),TPACCIntermediateRepresentationCodeFunctionLoadEliminationCompareInsert);
+  if CountInserts>1 then begin
+   UntypedDirectIntroSort(@Inserts[0],0,CountInserts-1,SizeOf(TPACCIntermediateRepresentationCodeFunctionLoadEliminationInsert),TPACCIntermediateRepresentationCodeFunctionLoadEliminationCompareInsert);
+  end;
+
+  SetLength(Inserts,CountInserts+1);
+  Inserts[CountInserts].BlockID:=CountBlocks;
+
+  InsertIndex:=0;
+  for BlockIndex:=0 to CountBlocks-1 do begin
+   Block:=RPO[BlockIndex];
+   repeat
+    Insert_:=@Inserts[InsertIndex];
+    if (Insert_^.BlockID=BlockIndex) and Insert_^.IsPhi then begin
+     Insert_^.New.Phi.Link:=Block.Phi;
+     Block.Phi:=Insert_^.New.Phi;
+     inc(InsertIndex);
+    end else begin
+     break;
+    end;
+   until false;
+   Instructions:=TPACCIntermediateRepresentationCodeInstructionList.Create;
+   try
+    InstructionIndex:=0;
+    Instruction:=nil;
+    repeat
+     if (Insert_^.BlockID=BlockIndex) and (Insert_^.Offset=InstructionIndex) then begin
+      Instruction:=Insert_^.New.Instruction;
+      inc(InsertIndex);
+     end else begin
+      if InstructionIndex<Block.Instructions.Count then begin
+       Instruction:=Block.Instructions[InstructionIndex];
+       inc(InstructionIndex);
+       if (Instruction.Opcode in [pircoLDUCI..pircoLDD]) and
+          (length(Instruction.Operands)>1) then begin
+
+        SetLength(Instruction.Operands,1);
+       end;
+      end else begin
+       break;
+      end;
+     end;
+     Instructions.Add(Instruction);
+    until false;
+    Block.Instructions.Clear;
+    Block.Instructions.Assign(Instructions,laCopy);
+   finally
+    Instructions.Free;
+   end;
+  end;         
     
  finally
   Inserts:=nil;
