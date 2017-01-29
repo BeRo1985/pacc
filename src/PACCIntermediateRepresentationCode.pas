@@ -193,14 +193,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircjkJMP,  // Jump
        pircjkJMPA, // Jump to address
        pircjkJMPT, // Jump table
-       pircjkJZI,   // Jump if zero int
-       pircjkJNZI,  // Jump if not zero int
-       pircjkJZL,   // Jump if zero long
-       pircjkJNZL,  // Jump if not zero long
-       pircjkJZF,   // Jump if zero float
-       pircjkJNZF,  // Jump if not zero float
-       pircjkJZD,   // Jump if zero double
-       pircjkJNZD,  // Jump if not zero double
+       pircjkJZ,   // Jump if zero
+       pircjkJNZ,  // Jump if not zero
        pircjkCOUNT
       );
 
@@ -2850,21 +2844,7 @@ begin
 
  LeftTemporary:=-1;
  EmitExpression(Node.Left,LeftTemporary);
- if (Node.Left.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
-    ((Node.Left.Type_^.Kind=tkPOINTER) and
-     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZI;
- end else if (Node.Left.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
-             ((Node.Left.Type_^.Kind=tkPOINTER) and
-              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZL;
- end else if Node.Left.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZF;
- end else if Node.Left.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZD;
- end else begin
-  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-28-0000',@Node.SourceLocation,true);
- end;
+ CurrentBlock.Jump.Kind:=pircjkJNZ;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(LeftTemporary);
  CurrentBlock.Successors.Clear;
  if IsAND then begin
@@ -2879,21 +2859,7 @@ begin
  EmitLabel(l0);
  RightTemporary:=-1;
  EmitExpression(Node.Right,RightTemporary);
- if (Node.Right.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
-    ((Node.Right.Type_^.Kind=tkPOINTER) and
-     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZI;
- end else if (Node.Right.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
-             ((Node.Right.Type_^.Kind=tkPOINTER) and
-              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZL;
- end else if Node.Right.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZF;
- end else if Node.Right.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZD;
- end else begin
-  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-29-0000',@Node.SourceLocation,true);
- end;
+ CurrentBlock.Jump.Kind:=pircjkJNZ;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(RightTemporary);
  CurrentBlock.Successors.Clear;
  CurrentBlock.Successors.Add(b1);
@@ -2931,21 +2897,7 @@ begin
 
  OperandTemporary:=-1;
  EmitExpression(Node.Operand,OperandTemporary);
- if (Node.Operand.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
-    ((Node.Operand.Type_^.Kind=tkPOINTER) and
-     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZI;
- end else if (Node.Operand.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
-             ((Node.Operand.Type_^.Kind=tkPOINTER) and
-              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZL;
- end else if Node.Operand.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZF;
- end else if Node.Operand.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZD;
- end else begin
-  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-10-48-0000',@Node.SourceLocation,true);
- end;
+ CurrentBlock.Jump.Kind:=pircjkJNZ;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(OperandTemporary);
  CurrentBlock.Successors.Clear;
  CurrentBlock.Successors.Add(b0);
@@ -3568,21 +3520,7 @@ begin
 
  ConditionTemporary:=-1;
  EmitExpression(Node.Condition,ConditionTemporary);
- if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
-    ((Node.Condition.Type_^.Kind=tkPOINTER) and
-     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZI;
- end else if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
-             ((Node.Condition.Type_^.Kind=tkPOINTER) and
-              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZL;
- end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZF;
- end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZD;
- end else begin
-  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-13-52-0000',@Node.SourceLocation,true);
- end;
+ CurrentBlock.Jump.Kind:=pircjkJNZ;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
  CurrentBlock.Successors.Clear;
  CurrentBlock.Successors.Add(b0);
@@ -4133,21 +4071,7 @@ begin
  EmitLabel(ConditionLabel);
  ConditionTemporary:=-1;
  EmitExpression(Node.Condition,ConditionTemporary);
- if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
-    ((Node.Condition.Type_^.Kind=tkPOINTER) and
-     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZI;
- end else if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
-             ((Node.Condition.Type_^.Kind=tkPOINTER) and
-              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZL;
- end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZF;
- end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZD;
- end else begin
-  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-14-39-0000',@Node.SourceLocation,true);
- end;
+ CurrentBlock.Jump.Kind:=pircjkJNZ;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
  CurrentBlock.Successors.Clear;
  CurrentBlock.Successors.Add(BodyBlock);
@@ -4191,21 +4115,7 @@ begin
  EmitLabel(ContinueLabel);
  ConditionTemporary:=-1;
  EmitExpression(Node.Condition,ConditionTemporary);
- if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
-    ((Node.Condition.Type_^.Kind=tkPOINTER) and
-     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZI;
- end else if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
-             ((Node.Condition.Type_^.Kind=tkPOINTER) and
-              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZL;
- end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZF;
- end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZD;
- end else begin
-  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-14-39-0000',@Node.SourceLocation,true);
- end;
+ CurrentBlock.Jump.Kind:=pircjkJNZ;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
  CurrentBlock.Successors.Clear;
  CurrentBlock.Successors.Add(BodyBlock);
@@ -4231,7 +4141,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.EmitSWITCHStatement(const 
     end else begin
      Opcode:=OpSI;
     end;
-    JumpKind:=pircjkJNZI;
+    JumpKind:=pircjkJNZ;
     CodeType:=pirctINT;
    end;
    pirctLONG:begin
@@ -4240,7 +4150,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.EmitSWITCHStatement(const 
     end else begin
      Opcode:=OpSL;
     end;
-    JumpKind:=pircjkJNZL;
+    JumpKind:=pircjkJNZ;
     CodeType:=pirctLONG;
    end;
    else begin
@@ -4405,21 +4315,7 @@ begin
 
  ConditionTemporary:=-1;
  EmitExpression(Node.Condition,ConditionTemporary);
- if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeINTTypeKinds) or
-    ((Node.Condition.Type_^.Kind=tkPOINTER) and
-     (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfInt)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZI;
- end else if (Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeLONGTypeKinds) or
-             ((Node.Condition.Type_^.Kind=tkPOINTER) and
-              (TPACCInstance(fInstance).Target.SizeOfPointer=TPACCInstance(fInstance).Target.SizeOfLong)) then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZL;
- end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeFLOATTypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZF;
- end else if Node.Condition.Type_^.Kind in PACCIntermediateRepresentationCodeDOUBLETypeKinds then begin
-  CurrentBlock.Jump.Kind:=pircjkJNZD;
- end else begin
-  TPACCInstance(fInstance).AddError('Internal error 2017-01-24-13-52-0000',@Node.SourceLocation,true);
- end;
+ CurrentBlock.Jump.Kind:=pircjkJNZ;
  CurrentBlock.Jump.Operand:=CreateTemporaryOperand(ConditionTemporary);
  CurrentBlock.Successors.Clear;
  CurrentBlock.Successors.Add(b0);
@@ -8608,14 +8504,8 @@ begin
  JumpKindNames[pircjkJMP]:='jmp';
  JumpKindNames[pircjkJMPA]:='jmpa';
  JumpKindNames[pircjkJMPT]:='jmpt';
- JumpKindNames[pircjkJZI]:='jzi';
- JumpKindNames[pircjkJNZI]:='jnzi';
- JumpKindNames[pircjkJZL]:='jzl';
- JumpKindNames[pircjkJNZL]:='jnzl';
- JumpKindNames[pircjkJZF]:='jzf';
- JumpKindNames[pircjkJNZF]:='jnzf';
- JumpKindNames[pircjkJZD]:='jzd';
- JumpKindNames[pircjkJNZD]:='jnzd';
+ JumpKindNames[pircjkJZ]:='jz';
+ JumpKindNames[pircjkJNZ]:='jnz';
  JumpKindNames[pircjkCOUNT]:='count';
 end;
 
