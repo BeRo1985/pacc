@@ -700,9 +700,9 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure GetAlias(const Alias:TPACCIntermediateRepresentationCodeAlias;const Operand:TPACCIntermediateRepresentationCodeOperand);
        procedure FillAlias;
        function AliasCaseKind(const OperandP:TPACCIntermediateRepresentationCodeOperand;
-                              const StackP:TPACCInt64;
+                              const SizeP:TPACCInt64;
                               const OperandQ:TPACCIntermediateRepresentationCodeOperand;
-                              const StackQ:TPACCInt64;
+                              const SizeQ:TPACCInt64;
                               out Delta:TPACCInt64):TPACCIntermediateRepresentationCodeAliasCaseKind;
        function Escapes(const Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
        procedure LoadOptimization;
@@ -5975,9 +5975,9 @@ begin
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.AliasCaseKind(const OperandP:TPACCIntermediateRepresentationCodeOperand;
-                                                                   const StackP:TPACCInt64;
+                                                                   const SizeP:TPACCInt64;
                                                                    const OperandQ:TPACCIntermediateRepresentationCodeOperand;
-                                                                   const StackQ:TPACCInt64;
+                                                                   const SizeQ:TPACCInt64;
                                                                    out Delta:TPACCInt64):TPACCIntermediateRepresentationCodeAliasCaseKind;
 var AliasP,AliasQ:TPACCIntermediateRepresentationCodeAlias;
     Overlapping:boolean;
@@ -5992,7 +5992,7 @@ begin
 
    Delta:=AliasP.Offset-AliasQ.Offset;
 
-   Overlapping:=(AliasP.Offset<(AliasQ.Offset+StackQ)) and (AliasQ.Offset<(AliasP.Offset+StackP));
+   Overlapping:=(AliasP.Offset<(AliasQ.Offset+SizeQ)) and (AliasQ.Offset<(AliasP.Offset+SizeP));
 
    if (AliasP.Kind in [pircakSTACKLOCAL,pircakSTACKESCAPE]) and
       (AliasQ.Kind in [pircakSTACKLOCAL,pircakSTACKESCAPE]) then begin
@@ -6264,10 +6264,14 @@ var CountInserts,InsertNumber:TPACCInt32;
               const Block:TPACCIntermediateRepresentationCodeBlock;
               Instruction:TPACCIntermediateRepresentationCodeInstruction;
               const InstructionLocation:TLocation):TPACCIntermediateRepresentationCodeOperand;
- var OldCountInserts,OldCountTemporaries,InstructionIndex,StartInstructionIndex:TPACCInt32;
+ var OldCountInserts,OldCountTemporaries,InstructionIndex,StartInstructionIndex,
+     Size:TPACCInt32;
      Predecessor:TPACCIntermediateRepresentationCodeBlock;
      CodeType:TPACCIntermediateRepresentationCodeType;
      MaskSize:TPACCUInt64;
+     Offset:TPACCInt64;
+     IsLoad:boolean;
+     Operand0,Operand1:TPACCIntermediateRepresentationCodeOperand;
   function DoLoad:TPACCIntermediateRepresentationCodeOperand;
   begin
    CountInserts:=OldCountInserts;
@@ -6302,8 +6306,41 @@ var CountInserts,InsertNumber:TPACCInt32;
     Instruction:=Block.Instructions[InstructionIndex];
 
     if AreOperandsEqual(Instruction.To_,Slice.Operand) or Escapes(Slice.Operand) then begin
-     
+     result:=DoLoad;
+     exit;
     end;
+
+    IsLoad:=false;
+
+    case Instruction.Opcode of
+     pircoLDUCI..pircoLDD:begin
+      IsLoad:=true;
+      Size:=LoadSize(Instruction);
+      Operand0:=Instruction.To_;
+      Operand1:=Instruction.Operands[0];
+     end;
+     pircoSTIC..pircoSTD:begin
+      Size:=StoreSize(Instruction);
+      Operand0:=Instruction.Operands[0];
+      Operand1:=Instruction.Operands[1];
+     end;
+     else begin
+      continue;
+     end;
+    end;
+
+    case AliasCaseKind(Slice.Operand,Slice.Size,Operand1,Size,Offset) of
+     pircackNOALIAS:begin
+     end;
+     pircackMAYALIAS:begin
+     end;
+     pircackMUSTALIAS:begin
+     end;
+     else begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-29-18-02-0000',@Instruction.SourceLocation,true);
+     end;
+    end;
+
 
    end;
 
