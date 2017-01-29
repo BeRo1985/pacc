@@ -6885,7 +6885,7 @@ type PEdge=^TEdge;
 var Values:array of TPACCInt32;
     FlowWork:PEdge;
     Edges:array[0..1] of PEdge;
-    UseWork:TPACCIntermediateRepresentationCodeUse;
+    UseWork:TPACCIntermediateRepresentationCodeUseList;
     CountUse:TPACCInt32;
  function IsZero(const Constant:TPACCIntermediateRepresentationCodeConstant;const Wide:boolean):boolean;
  begin
@@ -6922,10 +6922,26 @@ var Values:array of TPACCInt32;
    result:=Bottom;
   end;
  end;
- procedure Update(const TemporaryIndex,Merge:TPACCInt32);
+ procedure Update(const TemporaryIndex:TPACCInt32;Merge:TPACCInt32);
+ var UseIndex:TPACCInt32;
+     Temporary:TPACCIntermediateRepresentationCodeTemporary;
  begin
+  Merge:=LatticeMerge(TemporaryIndex,Merge);
+  if Merge<>Values[TemporaryIndex] then begin
+   Temporary:=Temporaries[TemporaryIndex];
+   for UseIndex:=0 to Temporary.Uses_.Count-1 do begin
+    UseWork.Add(Temporary.Uses_[UseIndex]);
+   end;
+   Values[TemporaryIndex]:=Merge;
+  end;
  end;
 begin
+ UseWork:=TPACCIntermediateRepresentationCodeUseList.Create;
+ try
+
+ finally
+  UseWork.Free;
+ end;
 {$ifdef IRDebug}
  writeln('> After constant folding:');
  DumpToConsole;
