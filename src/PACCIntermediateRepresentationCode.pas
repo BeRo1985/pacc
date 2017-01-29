@@ -706,6 +706,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
                               out Delta:TPACCInt64):TPACCIntermediateRepresentationCodeAliasCaseKind;
        function Escapes(const Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
        procedure LoadElimination;
+       procedure CopyElimination;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -6665,6 +6666,60 @@ begin
 {$endif}
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.CopyElimination;
+type PPPOperandListItem=^PPOperandListItem;
+     PPOperandListItem=^POperandListItem; 
+     POperandListItem=^TOperandListItem;
+     TOperandListItem=record
+      Temporary:TPACCInt32;
+      Link:POperandListItem;
+     end;
+var Operands:TPACCIntermediateRepresentationCodeOperands;
+ function CopyOf(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCIntermediateRepresentationCodeOperand;
+ begin
+  if Operand.Kind=pircokTEMPORARY then begin
+   result:=Operands[Operand.Temporary];
+  end else begin
+   result:=Operand;
+  end;
+ end;
+ procedure Update(const Operand,TemporaryOperand:TPACCIntermediateRepresentationCodeOperand;const ParentOperandListItem:PPPOperandListItem);
+ var OperandListItem:POperandListItem;
+ begin
+  if not AreOperandsEqual(Operands[Operand.Temporary],TemporaryOperand) then begin
+   Operands[Operand.Temporary]:=TemporaryOperand;
+   GetMem(OperandListItem,SizeOf(TOperandListItem));
+   FillChar(OperandListItem^,SizeOf(TOperandListItem),#0);
+   OperandListItem^.Temporary:=Operand.Temporary;
+   OperandListItem^.Link:=nil;
+   ParentOperandListItem^^:=OperandListItem;
+   ParentOperandListItem^:=@OperandListItem^.Link;
+  end;
+ end;
+ procedure VisitPhi(const Phi:TPACCIntermediateRepresentationCodePhi;const ParentOperandListItem:PPPOperandListItem);
+ var OperandIndex:TPACCInt32;
+     Operand0,Operand1:TPACCIntermediateRepresentationCodeOperand;
+ begin
+  Operand0:=EmptyOperand;
+  for OperandIndex:=0 to Phi.CountOperands-1 do begin
+   Operand1:=CopyOf(Phi.Operands[OperandIndex]);
+   if (Operand1.Kind<>pircokNONE) and not AreOperandsEqual(Operand1,Phi.To_) then begin
+    if (Operand0.Kind=pircokNONE) or AreOperandsEqual(Operand0,Operand1) then begin
+     Operand0:=Operand1;
+    end else begin
+     Operand0:=Phi.To_;
+    end;
+   end;
+  end;
+  Update(Phi.To_,Operand0,ParentOperandListItem);
+ end;
+begin
+{$ifdef IRDebug}
+ writeln('> After copy elimination:');
+ DumpToConsole;
+{$endif}
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
 begin
 {$ifdef IRDebug}
@@ -6683,7 +6738,8 @@ begin
  LoadElimination;
  FillUse;
  SSACheck;
- 
+ CopyElimination;
+ FillUse;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
