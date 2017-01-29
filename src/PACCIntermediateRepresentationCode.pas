@@ -7076,6 +7076,33 @@ var Values:array of TPACCInt32;
         Constants[Value]:=Constant;
        end;
        pirctFLOAT:begin
+        case Instruction.Opcode of
+         pircoCAST:begin
+          OutputFloatValue:=ConstantLeft.Data.FloatValue;
+         end;
+         pircoCITF:begin
+          OutputFloatValue:=TPACCInt32(ConstantLeft.Data.IntegerValue);
+         end;
+         pircoCLTF:begin
+          OutputFloatValue:=TPACCInt64(ConstantLeft.Data.IntegerValue);
+         end;
+         pircoCDTF:begin
+          OutputFloatValue:=ConstantLeft.Data.DoubleValue;
+         end;
+         pircoTRUNCF:begin
+          OutputFloatValue:=trunc(ConstantLeft.Data.FloatValue);
+         end;
+         pircoTRUNCD:begin
+          OutputFloatValue:=trunc(ConstantLeft.Data.DoubleValue);
+         end;
+         pircoNEG:begin
+          OutputFloatValue:=-ConstantLeft.Data.FloatValue;
+         end;
+         else begin
+          OutputFloatValue:=0;
+          TPACCInstance(fInstance).AddError('Internal error 2017-01-29-23-58-0000',@Instruction.SourceLocation,true);
+         end;
+        end;
         Value:=CreateFloatValueOperand(OutputFloatValue).Constant;
         Constant:=Constants[Value];
        end;
