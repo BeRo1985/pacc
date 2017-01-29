@@ -6470,8 +6470,8 @@ var CountInserts,InsertNumber:TPACCInt32;
       end else begin
        Location.Kind:=lkNOLOAD;
       end;
-      Location.Block:=Block;
-      Location.Offset:=Block.Instructions.Count;
+      Location.Block:=Predecessor;
+      Location.Offset:=Predecessor.Instructions.Count;
       Operand1:=Def(Slice,Mask,Predecessor,nil,Location);
       if Operand1.Kind=pircokNONE then begin
        result:=DoLoad;
