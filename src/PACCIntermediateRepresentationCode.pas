@@ -713,6 +713,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
        function DumpTemporaryBitSet(const BitSet:TPACCIntermediateRepresentationCodeBitSet):TPACCRawByteString;
+       function DumpOperand(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCRawByteString;
 
       public
 
@@ -6844,6 +6845,22 @@ begin
     Block:=Block.Link;
    end;
 
+{$ifdef IRDebug}
+   writeln('> Copy information:');
+   for TemporaryIndex:=0 to Temporaries.Count-1 do begin
+    Temporary:=Temporaries[TemporaryIndex];
+    if Operands[TemporaryIndex].Kind=pircokNONE then begin
+     writeln('    temporary(',TemporaryIndex,') was not seen');
+    end else if not AreOperandsEqual(Operands[TemporaryIndex],CreateTemporaryOperand(TemporaryIndex)) then begin
+     writeln('    temporary(',TemporaryIndex,') is copy of ',DumpOperand(Operands[TemporaryIndex]));
+    end else begin
+     writeln('    temporary(',TemporaryIndex,') was seen and it is unique');
+    end;
+   end;
+   writeln('> After copy elimination:');
+   DumpToConsole;
+{$endif}
+
   finally
    for Index:=0 to AllocatedOperandListItems.Count-1 do begin
     FreeMem(AllocatedOperandListItems[Index]);
@@ -6854,10 +6871,6 @@ begin
  finally
   Operands:=nil;
  end;
-{$ifdef IRDebug}
- writeln('> After copy elimination:');
- DumpToConsole;
-{$endif}
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.ConstantFolding;
@@ -7007,6 +7020,68 @@ begin
  result:=result+' ]';
 end;
 
+function TPACCIntermediateRepresentationCodeFunction.DumpOperand(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCRawByteString;
+var Constant:TPACCIntermediateRepresentationCodeConstant;
+begin
+ case Operand.Kind of
+  pircokNONE:begin
+   result:='';
+  end;
+  pircokTEMPORARY:begin
+   result:='temporary('+IntToStr(Operand.Temporary)+')';
+  end;
+  pircokCALL:begin
+   result:='';
+   Assert(false);
+  end;
+  pircokCONSTANT:begin
+   Constant:=Constants[Operand.Constant];
+   case Constant.Kind of
+    pircckNONE:begin
+     result:='constant(none())';
+    end;
+    pircckDATA:begin
+     case Constant.Data.Kind of
+      pirccdkINTEGER:begin
+       result:='constant(data(integer('+IntToStr(Constant.Data.IntegerValue)+')))';
+      end;
+      pirccdkFLOAT:begin
+       result:='constant(data(float('+ConvertDoubleToString(Constant.Data.FloatValue,omStandard)+')))';
+      end;
+      pirccdkDOUBLE:begin
+       result:='constant(data(double('+ConvertDoubleToString(Constant.Data.DoubleValue,omStandard)+')))';
+      end;
+     end;
+    end;
+    pircckADDRESS:begin
+     case Constant.Address.Kind of
+      pircakNONE:begin
+       result:='constant(address(none()))';
+      end;
+      pircakFUNCTION:begin
+       result:='constant(address(function('+Constant.Address.Function_.FunctionName+')))';
+      end;
+      pircakLABEL:begin
+       result:='constant(address(label('+LowerCase(IntToHex(TPACCPtrUInt(Constant.Address.Label_),SizeOf(TPACCPtrUInt) shl 1))+')))';
+      end;
+      pircakVARIABLE:begin
+       result:='constant(address(variable('+Constant.Address.Variable.VariableName+')))';
+      end;
+     end;
+    end;
+    else begin
+     result:='';
+     TPACCInstance(fInstance).AddError('Internal error 2017-01-28-23-27-0000',nil,true);
+    end;
+   end;
+  end;
+  else begin
+   result:='';
+// TPACCInstance(fInstance).AddError('Internal error 2017-01-28-00-38-0000',@Instruction.SourceLocation,true);
+  end;
+ end
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.DumpTo(const AStringList:TStringList);
 const AlignmentOpcode=4;
  procedure ProcessBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
@@ -7015,63 +7090,6 @@ const AlignmentOpcode=4;
      Phi:TPACCIntermediateRepresentationCodePhi;
      Line:TPACCRawByteString;
      Successor:TPACCIntermediateRepresentationCodeBlock;
-  procedure ProcessOperand(const Operand:TPACCIntermediateRepresentationCodeOperand);
-  var Constant:TPACCIntermediateRepresentationCodeConstant;
-  begin
-   case Operand.Kind of
-    pircokNONE:begin
-    end;
-    pircokTEMPORARY:begin
-     Line:=Line+'temporary('+IntToStr(Operand.Temporary)+')';
-    end;
-    pircokCALL:begin
-     Assert(false);
-    end;
-    pircokCONSTANT:begin
-     Constant:=Constants[Operand.Constant];
-     case Constant.Kind of
-      pircckNONE:begin
-       Line:=Line+'constant(none())';
-      end;
-      pircckDATA:begin
-       case Constant.Data.Kind of
-        pirccdkINTEGER:begin
-         Line:=Line+'constant(data(integer('+IntToStr(Constant.Data.IntegerValue)+')))';
-        end;
-        pirccdkFLOAT:begin
-         Line:=Line+'constant(data(float('+ConvertDoubleToString(Constant.Data.FloatValue,omStandard)+')))';
-        end;
-        pirccdkDOUBLE:begin
-         Line:=Line+'constant(data(double('+ConvertDoubleToString(Constant.Data.DoubleValue,omStandard)+')))';
-        end;
-       end;
-      end;
-      pircckADDRESS:begin
-       case Constant.Address.Kind of
-        pircakNONE:begin
-         Line:=Line+'constant(address(none()))';
-        end;
-        pircakFUNCTION:begin
-         Line:=Line+'constant(address(function('+Constant.Address.Function_.FunctionName+')))';
-        end;
-        pircakLABEL:begin
-         Line:=Line+'constant(address(label('+LowerCase(IntToHex(TPACCPtrUInt(Constant.Address.Label_),SizeOf(TPACCPtrUInt) shl 1))+')))';
-        end;
-        pircakVARIABLE:begin
-         Line:=Line+'constant(address(variable('+Constant.Address.Variable.VariableName+')))';
-        end;
-       end;
-      end;
-      else begin
-       TPACCInstance(fInstance).AddError('Internal error 2017-01-28-23-27-0000',nil,true);
-      end;
-     end;
-    end;
-    else begin
-//   TPACCInstance(fInstance).AddError('Internal error 2017-01-28-00-38-0000',@Instruction.SourceLocation,true);
-    end;
-   end
-  end;
  begin
   if assigned(Block) then begin
 
@@ -7100,8 +7118,7 @@ const AlignmentOpcode=4;
      end else begin
       Line:=Line+', ';
      end;
-     Line:=Line+'@b'+IntToStr(Phi.Blocks[OperandIndex].Index)+' ';
-     ProcessOperand(Phi.Operands[OperandIndex]);
+     Line:=Line+'@b'+IntToStr(Phi.Blocks[OperandIndex].Index)+' '+DumpOperand(Phi.Operands[OperandIndex]);
     end;
     AStringList.Add(Line);
    end;
@@ -7132,7 +7149,7 @@ const AlignmentOpcode=4;
      end else begin
       Line:=Line+', ';
      end;
-     ProcessOperand(Instruction.Operands[OperandIndex]);
+     Line:=Line+DumpOperand(Instruction.Operands[OperandIndex]);
     end;
 
     AStringList.Add(Line);
@@ -7145,8 +7162,7 @@ const AlignmentOpcode=4;
    end;
    Line:=Line+JumpKindNames[Block.Jump.Kind];
    if Block.Jump.Operand.Kind<>pircokNONE then begin
-    Line:=Line+' ';
-    ProcessOperand(Block.Jump.Operand);
+    Line:=Line+' '+DumpOperand(Block.Jump.Operand);
    end;
    if Block.Successors.Count>0 then begin
     Line:=Line+' => [';
