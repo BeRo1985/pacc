@@ -698,7 +698,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure FillLoopMultLoop(const Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock);
        procedure FillLoop;
        procedure GetAlias(const Alias:TPACCIntermediateRepresentationCodeAlias;const Operand:TPACCIntermediateRepresentationCodeOperand);
-       procedure FillAlias;
+       procedure AliasingAnalysis;
        function AliasCaseKind(const OperandP:TPACCIntermediateRepresentationCodeOperand;
                               const SizeP:TPACCInt64;
                               const OperandQ:TPACCIntermediateRepresentationCodeOperand;
@@ -5869,7 +5869,7 @@ begin
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.FillAlias;
+procedure TPACCIntermediateRepresentationCodeFunction.AliasingAnalysis;
  procedure Escape(const Operand:TPACCIntermediateRepresentationCodeOperand);
  var Alias:TPACCIntermediateRepresentationCodeAlias;
  begin
@@ -6372,7 +6372,7 @@ begin
  FillUse;
  SSACheck;
  FillLoop;
- FillAlias;
+ AliasingAnalysis;
  LoadOptimization;
 end;
 
