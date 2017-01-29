@@ -7578,10 +7578,17 @@ var Values:array of TPACCInt32;
         Constants[Value]:=Constant;
        end;
        pirctFLOAT:begin
+        if ConstantLeft.Kind<>pircckDATA then begin
+         TPACCInstance(fInstance).AddError('Invalid address operand',@Instruction.SourceLocation,true);
+        end;
+
         Value:=CreateFloatValueOperand(OutputFloatValue).Constant;
         Constant:=Constants[Value];
        end;
        pirctDOUBLE:begin
+        if ConstantLeft.Kind<>pircckDATA then begin
+         TPACCInstance(fInstance).AddError('Invalid address operand',@Instruction.SourceLocation,true);
+        end;
         Value:=CreateDoubleValueOperand(OutputDoubleValue).Constant;
         Constant:=Constants[Value];
        end;
