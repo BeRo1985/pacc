@@ -6736,7 +6736,7 @@ var Operands:TPACCIntermediateRepresentationCodeOperands;
    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-21-08-0000',nil,true);
   end;
  end;
-var Index,InstructionIndex,TemporaryIndex,UseIndex:TPACCInt32;
+var Index,InstructionIndex,TemporaryIndex,UseIndex,OperandIndex:TPACCInt32;
     OperandListItem0,OperandListItem1:POperandListItem;
     OperandListItemList:PPOperandListItem;
     Use:TPACCIntermediateRepresentationCodeUse;
@@ -6745,6 +6745,7 @@ var Index,InstructionIndex,TemporaryIndex,UseIndex:TPACCInt32;
     ParentPhi:PPACCIntermediateRepresentationCodePhi;
     Block:TPACCIntermediateRepresentationCodeBlock;
     Temporary:TPACCIntermediateRepresentationCodeTemporary;
+    Operand:TPACCIntermediateRepresentationCodeOperand;
 begin
  Operands:=nil;
  try
@@ -6801,6 +6802,45 @@ begin
      break;
     end;
    until false;
+
+   Block:=StartBlock;
+   while assigned(Block) do begin
+    ParentPhi:=@Block.Phi;
+    repeat
+     Phi:=ParentPhi^;
+     if assigned(Phi) then begin
+      if Phi.To_.Kind=pircokTEMPORARY then begin
+       Operand:=Operands[Phi.To_.Temporary];
+       if AreOperandsEqual(Operand,Phi.To_) then begin
+        for OperandIndex:=0 to Phi.CountOperands-1 do begin
+         Substitution(Phi.Operands[OperandIndex]);
+        end;
+       end;
+      end else begin
+       TPACCInstance(fInstance).AddError('Internal error 2017-01-29-21-29-0000',nil,true);
+      end;
+      ParentPhi:=@Phi.Link;
+     end else begin
+      break;
+     end;
+    until false;
+    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+     Instruction:=Block.Instructions[InstructionIndex];
+     Operand:=CopyOf(Instruction.To_);
+     if AreOperandsEqual(Operand,Instruction.To_) then begin
+      for OperandIndex:=0 to length(Instruction.Operands)-1 do begin
+       Substitution(Instruction.Operands[OperandIndex]);
+      end;
+     end else begin
+      Instruction.Opcode:=pircoNOP;
+      Instruction.Type_:=pirctNONE;
+      Instruction.To_:=EmptyOperand;
+      Instruction.Operands:=nil;
+     end;
+    end;
+    Substitution(Block.Jump.Operand);
+    Block:=Block.Link;
+   end;
 
   finally
    for Index:=0 to AllocatedOperandListItems.Count-1 do begin
