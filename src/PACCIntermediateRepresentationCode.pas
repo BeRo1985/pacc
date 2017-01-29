@@ -6727,6 +6727,14 @@ var Operands:TPACCIntermediateRepresentationCodeOperands;
    end;
   end;
  end;
+ procedure Substitution(var Operand:TPACCIntermediateRepresentationCodeOperand);
+ begin
+  if (Operand.Kind<>pircokTEMPORARY) or (CopyOf(Operand).Kind<>pircokNONE) then begin
+   Operand:=CopyOf(Operand);
+  end else begin
+   TPACCInstance(fInstance).AddError('Internal error 2017-01-29-21-08-0000',nil,true);
+  end;
+ end;
 begin
 {$ifdef IRDebug}
  writeln('> After copy elimination:');
