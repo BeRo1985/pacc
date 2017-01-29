@@ -7581,13 +7581,48 @@ var Values:array of TPACCInt32;
         if ConstantLeft.Kind<>pircckDATA then begin
          TPACCInstance(fInstance).AddError('Invalid address operand',@Instruction.SourceLocation,true);
         end;
-
+        case Instruction.Opcode of
+         pircoADD:begin
+          OutputFloatValue:=ConstantLeft.Data.FloatValue+ConstantRight.Data.FloatValue;
+         end;
+         pircoSUB:begin
+          OutputFloatValue:=ConstantLeft.Data.FloatValue-ConstantRight.Data.FloatValue;
+         end;
+         pircoSMUL:begin
+          OutputFloatValue:=ConstantLeft.Data.FloatValue*ConstantRight.Data.FloatValue;
+         end;
+         pircoSDIV:begin
+          OutputFloatValue:=ConstantLeft.Data.FloatValue/ConstantRight.Data.FloatValue;
+         end;
+         else begin
+          OutputFloatValue:=0;
+          TPACCInstance(fInstance).AddError('Internal error 2017-01-30-00-03-0000',@Instruction.SourceLocation,true);
+         end;
+        end;
         Value:=CreateFloatValueOperand(OutputFloatValue).Constant;
         Constant:=Constants[Value];
        end;
        pirctDOUBLE:begin
         if ConstantLeft.Kind<>pircckDATA then begin
          TPACCInstance(fInstance).AddError('Invalid address operand',@Instruction.SourceLocation,true);
+        end;
+        case Instruction.Opcode of
+         pircoADD:begin
+          OutputDoubleValue:=ConstantLeft.Data.DoubleValue+ConstantRight.Data.DoubleValue;
+         end;
+         pircoSUB:begin
+          OutputDoubleValue:=ConstantLeft.Data.DoubleValue-ConstantRight.Data.DoubleValue;
+         end;
+         pircoSMUL:begin
+          OutputDoubleValue:=ConstantLeft.Data.DoubleValue*ConstantRight.Data.DoubleValue;
+         end;
+         pircoSDIV:begin
+          OutputDoubleValue:=ConstantLeft.Data.DoubleValue/ConstantRight.Data.DoubleValue;
+         end;
+         else begin
+          OutputDoubleValue:=0;
+          TPACCInstance(fInstance).AddError('Internal error 2017-01-30-00-05-0000',@Instruction.SourceLocation,true);
+         end;
         end;
         Value:=CreateDoubleValueOperand(OutputDoubleValue).Constant;
         Constant:=Constants[Value];
