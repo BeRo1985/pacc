@@ -707,6 +707,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        function Escapes(const Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
        procedure LoadElimination;
        procedure CopyElimination;
+       procedure ConstantFolding;
+       procedure NoOperationElimination;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -6858,6 +6860,35 @@ begin
 {$endif}
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.ConstantFolding;
+begin
+{$ifdef IRDebug}
+ writeln('> After constant folding:');
+ DumpToConsole;
+{$endif}
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.NoOperationElimination;
+var InstructionIndex:TPACCInt32;
+    Block:TPACCIntermediateRepresentationCodeBlock;
+    Instruction:TPACCIntermediateRepresentationCodeInstruction;
+begin
+ Block:=StartBlock;
+ while assigned(Block) do begin
+  for InstructionIndex:=Block.Instructions.Count-1 downto 0 do begin
+   Instruction:=Block.Instructions[InstructionIndex];
+   if Instruction.Opcode=pircoNOP then begin
+    Block.Instructions.Delete(InstructionIndex);
+   end;
+  end;
+  Block:=Block.Link;
+ end;
+{$ifdef IRDebug}
+ writeln('> After no operation elimination:');
+ DumpToConsole;
+{$endif}
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
 begin
 {$ifdef IRDebug}
@@ -6877,6 +6908,9 @@ begin
  FillUse;
  SSACheck;
  CopyElimination;
+ FillUse;
+ ConstantFolding;
+ NoOperationElimination;
  FillUse;
 end;
 
