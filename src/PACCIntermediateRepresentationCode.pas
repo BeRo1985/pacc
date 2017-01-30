@@ -8023,6 +8023,21 @@ var InstructionIndex,InstructionOperandIndex,InstructionHashItemIndex,HashBucket
             (TPACCUInt32(Operand^.Data)*100663319));
   end;
  end;
+ function CompareInstructions(const Instruction,OtherInstruction:TPACCIntermediateRepresentationCodeInstruction):boolean;
+ var InstructionOperandIndex:TPACCInt32;
+ begin
+  result:=(Instruction.Opcode=OtherInstruction.Opcode) and
+          (Instruction.Type_=OtherInstruction.Type_) and
+          (length(Instruction.Operands)=length(OtherInstruction.Operands));
+  if result then begin
+   for InstructionOperandIndex:=0 to length(Instruction.Operands)-1 do begin
+    if not AreOperandsEqual(Instruction.Operands[InstructionOperandIndex],OtherInstruction.Operands[InstructionOperandIndex]) then begin
+     result:=false;
+     break;
+    end;
+   end;
+  end;
+ end;
 begin
 
  InstructionHashItems:=nil;
@@ -8037,7 +8052,7 @@ begin
   while assigned(Block) do begin
    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
     Instruction:=Block.Instructions[InstructionIndex];
-    if Instruction.To_.Kind=pircokTEMPORARY then begin
+    if (Instruction.To_.Kind=pircokTEMPORARY) and (length(Instruction.Operands)>0) then begin
      Hash:=HashInstruction(Instruction);
      HashBucketIndex:=Hash and HashMask;
      GetMem(InstructionHashItem,SizeOf(TInstructionHashItem));
@@ -8057,37 +8072,23 @@ begin
   while assigned(Block) do begin
    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
     Instruction:=Block.Instructions[InstructionIndex];
-    if Instruction.To_.Kind=pircokTEMPORARY then begin
+    if (Instruction.To_.Kind=pircokTEMPORARY) and (length(Instruction.Operands)>0) then begin
      Hash:=HashInstruction(Instruction);
      HashBucketIndex:=Hash and HashMask;
      InstructionHashItem:=InstructionHashItems[HashBucketIndex];
      while assigned(InstructionHashItem) do begin
-      // Check if the opcode, the code type and the count of operands are the same
+      // Check if both instructions are equal
       if (InstructionHashItem^.Hash=Hash) and
-         (InstructionHashItem^.Instruction.Opcode=Instruction.Opcode) and
-         (InstructionHashItem^.Instruction.Type_=Instruction.Type_) and
-         (length(InstructionHashItem^.Instruction.Operands)=length(Instruction.Operands)) then begin
-       // Check if the operands are the same
-       OK:=true;
-       for InstructionOperandIndex:=0 to length(Instruction.Operands)-1 do begin
-        if (InstructionHashItem^.Instruction.Operands[InstructionOperandIndex].Kind<>Instruction.Operands[InstructionOperandIndex].Kind) or
-           (InstructionHashItem^.Instruction.Operands[InstructionOperandIndex].Data<>Instruction.Operands[InstructionOperandIndex].Data) then begin
-         OK:=false;
-         break;
-        end;
-       end;
-       if OK then begin
-        // If all comparsions were successful, then check if this hash-table-instruction dominates the current instruction
-        if (((InstructionHashItem^.Block=Block) and (Block.Instructions.IndexOf(InstructionHashItem^.Instruction)<InstructionIndex)) or
-            (CompareSDominance(InstructionHashItem^.Block,Block) and (InstructionHashItem^.Block.ID<Block.ID))) then begin
-         // If yes, replace it
-         Instruction.Opcode:=pircoCOPY;
-         SetLength(Instruction.Operands,1);
-         Instruction.Operands[0]:=InstructionHashItem^.Instruction.To_;
-         CodeOptimized:=true;
-         break;
-        end;
-       end;
+         CompareInstructions(InstructionHashItem^.Instruction,Instruction) and
+         // If both instructions are equal, then check if this hash-table-instruction dominates the current instruction
+         (((InstructionHashItem^.Block=Block) and (Block.Instructions.IndexOf(InstructionHashItem^.Instruction)<InstructionIndex)) or
+          (CompareSDominance(InstructionHashItem^.Block,Block) and (InstructionHashItem^.Block.ID<Block.ID))) then begin
+       // If yes, replace it
+       Instruction.Opcode:=pircoCOPY;
+       SetLength(Instruction.Operands,1);
+       Instruction.Operands[0]:=InstructionHashItem^.Instruction.To_;
+       CodeOptimized:=true;
+       break;
       end;
       InstructionHashItem:=InstructionHashItem.Next;
      end;
