@@ -710,6 +710,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure CopyElimination;
        procedure ConstantFolding;
        procedure NoOperationElimination;
+       procedure EmptyBlockElimination;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -7885,6 +7886,31 @@ begin
 {$endif}
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.EmptyBlockElimination;
+var BlockPointer:PPACCIntermediateRepresentationCodeBlock;
+    Block,NextBlock:TPACCIntermediateRepresentationCodeBlock;
+begin
+ BlockPointer:=@StartBlock;
+ repeat
+  Block:=BlockPointer^;
+  if assigned(Block) then begin
+   NextBlock:=Block.Link;
+   if assigned(NextBlock) and (Block.Instructions.Count=0) and (Block.Jump.Kind=pircjkJMP) and (Block.Successors.Count=1) and not assigned(Block.Phi) then begin
+    DeleteBlock(Block);
+    BlockPointer^:=Block.Link;
+   end else begin
+    BlockPointer:=@Block.Link;
+   end;
+  end else begin
+   break;
+  end;
+ until false;
+{$ifdef IRDebug}
+ writeln('> After empty block elimination:');
+ DumpToConsole;
+{$endif}
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.PostProcess;
 begin
 {$ifdef IRDebug}
@@ -7907,6 +7933,7 @@ begin
  FillUse;
  ConstantFolding;
  NoOperationElimination;
+ EmptyBlockElimination;
  FillUse;
 end;
 
