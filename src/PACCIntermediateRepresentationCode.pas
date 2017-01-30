@@ -7559,9 +7559,9 @@ var Values:array of TPACCInt32;
    SetLength(Edges[n],Block.Successors.Count);
    for Index:=OldCount to length(Edges[n])-1 do begin
     if assigned(Block.Successors[Index]) then begin
-     Edges[n,Index].Destination:=-1;
-    end else begin
      Edges[n,Index].Destination:=Block.Successors[Index].ID;
+    end else begin
+     Edges[n,Index].Destination:=-1;
     end;
     Edges[n,Index].Dead:=true;
     Edges[n,Index].Work:=nil;
@@ -7642,6 +7642,7 @@ var Values:array of TPACCInt32;
  end;
 var Index,SubIndex:TPACCInt32;
     Block:TPACCIntermediateRepresentationCodeBlock;
+    Start:TEdge;
 begin
  Edges:=nil;
  try
@@ -7655,13 +7656,30 @@ begin
     SetLength(Edges[Index],Block.Successors.Count);
     for SubIndex:=0 to Block.Successors.Count-1 do begin
      if assigned(Block.Successors[SubIndex]) then begin
-      Edges[Index,SubIndex].Destination:=-1;
-     end else begin
       Edges[Index,SubIndex].Destination:=Block.Successors[SubIndex].ID;
+     end else begin
+      Edges[Index,SubIndex].Destination:=-1;
      end;
      Edges[Index,SubIndex].Dead:=true;
      Edges[Index,SubIndex].Work:=nil;
     end;
+   end;
+
+   if assigned(StartBlock) then begin
+    Start.Destination:=StartBlock.ID;
+   end else begin
+    Start.Destination:=-1;
+   end;
+   Start.Dead:=true;
+   Start.Work:=nil;
+
+   Values:=nil;
+   try
+    for Index:=0 to Temporaries.Count-1 do begin
+
+    end; 
+   finally
+    Values:=nil;
    end;
 
   finally
