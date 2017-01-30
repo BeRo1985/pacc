@@ -6834,7 +6834,7 @@ var Values:array of TPACCInt32;
  var UseIndex:TPACCInt32;
      Temporary:TPACCIntermediateRepresentationCodeTemporary;
  begin
-  Merge:=LatticeMerge(TemporaryIndex,Merge);
+  Merge:=LatticeMerge(Values[TemporaryIndex],Merge);
   if Merge<>Values[TemporaryIndex] then begin
    Temporary:=Temporaries[TemporaryIndex];
    for UseIndex:=0 to Temporary.Uses_.Count-1 do begin
@@ -7825,7 +7825,7 @@ begin
        case Block.Jump.Kind of
         pircjkJNZ:begin
          if Block.Jump.Operand.Kind=pircokCONSTANT then begin
-          Block.Jump.Kind:=pircjkJNZ;
+          Block.Jump.Kind:=pircjkJMP;
           if IsZero(Constants[Block.Jump.Operand.Constant],false) then begin
            Block.Successors.Delete(0);
           end else begin
