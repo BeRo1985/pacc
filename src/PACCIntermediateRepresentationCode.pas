@@ -6984,7 +6984,6 @@ var Values:array of TPACCInt32;
          Constant.Local:=false;
          Value:=Constant.Index;
         end;
-        Constants[Value]:=Constant;
        end;
        pirctFLOAT:begin
         if ConstantLeft.Kind<>pircckDATA then begin
@@ -7483,7 +7482,6 @@ var Values:array of TPACCInt32;
          Constant.Local:=false;
          Value:=Constant.Index;
         end;
-        Constants[Value]:=Constant;
        end;
        pirctFLOAT:begin
         if ConstantLeft.Kind<>pircckDATA then begin
@@ -7639,14 +7637,33 @@ var Values:array of TPACCInt32;
    end;
   end;
  end;
-var Index,SubIndex,BlockID,InstructionIndex:TPACCInt32;
+ function RenameOperand(var Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
+ var Lattice:TPACCInt32;
+ begin
+  result:=false;
+  if Operand.Kind=pircokTEMPORARY then begin
+   Lattice:=Values[Operand.Temporary];
+   if Lattice=Top then begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-30-03-06-0000',nil,true);
+   end else if Lattice<>Bottom then begin
+    Operand.Kind:=pircokCONSTANT;
+    Operand.Constant:=Lattice;
+    result:=true;
+   end;
+  end;
+ end;
+var Index,SubIndex,BlockID,InstructionIndex,OperandIndex:TPACCInt32;
     Block:TPACCIntermediateRepresentationCodeBlock;
+    BlockPointer:PPACCIntermediateRepresentationCodeBlock;
     Start:TEdge;
     Edge:PEdge;
     Phi:TPACCIntermediateRepresentationCodePhi;
+    PhiPointer:PPACCIntermediateRepresentationCodePhi;
     Use:TPACCIntermediateRepresentationCodeUse;
+    Instruction:TPACCIntermediateRepresentationCodeInstruction;
 {$ifdef IRDebug}
     Operand:TPACCIntermediateRepresentationCodeOperand;
+    Dead:boolean;
 {$endif}
 begin
  Edges:=nil;
@@ -7759,6 +7776,76 @@ begin
      writeln;
     end;
     writeln('> Dead code:');
+    Dead:=false;
+{$endif}
+
+    BlockPointer:=@StartBlock;
+    repeat
+     Block:=BlockPointer^;
+     if assigned(Block) then begin
+      if Block.Visit=0 then begin
+{$ifdef IRDebug}
+       Dead:=true;
+       writeln('    b',Block.Index);
+{$endif}
+       DeleteBlock(Block);
+       BlockPointer^:=Block.Link;
+      end else begin
+       PhiPointer:=@Block.Phi;
+       repeat
+        Phi:=PhiPointer^;
+        if assigned(Phi) then begin
+         if Values[Phi.To_.Temporary]<>Bottom then begin
+          PhiPointer^:=Phi.Link;
+         end else begin
+          for OperandIndex:=0 to Phi.CountOperands-1 do begin
+           if not DeadEdge(Phi.Blocks[OperandIndex].ID,Block.ID) then begin
+            RenameOperand(Phi.Operands[OperandIndex]);
+           end;
+          end;
+          PhiPointer:=@Phi.Link;
+         end;
+        end else begin
+         break;
+        end;
+       until false;
+       for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+        Instruction:=Block.Instructions[InstructionIndex];
+        if RenameOperand(Instruction.To_) then begin
+         Instruction.Opcode:=pircoNOP;
+         Instruction.To_:=EmptyOperand;
+         Instruction.Operands:=nil;
+        end else begin
+         for OperandIndex:=0 to length(Instruction.Operands)-1 do begin
+          RenameOperand(Instruction.Operands[OperandIndex]);
+         end;
+        end;
+       end;
+       RenameOperand(Block.Jump.Operand);
+       case Block.Jump.Kind of
+        pircjkJNZ:begin
+         if Block.Jump.Operand.Kind=pircokCONSTANT then begin
+          Block.Jump.Kind:=pircjkJNZ;
+          if IsZero(Constants[Block.Jump.Operand.Constant],false) then begin
+           Block.Successors.Delete(0);
+          end else begin
+           Block.Successors.Delete(1);
+          end;
+          Block.Jump.Operand:=EmptyOperand;
+         end;
+        end;
+       end;
+       BlockPointer:=@Block.Link;
+      end;
+     end else begin
+      break;
+     end;
+    until false;
+
+{$ifdef IRDebug}
+    if not Dead then begin
+     writeln('    (none)');
+    end;
 {$endif}
 
    finally
