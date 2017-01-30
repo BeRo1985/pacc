@@ -7673,6 +7673,13 @@ begin
    Start.Dead:=true;
    Start.Work:=nil;
 
+   FlowWork:=@Start;
+
+   CountUse:=0;
+
+   
+
+
    Values:=nil;
    try
     for Index:=0 to Temporaries.Count-1 do begin
