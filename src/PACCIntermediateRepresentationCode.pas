@@ -8574,9 +8574,11 @@ end;
 procedure TPACCIntermediateRepresentationCodeDeclaration.EmitDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
 begin
  fDeclaration:=Node;
- EmitInitializerList(Node.DeclarationInitialization,
-                     Node.DeclarationVariable.Type_^.Size,
-                     0);
+ if assigned(Node.DeclarationInitialization) then begin
+  EmitInitializerList(Node.DeclarationInitialization,
+                      Node.DeclarationVariable.Type_^.Size,
+                      0);
+ end;
 end;
 
 procedure TPACCIntermediateRepresentationCodeDeclaration.Finish;
