@@ -195,7 +195,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircjkJMP,  // Jump
        pircjkJMPA, // Jump to address
        pircjkJMPT, // Jump table
-       pircjkJZ,   // Jump if zero
        pircjkJNZ,  // Jump if not zero
        pircjkCOUNT
       );
@@ -6794,7 +6793,7 @@ type PEdge=^TEdge;
      end;
 var Values:array of TPACCInt32;
     FlowWork:PEdge;
-    Edges:array of array[0..1] of TEdge;
+    Edges:array of array of TEdge;
     UseWork:TPACCIntermediateRepresentationCodeUseList;
     CountUse:TPACCInt32;
  function IsZero(const Constant:TPACCIntermediateRepresentationCodeConstant;const Wide:boolean):boolean;
@@ -6846,9 +6845,15 @@ var Values:array of TPACCInt32;
   end;
  end;
  function DeadEdge(const s,d:TPACCInt32):boolean;
+ var Index:TPACCInt32;
  begin
-  result:=not (((Edges[s,0].Destination=d) and not Edges[s,0].Dead) or
-               ((Edges[s,1].Destination=d) and not Edges[s,1].Dead));
+  result:=true;
+  for Index:=0 to length(Edges[s])-1 do begin
+   if (Edges[s,Index].Destination=d) and not Edges[s,Index].Dead then begin
+    result:=false;
+    break;
+   end;
+  end;
  end;
  procedure VisitPhi(Phi:TPACCIntermediateRepresentationCodePhi;const n:TPACCInt32);
  var Value,OperandIndex:TPACCInt32;
@@ -7546,8 +7551,84 @@ var Values:array of TPACCInt32;
   end;
  end;
  procedure VisitJump(Block:TPACCIntermediateRepresentationCodeBlock;const n:TPACCInt32);
+ var Lattice,Index:TPACCInt32;
+     Value:TPACCInt64;
  begin
+  case Block.Jump.Kind of
+   pircjkRET,
+   pircjkRETC,
+   pircjkRETS,
+   pircjkRETI,
+   pircjkRETL,
+   pircjkRETF,
+   pircjkRETD:begin
+   end;
+   pircjkJMP:begin
+    Edges[n,0].Work:=FlowWork;
+    FlowWork:=@Edges[n,0];
+   end;
+   pircjkJMPA:begin
+   end;
+   pircjkJMPT:begin
+    Lattice:=LatticeValue(Block.Jump.Operand);
+    if Lattice=Top then begin
+     TPACCInstance(fInstance).AddError('Internal error 2017-01-30-01-13-0000',nil,true);
+    end else if Lattice=Bottom then begin
+     Edges[n,length(Edges)-1].Work:=FlowWork;
+     for Index:=length(Edges)-2 downto 0 do begin
+      Edges[n,Index].Work:=@Edges[n,Index+1];
+     end;
+     FlowWork:=@Edges[n,0];
+    end else begin
+     if (Constants[Lattice].Kind=pircckDATA) and (Constants[Lattice].Data.Kind=pirccdkINTEGER) then begin
+      Value:=Constants[Lattice].Data.IntegerValue;
+      if (Value>=0) and (Value<length(Edges)) then begin
+       Edges[n,Value].Work:=FlowWork;
+       FlowWork:=@Edges[n,Value];
+       for Index:=0 to length(Edges)-1 do begin
+        if Index<>Value then begin
+         Edges[n,Index].Work:=@Edges[n,Value];
+        end;
+       end;
+      end else begin
+       TPACCInstance(fInstance).AddError('Internal error 2017-01-30-01-20-0000',nil,true);
+      end;
+     end else begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-30-01-19-0000',nil,true);
+     end;
+    end;
+   end;
+   pircjkJNZ:begin
+    Lattice:=LatticeValue(Block.Jump.Operand);
+    if Lattice=Top then begin
+     TPACCInstance(fInstance).AddError('Internal error 2017-01-30-01-13-0000',nil,true);
+    end else if Lattice=Bottom then begin
+     Edges[n,1].Work:=FlowWork;
+     Edges[n,0].Work:=@Edges[n,1];
+     FlowWork:=@Edges[n,0];
+    end else if IsZero(Constants[Lattice],false) then begin
+     if Edges[n,0].Dead then begin
+      Edges[n,1].Work:=FlowWork;
+      FlowWork:=@Edges[n,1];
+     end else begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-30-01-16-0000',nil,true);
+     end;
+    end else begin
+     if Edges[n,1].Dead then begin
+      Edges[n,0].Work:=FlowWork;
+      FlowWork:=@Edges[n,0];
+     end else begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-30-01-15-0000',nil,true);
+     end;
+    end;
+   end;
+   else begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-01-30-00-33-0000',nil,true);
+   end;
+  end;
  end;
+var Index,SubIndex:TPACCInt32;
+    Block:TPACCIntermediateRepresentationCodeBlock;
 begin
  Edges:=nil;
  try
@@ -7555,6 +7636,20 @@ begin
   UseWork:=TPACCIntermediateRepresentationCodeUseList.Create;
   try
 
+   for Index:=0 to CountBlocks-1 do begin
+    Block:=RPO[Index];
+    Block.Visit:=0;
+    SetLength(Edges[Index],Block.Successors.Count);
+    for SubIndex:=0 to Block.Successors.Count-1 do begin
+     if assigned(Block.Successors[SubIndex]) then begin
+      Edges[Index,SubIndex].Destination:=-1;
+     end else begin
+      Edges[Index,SubIndex].Destination:=Block.Successors[SubIndex].ID;
+     end;
+     Edges[Index,SubIndex].Dead:=true;
+     Edges[Index,SubIndex].Work:=nil;
+    end;
+   end;
 
   finally
    UseWork.Free;
@@ -8514,7 +8609,6 @@ begin
  JumpKindNames[pircjkJMP]:='jmp';
  JumpKindNames[pircjkJMPA]:='jmpa';
  JumpKindNames[pircjkJMPT]:='jmpt';
- JumpKindNames[pircjkJZ]:='jz';
  JumpKindNames[pircjkJNZ]:='jnz';
  JumpKindNames[pircjkCOUNT]:='count';
 end;
