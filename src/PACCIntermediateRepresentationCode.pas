@@ -8000,7 +8000,8 @@ type PInstructionHashItem=^TInstructionHashItem;
       Instruction:TPACCIntermediateRepresentationCodeInstruction;
      end;
      TInstructionHashItems=array of PInstructionHashItem;
-var InstructionIndex,InstructionOperandIndex,InstructionHashItemIndex,HashBucketIndex,BlockIndex:TPACCInt32;
+var InstructionIndex,InstructionOperandIndex,InstructionHashItemIndex,
+    HashBucketIndex,BlockIndex,TemporaryIndex:TPACCInt32;
     Hash:TPACCUInt32;
     Block,Successor:TPACCIntermediateRepresentationCodeBlock;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
@@ -8008,6 +8009,7 @@ var InstructionIndex,InstructionOperandIndex,InstructionHashItemIndex,HashBucket
     InstructionHashItem,NextInstructionHashItem:PInstructionHashItem;
     Phi:TPACCIntermediateRepresentationCodePhi;
     PhiPointer:PPACCIntermediateRepresentationCodePhi;
+    TemporaryToInstructionHashItemMap:array of PInstructionHashItem;
     OK:boolean;
  function HashInstruction(const Instruction:TPACCIntermediateRepresentationCodeInstruction):TPACCUInt32;
  var InstructionOperandIndex:TPACCInt32;
@@ -8041,12 +8043,17 @@ var InstructionIndex,InstructionOperandIndex,InstructionHashItemIndex,HashBucket
 begin
 
  InstructionHashItems:=nil;
+ TemporaryToInstructionHashItemMap:=nil;
  try
 
   // 1. Collect all available expressions into a hash table
   SetLength(InstructionHashItems,HashSize);
   for InstructionHashItemIndex:=0 to HashSize-1 do begin
    InstructionHashItems[InstructionHashItemIndex]:=nil;
+  end;
+  SetLength(TemporaryToInstructionHashItemMap,Temporaries.Count);
+  for TemporaryIndex:=0 to Temporaries.Count-1 do begin
+   TemporaryToInstructionHashItemMap[TemporaryIndex]:=nil;
   end;
   Block:=StartBlock;
   while assigned(Block) do begin
@@ -8062,6 +8069,12 @@ begin
      InstructionHashItem^.Hash:=Hash;
      InstructionHashItem^.Block:=Block;
      InstructionHashItem^.Instruction:=Instruction;
+     TemporaryIndex:=Instruction.To_.Temporary;
+     if assigned(TemporaryToInstructionHashItemMap[TemporaryIndex]) then begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-01-31-00-28-0000',@Instruction.SourceLocation,true);
+     end else begin
+      TemporaryToInstructionHashItemMap[TemporaryIndex]:=InstructionHashItem;
+     end;
     end;
    end;
    Block:=Block.Link;
@@ -8126,7 +8139,8 @@ begin
    InstructionHashItems[InstructionHashItemIndex]:=nil;
   end;
   InstructionHashItems:=nil;
-  
+  TemporaryToInstructionHashItemMap:=nil;
+
  end;
 
 {$ifdef IRDebug}
