@@ -8068,6 +8068,9 @@ begin
 
  until not CodeOptimized;
 
+ DefinitionUseAnalysis;
+ SSACheck;
+
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
