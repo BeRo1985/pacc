@@ -7935,6 +7935,7 @@ begin
  NoOperationElimination;
  EmptyBlockElimination;
  DefinitionUseAnalysis;
+ SSACheck;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
