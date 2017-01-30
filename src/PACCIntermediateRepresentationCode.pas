@@ -7551,9 +7551,22 @@ var Values:array of TPACCInt32;
   end;
  end;
  procedure VisitJump(Block:TPACCIntermediateRepresentationCodeBlock;const n:TPACCInt32);
- var Lattice,Index:TPACCInt32;
+ var Lattice,Index,OldCount:TPACCInt32;
      Value:TPACCInt64;
  begin
+  OldCount:=length(Edges[n]);
+  if OldCount<Block.Successors.Count then begin
+   SetLength(Edges[n],Block.Successors.Count);
+   for Index:=OldCount to length(Edges[n])-1 do begin
+    if assigned(Block.Successors[Index]) then begin
+     Edges[n,Index].Destination:=-1;
+    end else begin
+     Edges[n,Index].Destination:=Block.Successors[Index].ID;
+    end;
+    Edges[n,Index].Dead:=true;
+    Edges[n,Index].Work:=nil;
+   end;
+  end;
   case Block.Jump.Kind of
    pircjkRET,
    pircjkRETC,
