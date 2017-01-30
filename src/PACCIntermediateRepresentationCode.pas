@@ -173,7 +173,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircoPARF, // Get function parameter float
        pircoPARD, // Get function parameter double
        pircoARGI, // Set function call argument int
-       pircoARGL, // Set function call argument int
+       pircoARGL, // Set function call argument long
        pircoARGF, // Set function call argument float
        pircoARGD, // Set function call argument double
        pircoCALL,
@@ -272,24 +272,20 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pircokTEMPORARY,
        pircokCONSTANT,
        pircokCALL,
-       pircokFUNCTION,
        pircokCOUNT
      );
 
      PPACCIntermediateRepresentationCodeOperand=^TPACCIntermediateRepresentationCodeOperand;
      TPACCIntermediateRepresentationCodeOperand=record
-      Flags:TPACCIntermediateRepresentationCodeOperandFlags;
       case Kind:TPACCIntermediateRepresentationCodeOperandKind of
        pircokNONE:(
+        Data:TPACCUInt32;
        );
        pircokTEMPORARY:(
         Temporary:TPACCInt32;
        );
        pircokCONSTANT:(
         Constant:TPACCInt32;
-       );
-       pircokFUNCTION:(
-        Function_:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration;
        );
        pircokCOUNT:(
        );
@@ -587,6 +583,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        PhiLink:PPACCIntermediateRepresentationCodePhi;
        NeedNewBlock:boolean;
 
+       CodeOptimized:boolean;
+
        AssignOpLValueTemporary:TPACCInt32;
 
        function DataTypeToCodeType(const Type_:PPACCType):TPACCIntermediateRepresentationCodeType;
@@ -613,7 +611,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        function CreateVariableOperand(const Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable):TPACCIntermediateRepresentationCodeOperand;
        function CreateLabelOperand(const Label_:TPACCAbstractSyntaxTreeNodeLabel):TPACCIntermediateRepresentationCodeOperand;
        function CreateFunctionOperand(const TheFunction:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration):TPACCIntermediateRepresentationCodeOperand;
-       function SetOperandFlags(const Operand:TPACCIntermediateRepresentationCodeOperand;const IncludeFlags,ExcludeFlags:TPACCIntermediateRepresentationCodeOperandFlags):TPACCIntermediateRepresentationCodeOperand;
        procedure EmitInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AType_:TPACCIntermediateRepresentationCodeType;const ATo_:TPACCIntermediateRepresentationCodeOperand;const AOperands:array of TPACCIntermediateRepresentationCodeOperand;const SourceLocation:TPACCSourceLocation); overload;
        procedure EmitLoad(var OutputTemporary:TPACCInt32;const InputLValueTemporary:TPACCInt32;const Type_:PPACCType;const SourceLocation:TPACCSourceLocation);
        procedure EmitStore(const DestinationLValueTemporary,InputValueTemporary:TPACCInt32;const Type_:PPACCType;const SourceLocation:TPACCSourceLocation);
@@ -709,6 +706,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure LoadElimination;
        procedure CopyElimination;
        procedure ConstantFolding;
+       procedure LocalCommonSubexpressionElimination;
        procedure NoOperationElimination;
        procedure EmptyBlockElimination;
        procedure PostProcess;
@@ -901,8 +899,8 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
 const EmptyOperand:TPACCIntermediateRepresentationCodeOperand=
        (
-        Flags:[];
         Kind:pircokNONE;
+        Data:0;
        );
 
       CodeTypeBaseClass:array[TPACCIntermediateRepresentationCodeType] of TPACCInt32=(0,0,0,0,1,1);
@@ -1550,7 +1548,6 @@ end;
 
 function TPACCIntermediateRepresentationCodeFunction.CreateTemporaryOperand(const Temporary:TPACCInt32):TPACCIntermediateRepresentationCodeOperand;
 begin
- result.Flags:=[];
  result.Kind:=pircokTEMPORARY;
  result.Temporary:=Temporary;
 end;
@@ -1568,7 +1565,6 @@ begin
   Constant.Data.IntegerValue:=Value;
   IntegerConstantHashMap[Value]:=Constant;
  end;
- result.Flags:=[];
  result.Kind:=pircokCONSTANT;
  result.Constant:=Constant.Index;
 end;
@@ -1586,7 +1582,6 @@ begin
   Constant.Data.FloatValue:=Value;
   FloatConstantHashMap[TPACCUInt32(pointer(@Value)^)]:=Constant;
  end;
- result.Flags:=[];
  result.Kind:=pircokCONSTANT;
  result.Constant:=Constant.Index;
 end;
@@ -1604,7 +1599,6 @@ begin
   Constant.Data.DoubleValue:=Value;
   DoubleConstantHashMap[TPACCInt64(pointer(@Value)^)]:=Constant;
  end;
- result.Flags:=[];
  result.Kind:=pircokCONSTANT;
  result.Constant:=Constant.Index;
 end;
@@ -1627,7 +1621,6 @@ begin
    Constant.Address.Variable:=Variable;
    VariableConstantHashMap[Variable]:=Constant;
   end;
-  result.Flags:=[];
   result.Kind:=pircokCONSTANT;
   result.Constant:=Constant.Index;
  end;
@@ -1646,7 +1639,6 @@ begin
   Constant.Address.Label_:=Label_;
   LabelConstantHashMap[Label_]:=Constant;
  end;
- result.Flags:=[];
  result.Kind:=pircokCONSTANT;
  result.Constant:=Constant.Index;
 end;
@@ -1664,15 +1656,8 @@ begin
   Constant.Address.Function_:=TheFunction;
   FunctionConstantHashMap[TheFunction]:=Constant;
  end;
- result.Flags:=[];
  result.Kind:=pircokCONSTANT;
  result.Constant:=Constant.Index;
-end;
-
-function TPACCIntermediateRepresentationCodeFunction.SetOperandFlags(const Operand:TPACCIntermediateRepresentationCodeOperand;const IncludeFlags,ExcludeFlags:TPACCIntermediateRepresentationCodeOperandFlags):TPACCIntermediateRepresentationCodeOperand;
-begin
- result:=Operand;
- result.Flags:=(result.Flags-ExcludeFlags)+IncludeFlags;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitInstruction(const AOpcode:TPACCIntermediateRepresentationCodeOpcode;const AType_:TPACCIntermediateRepresentationCodeType;const ATo_:TPACCIntermediateRepresentationCodeOperand;const AOperands:array of TPACCIntermediateRepresentationCodeOperand;const SourceLocation:TPACCSourceLocation);
@@ -4546,7 +4531,7 @@ begin
       SetLength(ReversePostOrderBlocks,CountReversePostOrderBlocks*2);
      end;
      ReversePostOrderBlocks[Block.ID]:=Block;
-     Phi:=@Block.link;
+     Phi:=@Block.Link;
     end;
    end else begin
     break;
@@ -5824,6 +5809,9 @@ var Index,InstructionIndex,InstructionOperandIndex:TPACCInt32;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
     Alias,Alias0,Alias1:TPACCIntermediateRepresentationCodeAlias;
 begin
+ for Index:=0 to Temporaries.Count-1 do begin
+  Temporaries[Index].Alias.Kind:=pircakBOTTOM;
+ end;
  for Index:=0 to CountBlocks-1 do begin
 
  	Block:=ReversePostOrderBlocks[Index];
@@ -6497,6 +6485,7 @@ begin
      if (Insert_^.BlockID=BlockIndex) and (Insert_^.Offset=InstructionIndex) then begin
       Instruction:=Insert_^.New.Instruction;
       inc(InsertIndex);
+      CodeOptimized:=true;
      end else begin
       if InstructionIndex<Block.Instructions.Count then begin
        Instruction:=Block.Instructions[InstructionIndex];
@@ -6554,6 +6543,7 @@ begin
          end;
         end;
         SetLength(Instruction.Operands,1);
+        CodeOptimized:=true;
        end;
       end else begin
        break;
@@ -6641,11 +6631,15 @@ var Operands:TPACCIntermediateRepresentationCodeOperands;
    end;
   end;
  end;
- procedure Substitution(var Operand:TPACCIntermediateRepresentationCodeOperand);
+ function Substitution(var Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
+ var NewOperand:TPACCIntermediateRepresentationCodeOperand;
  begin
   if (Operand.Kind<>pircokTEMPORARY) or (CopyOf(Operand).Kind<>pircokNONE) then begin
-   Operand:=CopyOf(Operand);
+   NewOperand:=CopyOf(Operand);
+   result:=not AreOperandsEqual(Operand,NewOperand);
+   Operand:=NewOperand;
   end else begin
+   result:=false;
    TPACCInstance(fInstance).AddError('Internal error 2017-01-29-21-08-0000',nil,true);
   end;
  end;
@@ -6726,7 +6720,9 @@ begin
        Operand:=Operands[Phi.To_.Temporary];
        if AreOperandsEqual(Operand,Phi.To_) then begin
         for OperandIndex:=0 to Phi.CountOperands-1 do begin
-         Substitution(Phi.Operands[OperandIndex]);
+         if Substitution(Phi.Operands[OperandIndex]) then begin
+          CodeOptimized:=true;
+         end;
         end;
        end;
       end else begin
@@ -6742,9 +6738,14 @@ begin
      Operand:=CopyOf(Instruction.To_);
      if AreOperandsEqual(Operand,Instruction.To_) then begin
       for OperandIndex:=0 to length(Instruction.Operands)-1 do begin
-       Substitution(Instruction.Operands[OperandIndex]);
+       if Substitution(Instruction.Operands[OperandIndex]) then begin
+        CodeOptimized:=true;
+       end;
       end;
      end else begin
+      if Instruction.Opcode<>pircoNOP then begin
+       CodeOptimized:=true;
+      end;
       Instruction.Opcode:=pircoNOP;
       Instruction.Type_:=pirctNONE;
       Instruction.To_:=EmptyOperand;
@@ -7789,6 +7790,7 @@ begin
        Dead:=true;
        writeln('    b',Block.Index);
 {$endif}
+       CodeOptimized:=true;
        DeleteBlock(Block);
        BlockPointer^:=Block.Link;
       end else begin
@@ -7798,10 +7800,13 @@ begin
         if assigned(Phi) then begin
          if Values[Phi.To_.Temporary]<>Bottom then begin
           PhiPointer^:=Phi.Link;
+          CodeOptimized:=true;
          end else begin
           for OperandIndex:=0 to Phi.CountOperands-1 do begin
            if not DeadEdge(Phi.Blocks[OperandIndex].ID,Block.ID) then begin
-            RenameOperand(Phi.Operands[OperandIndex]);
+            if RenameOperand(Phi.Operands[OperandIndex]) then begin
+             CodeOptimized:=true;
+            end;
            end;
           end;
           PhiPointer:=@Phi.Link;
@@ -7816,13 +7821,18 @@ begin
          Instruction.Opcode:=pircoNOP;
          Instruction.To_:=EmptyOperand;
          Instruction.Operands:=nil;
+         CodeOptimized:=true;
         end else begin
          for OperandIndex:=0 to length(Instruction.Operands)-1 do begin
-          RenameOperand(Instruction.Operands[OperandIndex]);
+          if RenameOperand(Instruction.Operands[OperandIndex]) then begin
+           CodeOptimized:=true;
+          end;
          end;
         end;
        end;
-       RenameOperand(Block.Jump.Operand);
+       if RenameOperand(Block.Jump.Operand) then begin
+        CodeOptimized:=true;
+       end;
        case Block.Jump.Kind of
         pircjkJNZ:begin
          if Block.Jump.Operand.Kind=pircokCONSTANT then begin
@@ -7833,6 +7843,7 @@ begin
            Block.Successors.Delete(1);
           end;
           Block.Jump.Operand:=EmptyOperand;
+          CodeOptimized:=true;
          end;
         end;
        end;
@@ -7861,6 +7872,111 @@ begin
  end;
 {$ifdef IRDebug}
  writeln('> After constant folding:');
+ DumpToConsole;
+{$endif}
+end;
+
+procedure TPACCIntermediateRepresentationCodeFunction.LocalCommonSubexpressionElimination;
+const HashBits=12;
+      HashSize=1 shl HashBits;
+      HashMask=HashSize-1;
+type PInstructionHashItem=^TInstructionHashItem;
+     TInstructionHashItem=record
+      Next:PInstructionHashItem;
+      Hash:TPACCUInt32;
+      Instruction:TPACCIntermediateRepresentationCodeInstruction;
+     end;
+     TInstructionHashItems=array of PInstructionHashItem;
+var InstructionIndex,InstructionOperandIndex,InstructionHashItemIndex,HashBucketIndex:TPACCInt32;
+    Hash:TPACCUInt32;
+    Block:TPACCIntermediateRepresentationCodeBlock;
+    Instruction:TPACCIntermediateRepresentationCodeInstruction;
+    Operand:PPACCIntermediateRepresentationCodeOperand;
+    InstructionHashItems:TInstructionHashItems;
+    InstructionHashItem,NextInstructionHashItem:PInstructionHashItem;
+    OK:boolean;
+begin
+ InstructionHashItems:=nil;
+ try
+
+  SetLength(InstructionHashItems,HashSize);
+  for InstructionHashItemIndex:=0 to HashSize-1 do begin
+   InstructionHashItems[InstructionHashItemIndex]:=nil;
+  end;
+
+  Block:=StartBlock;
+  while assigned(Block) do begin
+
+   for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+    Instruction:=Block.Instructions[InstructionIndex];
+    if Instruction.To_.Kind=pircokTEMPORARY then begin
+
+     Hash:=(TPACCUInt32(Instruction.Opcode)*402653189) xor
+           (TPACCUInt32(Instruction.Type_)*50331653) xor
+           (TPACCUInt32(length(Instruction.Operands))*25165843);
+     for InstructionOperandIndex:=0 to length(Instruction.Operands)-1 do begin
+      Operand:=@Instruction.Operands[InstructionOperandIndex];
+      Hash:=((Hash shl 13) or (Hash shr 19))+
+            ((TPACCUInt32(Operand^.Kind)*201326611) xor
+             (TPACCUInt32(Operand^.Data)*100663319));
+     end;
+     HashBucketIndex:=Hash and HashMask;
+
+     InstructionHashItem:=InstructionHashItems[HashBucketIndex];
+     while assigned(InstructionHashItem) do begin
+      if (InstructionHashItem^.Hash=Hash) and
+         (InstructionHashItem^.Instruction.Opcode=Instruction.Opcode) and
+         (InstructionHashItem^.Instruction.Type_=Instruction.Type_) and
+         (length(InstructionHashItem^.Instruction.Operands)=length(Instruction.Operands)) then begin
+       OK:=true;
+       for InstructionOperandIndex:=0 to length(Instruction.Operands)-1 do begin
+        if (InstructionHashItem^.Instruction.Operands[InstructionOperandIndex].Kind<>Instruction.Operands[InstructionOperandIndex].Kind) or
+           (InstructionHashItem^.Instruction.Operands[InstructionOperandIndex].Data<>Instruction.Operands[InstructionOperandIndex].Data) then begin
+         OK:=false;
+         break;
+        end;
+       end;
+       if OK then begin
+        break;
+       end;
+      end;
+      InstructionHashItem:=InstructionHashItem.Next;
+     end;
+     if assigned(InstructionHashItem) then begin
+      Instruction.Opcode:=pircoCOPY;
+      SetLength(Instruction.Operands,1);
+      Instruction.Operands[0]:=InstructionHashItem^.Instruction.To_;
+      CodeOptimized:=true;
+     end else begin
+      GetMem(InstructionHashItem,SizeOf(TInstructionHashItem));
+      InstructionHashItem^.Next:=InstructionHashItems[HashBucketIndex];
+      InstructionHashItems[HashBucketIndex]:=InstructionHashItem;
+      InstructionHashItem^.Hash:=Hash;
+      InstructionHashItem^.Instruction:=Instruction;
+     end;
+
+    end;
+   end;
+
+   for InstructionHashItemIndex:=0 to HashSize-1 do begin
+    InstructionHashItem:=InstructionHashItems[InstructionHashItemIndex];
+    while assigned(InstructionHashItem) do begin
+     NextInstructionHashItem:=InstructionHashItem^.Next;
+     FreeMem(InstructionHashItem);
+     InstructionHashItem:=NextInstructionHashItem;
+    end;
+    InstructionHashItems[InstructionHashItemIndex]:=nil;
+   end;
+
+   Block:=Block.Link;
+  end;
+
+ finally
+  InstructionHashItems:=nil;
+ end;
+
+{$ifdef IRDebug}
+ writeln('> After local common subexpression elimination:');
  DumpToConsole;
 {$endif}
 end;
@@ -7917,25 +8033,41 @@ begin
  writeln('> After initial intermediate representation code generation:');
  DumpToConsole;
 {$endif}
+
  ReversePostOrderConstruction;
+
  FindControlFlowGraphPredecessors;
+
  DefinitionUseAnalysis;
  PromoteUniformMemoryStackSlotsToTemporaries;
  SSA;
+
  DefinitionUseAnalysis;
  SSACheck;
  LoopAnalysis;
  AliasingAnalysis;
  LoadElimination;
- DefinitionUseAnalysis;
- SSACheck;
- CopyElimination;
- DefinitionUseAnalysis;
- ConstantFolding;
- NoOperationElimination;
- EmptyBlockElimination;
- DefinitionUseAnalysis;
- SSACheck;
+
+ repeat
+
+  CodeOptimized:=false;
+
+  DefinitionUseAnalysis;
+  SSACheck;
+  CopyElimination;
+
+  DefinitionUseAnalysis;
+  SSACheck;
+  ConstantFolding;
+  NoOperationElimination;
+  EmptyBlockElimination;
+
+  DefinitionUseAnalysis;
+  SSACheck;
+  LocalCommonSubexpressionElimination;
+
+ until not CodeOptimized;
+
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
