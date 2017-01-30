@@ -707,6 +707,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure CopyElimination;
        procedure ConstantFolding;
        procedure LocalCommonSubexpressionElimination;
+       procedure GlobalCommonSubexpressionElimination;
        procedure NoOperationElimination;
        procedure EmptyBlockElimination;
        procedure PostProcess;
@@ -4388,7 +4389,7 @@ begin
    end;
   end;
  end;
-end;           
+end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.DeleteBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
 var Index,SubIndex,SubSubIndex:TPACCInt32;
@@ -6717,6 +6718,10 @@ begin
      Phi:=ParentPhi^;
      if assigned(Phi) then begin
       if Phi.To_.Kind=pircokTEMPORARY then begin
+       if Phi.To_.Temporary=45 then begin
+        if Phi.To_.Temporary=45 then begin
+        end;
+       end;
        Operand:=Operands[Phi.To_.Temporary];
        if AreOperandsEqual(Operand,Phi.To_) then begin
         for OperandIndex:=0 to Phi.CountOperands-1 do begin
@@ -6724,11 +6729,13 @@ begin
           CodeOptimized:=true;
          end;
         end;
+        ParentPhi:=@Phi.Link;
+       end else begin
+        ParentPhi^:=Phi.Link;
        end;
       end else begin
        TPACCInstance(fInstance).AddError('Internal error 2017-01-29-21-29-0000',nil,true);
       end;
-      ParentPhi:=@Phi.Link;
      end else begin
       break;
      end;
@@ -7981,6 +7988,184 @@ begin
 {$endif}
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.GlobalCommonSubexpressionElimination;
+const HashBits=12;
+      HashSize=1 shl HashBits;
+      HashMask=HashSize-1;
+type PInstructionHashItem=^TInstructionHashItem;
+     TInstructionHashItem=record
+      Next:PInstructionHashItem;
+      Hash:TPACCUInt32;
+      Block:TPACCIntermediateRepresentationCodeBlock;
+      Instruction:TPACCIntermediateRepresentationCodeInstruction;
+     end;
+     TInstructionHashItems=array of PInstructionHashItem;
+var InstructionIndex,InstructionOperandIndex,InstructionHashItemIndex,HashBucketIndex,BlockIndex:TPACCInt32;
+    Hash:TPACCUInt32;
+    Block,Successor:TPACCIntermediateRepresentationCodeBlock;
+    BlockStack:TPACCIntermediateRepresentationCodeBlockList;
+    Instruction:TPACCIntermediateRepresentationCodeInstruction;
+    InstructionHashItems:TInstructionHashItems;
+    InstructionHashItem,NextInstructionHashItem:PInstructionHashItem;
+    Phi:TPACCIntermediateRepresentationCodePhi;
+    PhiPointer:PPACCIntermediateRepresentationCodePhi;
+    OK:boolean;
+ function HashInstruction(const Instruction:TPACCIntermediateRepresentationCodeInstruction):TPACCUInt32;
+ var InstructionOperandIndex:TPACCInt32;
+     Operand:PPACCIntermediateRepresentationCodeOperand;
+ begin
+  result:=(TPACCUInt32(Instruction.Opcode)*402653189) xor
+          (TPACCUInt32(Instruction.Type_)*50331653) xor
+          (TPACCUInt32(length(Instruction.Operands))*25165843);
+  for InstructionOperandIndex:=0 to length(Instruction.Operands)-1 do begin
+   Operand:=@Instruction.Operands[InstructionOperandIndex];
+   result:=((result shl 13) or (result shr 19))+
+           ((TPACCUInt32(Operand^.Kind)*201326611) xor
+            (TPACCUInt32(Operand^.Data)*100663319));
+  end;
+ end;
+begin
+
+ // 1. Mark active blocks
+ Block:=StartBlock;
+ while assigned(Block) do begin
+  Block.Visit:=0;
+  Block:=Block.Link;
+ end;
+ BlockStack:=TPACCIntermediateRepresentationCodeBlockList.Create;
+ try
+  BlockStack.Add(StartBlock);
+  while BlockStack.Count>0 do begin
+   Block:=BlockStack[BlockStack.Count-1];
+   BlockStack.Delete(BlockStack.Count-1);
+   if assigned(Block) and (Block.Visit=0) then begin
+    inc(Block.Visit);
+    Successor:=Block.Dominance;
+    while assigned(Successor) do begin
+     BlockStack.Add(Successor);
+     Successor:=Successor.DominanceLink;
+    end;
+   end;
+  end;
+ finally
+  BlockStack.Free;
+ end;
+
+ InstructionHashItems:=nil;
+ try
+
+  // 2. Collect all available expressions into a hash table
+  SetLength(InstructionHashItems,HashSize);
+  for InstructionHashItemIndex:=0 to HashSize-1 do begin
+   InstructionHashItems[InstructionHashItemIndex]:=nil;
+  end;
+  Block:=StartBlock;
+  while assigned(Block) do begin
+   if Block.Visit<>0 then begin
+    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+     Instruction:=Block.Instructions[InstructionIndex];
+     if Instruction.To_.Kind=pircokTEMPORARY then begin
+      Hash:=HashInstruction(Instruction);
+      HashBucketIndex:=Hash and HashMask;
+      GetMem(InstructionHashItem,SizeOf(TInstructionHashItem));
+      Initialize(InstructionHashItem^);
+      InstructionHashItem^.Next:=InstructionHashItems[HashBucketIndex];
+      InstructionHashItems[HashBucketIndex]:=InstructionHashItem;
+      InstructionHashItem^.Hash:=Hash;
+      InstructionHashItem^.Block:=Block;
+      InstructionHashItem^.Instruction:=Instruction;
+     end;
+    end;
+   end;
+   Block:=Block.Link;
+  end;
+
+  // 3. Substitute expressions
+  Block:=StartBlock;
+  while assigned(Block) do begin
+   if Block.Visit<>0 then begin
+    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+     Instruction:=Block.Instructions[InstructionIndex];
+     if Instruction.To_.Kind=pircokTEMPORARY then begin
+      Hash:=HashInstruction(Instruction);
+      HashBucketIndex:=Hash and HashMask;
+      InstructionHashItem:=InstructionHashItems[HashBucketIndex];
+      while assigned(InstructionHashItem) do begin
+       // Check if the opcode, the code type and the count of operands are the same
+       if (InstructionHashItem^.Hash=Hash) and
+          (InstructionHashItem^.Instruction.Opcode=Instruction.Opcode) and
+          (InstructionHashItem^.Instruction.Type_=Instruction.Type_) and
+          (length(InstructionHashItem^.Instruction.Operands)=length(Instruction.Operands)) then begin
+        // Check if the operands are the same
+        OK:=true;
+        for InstructionOperandIndex:=0 to length(Instruction.Operands)-1 do begin
+         if (InstructionHashItem^.Instruction.Operands[InstructionOperandIndex].Kind<>Instruction.Operands[InstructionOperandIndex].Kind) or
+            (InstructionHashItem^.Instruction.Operands[InstructionOperandIndex].Data<>Instruction.Operands[InstructionOperandIndex].Data) then begin
+          OK:=false;
+          break;
+         end;
+        end;
+        if OK then begin
+         // If all comparsions were successful, then check if this hash-table-instruction dominates the current instruction
+         if (((InstructionHashItem^.Block=Block) and (Block.Instructions.IndexOf(InstructionHashItem^.Instruction)<InstructionIndex)) or
+             (CompareSDominance(InstructionHashItem^.Block,Block) and (InstructionHashItem^.Block.ID<Block.ID))) then begin
+          // If yes, replace it
+          Instruction.Opcode:=pircoCOPY;
+          SetLength(Instruction.Operands,1);
+          Instruction.Operands[0]:=InstructionHashItem^.Instruction.To_;
+          CodeOptimized:=true;
+          break;
+         end;
+        end;
+       end;
+       InstructionHashItem:=InstructionHashItem.Next;
+      end;
+     end;
+    end;
+   end;
+   Block:=Block.Link;
+  end;
+
+  // 5. Processing Phis
+  Block:=StartBlock;
+  while assigned(Block) do begin
+   if Block.Visit<>0 then begin
+    PhiPointer:=@Block.Phi;
+    repeat
+     Phi:=PhiPointer^;
+     if assigned(Phi) then begin
+      PhiPointer:=@Phi.Link;
+     end else begin
+      break;
+     end;
+    until false;
+   end;
+   Block:=Block.Link;
+  end;
+
+ finally
+
+  // 5. Free hash table
+  for InstructionHashItemIndex:=0 to HashSize-1 do begin
+   InstructionHashItem:=InstructionHashItems[InstructionHashItemIndex];
+   while assigned(InstructionHashItem) do begin
+    NextInstructionHashItem:=InstructionHashItem^.Next;
+    Finalize(InstructionHashItem^);
+    FreeMem(InstructionHashItem);
+    InstructionHashItem:=NextInstructionHashItem;
+   end;
+   InstructionHashItems[InstructionHashItemIndex]:=nil;
+  end;
+  InstructionHashItems:=nil;
+  
+ end;
+
+{$ifdef IRDebug}
+ writeln('> After global subexpression elimination:');
+ DumpToConsole;
+{$endif}
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.NoOperationElimination;
 var InstructionIndex:TPACCInt32;
     Block:TPACCIntermediateRepresentationCodeBlock;
@@ -8062,9 +8247,12 @@ begin
   NoOperationElimination;
   EmptyBlockElimination;
 
+  ReversePostOrderConstruction;
+  FindControlFlowGraphPredecessors;
   DefinitionUseAnalysis;
   SSACheck;
   LocalCommonSubexpressionElimination;
+  GlobalCommonSubexpressionElimination;
 
  until not CodeOptimized;
 
