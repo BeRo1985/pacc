@@ -6855,12 +6855,12 @@ var Values:array of TPACCInt32;
    end;
   end;
  end;
- procedure VisitPhi(Phi:TPACCIntermediateRepresentationCodePhi;const n:TPACCInt32);
+ procedure VisitPhi(Phi:TPACCIntermediateRepresentationCodePhi;const BlockID:TPACCInt32);
  var Value,OperandIndex:TPACCInt32;
  begin
   Value:=Top;
   for OperandIndex:=0 to Phi.CountOperands-1 do begin
-   if not DeadEdge(Phi.Blocks[OperandIndex].ID,n) then begin
+   if not DeadEdge(Phi.Blocks[OperandIndex].ID,BlockID) then begin
     Value:=LatticeMerge(Value,LatticeValue(Phi.Operands[OperandIndex]));
    end;
   end;
@@ -7550,21 +7550,21 @@ var Values:array of TPACCInt32;
    Update(Instruction.To_.Temporary,Value);
   end;
  end;
- procedure VisitJump(Block:TPACCIntermediateRepresentationCodeBlock;const n:TPACCInt32);
+ procedure VisitJump(Block:TPACCIntermediateRepresentationCodeBlock;const BlockID:TPACCInt32);
  var Lattice,Index,OldCount:TPACCInt32;
      Value:TPACCInt64;
  begin
-  OldCount:=length(Edges[n]);
+  OldCount:=length(Edges[BlockID]);
   if OldCount<Block.Successors.Count then begin
-   SetLength(Edges[n],Block.Successors.Count);
-   for Index:=OldCount to length(Edges[n])-1 do begin
+   SetLength(Edges[BlockID],Block.Successors.Count);
+   for Index:=OldCount to length(Edges[BlockID])-1 do begin
     if assigned(Block.Successors[Index]) then begin
-     Edges[n,Index].Destination:=Block.Successors[Index].ID;
+     Edges[BlockID,Index].Destination:=Block.Successors[Index].ID;
     end else begin
-     Edges[n,Index].Destination:=-1;
+     Edges[BlockID,Index].Destination:=-1;
     end;
-    Edges[n,Index].Dead:=true;
-    Edges[n,Index].Work:=nil;
+    Edges[BlockID,Index].Dead:=true;
+    Edges[BlockID,Index].Work:=nil;
    end;
   end;
   case Block.Jump.Kind of
@@ -7577,8 +7577,8 @@ var Values:array of TPACCInt32;
    pircjkRETD:begin
    end;
    pircjkJMP:begin
-    Edges[n,0].Work:=FlowWork;
-    FlowWork:=@Edges[n,0];
+    Edges[BlockID,0].Work:=FlowWork;
+    FlowWork:=@Edges[BlockID,0];
    end;
    pircjkJMPA:begin
    end;
@@ -7587,20 +7587,20 @@ var Values:array of TPACCInt32;
     if Lattice=Top then begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-30-01-13-0000',nil,true);
     end else if Lattice=Bottom then begin
-     Edges[n,length(Edges)-1].Work:=FlowWork;
+     Edges[BlockID,length(Edges)-1].Work:=FlowWork;
      for Index:=length(Edges)-2 downto 0 do begin
-      Edges[n,Index].Work:=@Edges[n,Index+1];
+      Edges[BlockID,Index].Work:=@Edges[BlockID,Index+1];
      end;
-     FlowWork:=@Edges[n,0];
+     FlowWork:=@Edges[BlockID,0];
     end else begin
      if (Constants[Lattice].Kind=pircckDATA) and (Constants[Lattice].Data.Kind=pirccdkINTEGER) then begin
       Value:=Constants[Lattice].Data.IntegerValue;
       if (Value>=0) and (Value<length(Edges)) then begin
-       Edges[n,Value].Work:=FlowWork;
-       FlowWork:=@Edges[n,Value];
+       Edges[BlockID,Value].Work:=FlowWork;
+       FlowWork:=@Edges[BlockID,Value];
        for Index:=0 to length(Edges)-1 do begin
         if Index<>Value then begin
-         Edges[n,Index].Work:=@Edges[n,Value];
+         Edges[BlockID,Index].Work:=@Edges[BlockID,Value];
         end;
        end;
       end else begin
@@ -7616,20 +7616,20 @@ var Values:array of TPACCInt32;
     if Lattice=Top then begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-30-01-13-0000',nil,true);
     end else if Lattice=Bottom then begin
-     Edges[n,1].Work:=FlowWork;
-     Edges[n,0].Work:=@Edges[n,1];
-     FlowWork:=@Edges[n,0];
+     Edges[BlockID,1].Work:=FlowWork;
+     Edges[BlockID,0].Work:=@Edges[BlockID,1];
+     FlowWork:=@Edges[BlockID,0];
     end else if IsZero(Constants[Lattice],false) then begin
-     if Edges[n,0].Dead then begin
-      Edges[n,1].Work:=FlowWork;
-      FlowWork:=@Edges[n,1];
+     if Edges[BlockID,0].Dead then begin
+      Edges[BlockID,1].Work:=FlowWork;
+      FlowWork:=@Edges[BlockID,1];
      end else begin
       TPACCInstance(fInstance).AddError('Internal error 2017-01-30-01-16-0000',nil,true);
      end;
     end else begin
-     if Edges[n,1].Dead then begin
-      Edges[n,0].Work:=FlowWork;
-      FlowWork:=@Edges[n,0];
+     if Edges[BlockID,1].Dead then begin
+      Edges[BlockID,0].Work:=FlowWork;
+      FlowWork:=@Edges[BlockID,0];
      end else begin
       TPACCInstance(fInstance).AddError('Internal error 2017-01-30-01-15-0000',nil,true);
      end;
@@ -7640,9 +7640,15 @@ var Values:array of TPACCInt32;
    end;
   end;
  end;
-var Index,SubIndex:TPACCInt32;
+var Index,SubIndex,BlockID,InstructionIndex:TPACCInt32;
     Block:TPACCIntermediateRepresentationCodeBlock;
     Start:TEdge;
+    Edge:PEdge;
+    Phi:TPACCIntermediateRepresentationCodePhi;
+    Use:TPACCIntermediateRepresentationCodeUse;
+{$ifdef IRDebug}
+    Operand:TPACCIntermediateRepresentationCodeOperand;
+{$endif}
 begin
  Edges:=nil;
  try
@@ -7650,41 +7656,114 @@ begin
   UseWork:=TPACCIntermediateRepresentationCodeUseList.Create;
   try
 
-   for Index:=0 to CountBlocks-1 do begin
-    Block:=RPO[Index];
-    Block.Visit:=0;
-    SetLength(Edges[Index],Block.Successors.Count);
-    for SubIndex:=0 to Block.Successors.Count-1 do begin
-     if assigned(Block.Successors[SubIndex]) then begin
-      Edges[Index,SubIndex].Destination:=Block.Successors[SubIndex].ID;
-     end else begin
-      Edges[Index,SubIndex].Destination:=-1;
-     end;
-     Edges[Index,SubIndex].Dead:=true;
-     Edges[Index,SubIndex].Work:=nil;
-    end;
-   end;
-
-   if assigned(StartBlock) then begin
-    Start.Destination:=StartBlock.ID;
-   end else begin
-    Start.Destination:=-1;
-   end;
-   Start.Dead:=true;
-   Start.Work:=nil;
-
-   FlowWork:=@Start;
-
-   CountUse:=0;
-
-   
-
-
    Values:=nil;
    try
-    for Index:=0 to Temporaries.Count-1 do begin
 
-    end; 
+    SetLength(Values,Temporaries.Count);
+    for Index:=0 to Temporaries.Count-1 do begin
+     Values[Index]:=Top;
+    end;
+
+    for Index:=0 to CountBlocks-1 do begin
+     Block:=RPO[Index];
+     Block.Visit:=0;
+     SetLength(Edges[Index],Block.Successors.Count);
+     for SubIndex:=0 to Block.Successors.Count-1 do begin
+      if assigned(Block.Successors[SubIndex]) then begin
+       Edges[Index,SubIndex].Destination:=Block.Successors[SubIndex].ID;
+      end else begin
+       Edges[Index,SubIndex].Destination:=-1;
+      end;
+      Edges[Index,SubIndex].Dead:=true;
+      Edges[Index,SubIndex].Work:=nil;
+     end;
+    end;
+
+    if assigned(StartBlock) then begin
+     Start.Destination:=StartBlock.ID;
+    end else begin
+     Start.Destination:=-1;
+    end;
+    Start.Dead:=true;
+    Start.Work:=nil;
+
+    FlowWork:=@Start;
+
+    CountUse:=0;
+
+    repeat
+     Edge:=FlowWork;
+     if assigned(Edge) then begin
+      FlowWork:=Edge^.Work;
+      Edge^.Work:=nil;
+      if (Edge^.Destination>=0) and Edge^.Dead then begin
+       Edge^.Dead:=false;
+       BlockID:=Edge^.Destination;
+       Block:=RPO[BlockID];
+       Phi:=Block.Phi;
+       while assigned(Phi) do begin
+        VisitPhi(Phi,BlockID);
+        Phi:=Phi.Link;
+       end;
+       if Block.Visit=0 then begin
+        for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+         VisitInstruction(Block.Instructions[InstructionIndex]);
+        end;
+        VisitJump(Block,BlockID);
+       end;
+       inc(Block.Visit);
+       if not ((Block.Jump.Kind<>pircjkJMP) or Edges[BlockID,0].Dead or (FlowWork=@Edges[BlockID,0])) then begin
+        TPACCInstance(fInstance).AddError('Internal error 2017-01-30-02-33-0000',nil,true);
+       end;
+      end;
+     end else if CountUse<>0 then begin
+      dec(CountUse);
+      Use:=UseWork[CountUse];
+      BlockID:=Use.BlockID;
+      Block:=RPO[BlockID];
+      if Block.Visit<>0 then begin
+       case Use.Kind of
+        pircukPHI:begin
+         VisitPhi(Use.By.Phi,Use.BlockID);
+        end;
+        pircukINSTRUCTION:begin
+         VisitInstruction(Use.By.Instruction);
+        end;
+        pircukJUMP:begin
+         VisitJump(Block,BlockID);
+        end;
+        else begin
+         TPACCInstance(fInstance).AddError('Internal error 2017-01-30-02-37-0000',nil,true);
+        end;
+       end;
+      end;
+     end else begin
+      break;
+     end;
+    until false;
+
+{$ifdef IRDebug}
+    writeln('> Findings:');
+    for Index:=0 to Temporaries.Count-1 do begin
+     write('    temporary(',Index,') ');
+     case Values[Index] of
+      Bottom:begin
+       write('bottom');
+      end;
+      Top:begin
+       write('top');
+      end;
+      else begin
+       Operand.Kind:=pircokCONSTANT;
+       Operand.Constant:=Values[Index];
+       write(DumpOperand(Operand));
+      end;
+     end;
+     writeln;
+    end;
+    writeln('> Dead code:');
+{$endif}
+
    finally
     Values:=nil;
    end;
