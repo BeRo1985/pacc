@@ -680,24 +680,24 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements);
        function AreOperandsEqual(const Operand,OtherOperand:TPACCIntermediateRepresentationCodeOperand):boolean;
        procedure DeleteBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
-       procedure FillRPO;
-       procedure FillPredecessors;
-       procedure FillUse;
+       procedure ReversePostOrderConstruction;
+       procedure FindControlFlowGraphPredecessors;
+       procedure DefinitionUseAnalysis;
        procedure PromoteUniformMemoryStackSlotsToTemporaries;
        procedure LiveOn(var BitSet:TPACCIntermediateRepresentationCodeBitSet;const Block,Successor:TPACCIntermediateRepresentationCodeBlock);
        function ReturnRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;var CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
        function ArgumentRegisters(const Operand:TPACCIntermediateRepresentationCodeOperand;var CountLiveInt,CountLiveFloat:TPACCInt32):TPACCIntermediateRepresentationCodeBitSet;
        function IntegerRegisterToSave(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCInt32;
        function FloatRegisterToSave(const Operand:TPACCIntermediateRepresentationCodeOperand):TPACCInt32;
-       procedure FillLive;
+       procedure LivenessAnalysis;
        function CompareSDominance(Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock):boolean;
        function CompareDominance(Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock):boolean;
        function CodeTypeMerge(var ResultType_:TPACCIntermediateRepresentationCodeType;const Type_:TPACCIntermediateRepresentationCodeType):boolean;
        procedure SSA;
        procedure SSACheck;
        procedure LoopIteration(const Hook:TPACCIntermediateRepresentationCodeFunctionLoopIterationHook);
-       procedure FillLoopMultLoop(const Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock);
-       procedure FillLoop;
+       procedure LoopAnalysisMultLoop(const Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock);
+       procedure LoopAnalysis;
        procedure GetAlias(const Alias:TPACCIntermediateRepresentationCodeAlias;const Operand:TPACCIntermediateRepresentationCodeOperand);
        procedure AliasingAnalysis;
        function AliasCaseKind(const OperandP:TPACCIntermediateRepresentationCodeOperand;
@@ -731,7 +731,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        CountBlocks:TPACCInt32;
 
-       RPO:TPACCIntermediateRepresentationCodeBlocks;
+       ReversePostOrderBlocks:TPACCIntermediateRepresentationCodeBlocks;
 
        Temporaries:TPACCIntermediateRepresentationCodeTemporaryList;
 
@@ -1336,7 +1336,7 @@ begin
 
  CountBlocks:=0;
 
- RPO:=nil;
+ ReversePostOrderBlocks:=nil;
 
  Temporaries:=TPACCIntermediateRepresentationCodeTemporaryList.Create;
 
@@ -1373,7 +1373,7 @@ begin
  LabelConstantHashMap.Free;
  VariableConstantHashMap.Free;
  FunctionConstantHashMap.Free;
- RPO:=nil;
+ ReversePostOrderBlocks:=nil;
  inherited Destroy;
 end;
 
@@ -4455,7 +4455,7 @@ begin
  end;
 end;
 
-function CompareTPACCIntermediateRepresentationCodeFunctionFillRPORPORecSuccessors(a,b:pointer):TPACCInt32;
+function CompareTPACCIntermediateRepresentationCodeFunctionReversePostOrderConstructionBlocks(a,b:pointer):TPACCInt32;
 begin
  if assigned(a) and assigned(b) then begin
   result:=TPACCIntermediateRepresentationCodeBlock(a).Loop-TPACCIntermediateRepresentationCodeBlock(b).Loop;
@@ -4468,33 +4468,33 @@ begin
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.FillRPO;
- function RPORec(const Block:TPACCIntermediateRepresentationCodeBlock;const x:TPACCInt32):TPACCInt32;
+procedure TPACCIntermediateRepresentationCodeFunction.ReversePostOrderConstruction;
+ function Scan(const Block:TPACCIntermediateRepresentationCodeBlock;const ID:TPACCInt32):TPACCInt32;
  var Index:TPACCInt32;
      Successors:TPACCIntermediateRepresentationCodeBlockList;
  begin
-  result:=x;
+  result:=ID;
   if assigned(Block) and (Block.ID<0) then begin
    Block.ID:=1;
    case Block.Successors.Count of
     1:begin
      if assigned(Block.Successors[0]) then begin
-      result:=RPORec(Block.Successors[0],result);
+      result:=Scan(Block.Successors[0],result);
      end;
     end;
     2:begin
      if assigned(Block.Successors[0]) and assigned(Block.Successors[1]) then begin
       if Block.Successors[0].Loop>Block.Successors[1].Loop then begin
-       result:=RPORec(Block.Successors[1],result);
-       result:=RPORec(Block.Successors[0],result);
+       result:=Scan(Block.Successors[1],result);
+       result:=Scan(Block.Successors[0],result);
       end else begin
-       result:=RPORec(Block.Successors[0],result);
-       result:=RPORec(Block.Successors[1],result);
+       result:=Scan(Block.Successors[0],result);
+       result:=Scan(Block.Successors[1],result);
       end;
      end else if assigned(Block.Successors[0]) then begin
-      result:=RPORec(Block.Successors[0],result);
+      result:=Scan(Block.Successors[0],result);
      end else if assigned(Block.Successors[1]) then begin
-      result:=RPORec(Block.Successors[1],result);
+      result:=Scan(Block.Successors[1],result);
      end;
     end;
     4..$7fffffff:begin
@@ -4503,10 +4503,10 @@ procedure TPACCIntermediateRepresentationCodeFunction.FillRPO;
       for Index:=0 to Block.Successors.Count-1 do begin
        Successors.Add(Block.Successors[Index]);
       end;
-      Successors.Sort(CompareTPACCIntermediateRepresentationCodeFunctionFillRPORPORecSuccessors);
+      Successors.Sort(CompareTPACCIntermediateRepresentationCodeFunctionReversePostOrderConstructionBlocks);
       for Index:=0 to Successors.Count-1 do begin
        if assigned(Successors[Index]) then begin
-        result:=RPORec(Successors[Index],result);
+        result:=Scan(Successors[Index],result);
        end;
       end;
      finally
@@ -4519,7 +4519,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.FillRPO;
    dec(result);
   end;
  end;
-var Count,CountRPO:TPACCInt32;
+var Count,CountReversePostOrderBlocks:TPACCInt32;
     Block:TPACCIntermediateRepresentationCodeBlock;
     Phi:PPACCIntermediateRepresentationCodeBlock;
 begin
@@ -4528,10 +4528,10 @@ begin
   Block.ID:=-1;
   Block:=Block.Link;
  end;
- Count:=1+RPORec(StartBlock,CountBlocks-1);
+ Count:=1+Scan(StartBlock,CountBlocks-1);
  dec(CountBlocks,Count);
  Phi:=@StartBlock;
- CountRPO:=0;
+ CountReversePostOrderBlocks:=0;
  try
   repeat
    Block:=Phi^;
@@ -4541,11 +4541,11 @@ begin
      Phi^:=Block.Link;
     end else begin
      dec(Block.ID,Count);
-     CountRPO:=Max(CountRPO,Block.ID+1);
-     if length(RPO)<CountRPO then begin
-      SetLength(RPO,CountRPO*2);
+     CountReversePostOrderBlocks:=Max(CountReversePostOrderBlocks,Block.ID+1);
+     if length(ReversePostOrderBlocks)<CountReversePostOrderBlocks then begin
+      SetLength(ReversePostOrderBlocks,CountReversePostOrderBlocks*2);
      end;
-     RPO[Block.ID]:=Block;
+     ReversePostOrderBlocks[Block.ID]:=Block;
      Phi:=@Block.link;
     end;
    end else begin
@@ -4553,11 +4553,11 @@ begin
    end;
   until false;
  finally
-  SetLength(RPO,CountRPO);
+  SetLength(ReversePostOrderBlocks,CountReversePostOrderBlocks);
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.FillPredecessors;
+procedure TPACCIntermediateRepresentationCodeFunction.FindControlFlowGraphPredecessors;
 var Index:TPACCInt32;
     Block,Successor:TPACCIntermediateRepresentationCodeBlock;
     AlreadySeenHashMap:TPACCPointerHashMap;
@@ -4590,7 +4590,7 @@ begin
 
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.FillUse;
+procedure TPACCIntermediateRepresentationCodeFunction.DefinitionUseAnalysis;
 var Index,SubIndex:TPACCInt32;
     Block:TPACCIntermediateRepresentationCodeBlock;
     Phi:TPACCIntermediateRepresentationCodePhi;
@@ -4991,7 +4991,7 @@ begin
  result:=0;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.FillLive;
+procedure TPACCIntermediateRepresentationCodeFunction.LivenessAnalysis;
 var Phis:array of TPACCInt32;
     CountLive,TemporaryCountLive:array[0..1] of TPACCInt32;
  function PhiTmp(const t:TPACCInt32):TPACCInt32;
@@ -5061,7 +5061,7 @@ begin
 
    for Index:=CountBlocks-1 downto 0 do begin
 
-    Block:=RPO[Index];
+    Block:=ReversePostOrderBlocks[Index];
 
     TemporaryBitSetU.Assign(Block.Out_);
 
@@ -5249,7 +5249,7 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
   repeat
    Changed:=false;
    for Index:=1 to CountBlocks-1 do begin
-    Block:=RPO[Index];
+    Block:=ReversePostOrderBlocks[Index];
     DominanceBlock:=nil;
     for SubIndex:=0 to Block.Predecessors.Count-1 do begin
      if assigned(Block.Predecessors[SubIndex].InterDominance) or (Block.Predecessors[SubIndex]=StartBlock) then begin
@@ -5608,7 +5608,7 @@ begin
  DebugPrintDominators;
 {$endif}
  FillDominanceFrontier;
- FillLive;
+ LivenessAnalysis;
  FillMissingPhiInstructions;
  Rename;
 {$ifdef IRDebug}
@@ -5669,7 +5669,7 @@ begin
     Temporary:=Temporaries[TemporaryIndex];
     for UseIndex:=0 to Temporary.Uses_.Count-1 do begin
      Use:=Temporary.Uses_[UseIndex];
-     UseInBlock:=RPO[Use.BlockID];
+     UseInBlock:=ReversePostOrderBlocks[Use.BlockID];
      if Use.Kind=pircukPHI then begin
       if PhiCheck(Use.By.Phi,Block,Operand) then begin
        Error;
@@ -5693,7 +5693,7 @@ begin
     Temporary:=Temporaries[TemporaryIndex];
     for UseIndex:=0 to Temporary.Uses_.Count-1 do begin
      Use:=Temporary.Uses_[UseIndex];
-     UseInBlock:=RPO[Use.BlockID];
+     UseInBlock:=ReversePostOrderBlocks[Use.BlockID];
      if Use.Kind=pircukPHI then begin
       if PhiCheck(Use.By.Phi,Block,Operand) then begin
        Error;
@@ -5738,7 +5738,7 @@ begin
   Block:=Block.Link;
  end;
  for Index:=0 to CountBlocks-1 do begin
-  Block:=RPO[Index];
+  Block:=ReversePostOrderBlocks[Index];
   for PredecessorIndex:=0 to Block.Predecessors.Count-1 do begin
    Predecessor:=Block.Predecessors[PredecessorIndex];
    if Predecessor.ID>=Index then begin
@@ -5748,14 +5748,14 @@ begin
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.FillLoopMultLoop(const Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock);
+procedure TPACCIntermediateRepresentationCodeFunction.LoopAnalysisMultLoop(const Block,OtherBlock:TPACCIntermediateRepresentationCodeBlock);
 begin
  if assigned(Block) then begin
  end;
  OtherBlock.Loop:=OtherBlock.Loop*10;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.FillLoop;
+procedure TPACCIntermediateRepresentationCodeFunction.LoopAnalysis;
 var Block:TPACCIntermediateRepresentationCodeBlock;
 begin
  Block:=StartBlock;
@@ -5763,7 +5763,7 @@ begin
   Block.Loop:=1;
   Block:=Block.Link;
  end;
- LoopIteration(FillLoopMultLoop);
+ LoopIteration(LoopAnalysisMultLoop);
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.GetAlias(const Alias:TPACCIntermediateRepresentationCodeAlias;const Operand:TPACCIntermediateRepresentationCodeOperand);
@@ -5826,7 +5826,7 @@ var Index,InstructionIndex,InstructionOperandIndex:TPACCInt32;
 begin
  for Index:=0 to CountBlocks-1 do begin
 
- 	Block:=RPO[Index];
+ 	Block:=ReversePostOrderBlocks[Index];
 
   Phi:=Block.Phi;
   while assigned(Phi) do begin
@@ -6478,7 +6478,7 @@ begin
 
   InsertIndex:=0;
   for BlockIndex:=0 to CountBlocks-1 do begin
-   Block:=RPO[BlockIndex];
+   Block:=ReversePostOrderBlocks[BlockIndex];
    repeat
     Insert_:=@Inserts[InsertIndex];
     if (Insert_^.BlockID=BlockIndex) and Insert_^.IsPhi then begin
@@ -7682,7 +7682,7 @@ begin
     end;
 
     for Index:=0 to CountBlocks-1 do begin
-     Block:=RPO[Index];
+     Block:=ReversePostOrderBlocks[Index];
      Block.Visit:=0;
      SetLength(Edges[Index],Block.Successors.Count);
      for SubIndex:=0 to Block.Successors.Count-1 do begin
@@ -7714,7 +7714,7 @@ begin
       if (Edge^.Destination>=0) and Edge^.Dead then begin
        Edge^.Dead:=false;
        BlockID:=Edge^.Destination;
-       Block:=RPO[BlockID];
+       Block:=ReversePostOrderBlocks[BlockID];
        Phi:=Block.Phi;
        while assigned(Phi) do begin
         VisitPhi(Phi,BlockID);
@@ -7735,7 +7735,7 @@ begin
       Use:=UseWork[UseWork.Count-1];
       UseWork.Delete(UseWork.Count-1);
       BlockID:=Use.BlockID;
-      Block:=RPO[BlockID];
+      Block:=ReversePostOrderBlocks[BlockID];
       if Block.Visit<>0 then begin
        case Use.Kind of
         pircukPHI:begin
@@ -7917,24 +7917,24 @@ begin
  writeln('> After initial intermediate representation code generation:');
  DumpToConsole;
 {$endif}
- FillRPO;
- FillPredecessors;
- FillUse;
+ ReversePostOrderConstruction;
+ FindControlFlowGraphPredecessors;
+ DefinitionUseAnalysis;
  PromoteUniformMemoryStackSlotsToTemporaries;
  SSA;
- FillUse;
+ DefinitionUseAnalysis;
  SSACheck;
- FillLoop;
+ LoopAnalysis;
  AliasingAnalysis;
  LoadElimination;
- FillUse;
+ DefinitionUseAnalysis;
  SSACheck;
  CopyElimination;
- FillUse;
+ DefinitionUseAnalysis;
  ConstantFolding;
  NoOperationElimination;
  EmptyBlockElimination;
- FillUse;
+ DefinitionUseAnalysis;
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
