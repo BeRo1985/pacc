@@ -708,8 +708,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure ConstantFolding;
        procedure LocalCommonSubexpressionElimination;
        procedure GlobalCommonSubexpressionElimination;
-       procedure NoOperationElimination;
-       procedure EmptyBlockElimination;
+       procedure DeadCodeElimination;
        procedure PostProcess;
        procedure EmitFunction(const AFunctionNode:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
 
@@ -8001,10 +8000,10 @@ type PInstructionHashItem=^TInstructionHashItem;
      end;
      TInstructionHashItems=array of PInstructionHashItem;
 var InstructionIndex,InstructionOperandIndex,InstructionHashItemIndex,
-    HashBucketIndex,BlockIndex,TemporaryIndex:TPACCInt32;
+    HashBucketIndex,BlockIndex,TemporaryIndex,PhiOperandIndex:TPACCInt32;
     Hash:TPACCUInt32;
     Block,Successor:TPACCIntermediateRepresentationCodeBlock;
-    Instruction:TPACCIntermediateRepresentationCodeInstruction;
+    Instruction,FromInstruction:TPACCIntermediateRepresentationCodeInstruction;
     InstructionHashItems:TInstructionHashItems;
     InstructionHashItem,NextInstructionHashItem:PInstructionHashItem;
     Phi:TPACCIntermediateRepresentationCodePhi;
@@ -8113,11 +8112,50 @@ begin
   // 3. Processing Phis
   Block:=StartBlock;
   while assigned(Block) do begin
+   InstructionIndex:=0;
    PhiPointer:=@Block.Phi;
    repeat
     Phi:=PhiPointer^;
     if assigned(Phi) then begin
-     PhiPointer:=@Phi.Link;
+     OK:=(Phi.CountOperands>1) and
+         (Phi.Operands[0].Kind=pircokTEMPORARY) and
+         assigned(TemporaryToInstructionHashItemMap[Phi.Operands[0].Temporary]) and
+         (Temporaries[Phi.Operands[0].Temporary].Uses_.Count=1);
+     if OK then begin
+      for PhiOperandIndex:=1 to Phi.CountOperands-1 do begin
+       if not ((Phi.Operands[PhiOperandIndex].Kind=pircokTEMPORARY) and
+                assigned(TemporaryToInstructionHashItemMap[Phi.Operands[PhiOperandIndex].Temporary]) and
+                (Temporaries[Phi.Operands[PhiOperandIndex].Temporary].Uses_.Count=1) and
+                CompareInstructions(TemporaryToInstructionHashItemMap[Phi.Operands[0].Temporary].Instruction,
+                                    TemporaryToInstructionHashItemMap[Phi.Operands[PhiOperandIndex].Temporary].Instruction)) then begin
+        OK:=false;
+        break;
+       end;
+      end;
+     end;
+     if OK then begin
+      FromInstruction:=TemporaryToInstructionHashItemMap[Phi.Operands[0].Temporary].Instruction;
+      Instruction:=TPACCIntermediateRepresentationCodeInstruction.Create;
+      TPACCInstance(fInstance).AllocatedObjects.Add(Instruction);
+      Instruction.Opcode:=FromInstruction.Opcode;
+      Instruction.Type_:=FromInstruction.Type_;
+      Instruction.To_:=Phi.To_;
+      Instruction.Operands:=copy(FromInstruction.Operands);
+      Instruction.SourceLocation:=FromInstruction.SourceLocation;
+      Block.Instructions.Insert(InstructionIndex,Instruction);
+      inc(InstructionIndex);
+{     for PhiOperandIndex:=0 to Phi.CountOperands-1 do begin
+       Instruction:=TemporaryToInstructionHashItemMap[Phi.Operands[PhiOperandIndex].Temporary].Instruction;
+       Instruction.Opcode:=pircoNOP;
+       Instruction.To_:=EmptyOperand;
+       Instruction.Operands:=nil;
+       dec(Temporaries[Phi.Operands[PhiOperandIndex].Temporary].CountDefinitions);
+      end;}
+      CodeOptimized:=true;
+      PhiPointer^:=Phi.Link;
+     end else begin
+      PhiPointer:=@Phi.Link;
+     end;
     end else begin
      break;
     end;
@@ -8149,11 +8187,32 @@ begin
 {$endif}
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.NoOperationElimination;
+procedure TPACCIntermediateRepresentationCodeFunction.DeadCodeElimination;
 var InstructionIndex:TPACCInt32;
-    Block:TPACCIntermediateRepresentationCodeBlock;
+    BlockPointer:PPACCIntermediateRepresentationCodeBlock;
+    Block,NextBlock:TPACCIntermediateRepresentationCodeBlock;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
+    Temporary:TPACCIntermediateRepresentationCodeTemporary;
 begin
+
+ // 1. Eliminate all expressions without future-use
+ Block:=StartBlock;
+ while assigned(Block) do begin
+  for InstructionIndex:=Block.Instructions.Count-1 downto 0 do begin
+   Instruction:=Block.Instructions[InstructionIndex];
+   if (Instruction.Opcode<>pircoCALL) and
+      (Instruction.To_.Kind=pircokTEMPORARY) then begin
+    Temporary:=Temporaries[Instruction.To_.Temporary];
+    if Temporary.Uses_.Count=0 then begin
+     dec(Temporary.CountDefinitions);
+     Block.Instructions.Delete(InstructionIndex);
+    end;
+   end;
+  end;
+  Block:=Block.Link;
+ end;
+
+ // 2. Eliminate all NOP instructions
  Block:=StartBlock;
  while assigned(Block) do begin
   for InstructionIndex:=Block.Instructions.Count-1 downto 0 do begin
@@ -8164,22 +8223,17 @@ begin
   end;
   Block:=Block.Link;
  end;
-{$ifdef IRDebug}
- writeln('> After no operation elimination:');
- DumpToConsole;
-{$endif}
-end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.EmptyBlockElimination;
-var BlockPointer:PPACCIntermediateRepresentationCodeBlock;
-    Block,NextBlock:TPACCIntermediateRepresentationCodeBlock;
-begin
+ // 3. Eliminate all empty blocks
  BlockPointer:=@StartBlock;
  repeat
   Block:=BlockPointer^;
   if assigned(Block) then begin
    NextBlock:=Block.Link;
-   if assigned(NextBlock) and (Block.Instructions.Count=0) and (Block.Jump.Kind=pircjkJMP) and (Block.Successors.Count=1) and not assigned(Block.Phi) then begin
+   if assigned(NextBlock) and
+     (Block.Instructions.Count=0) and
+     (Block.Jump.Kind=pircjkJMP) and
+     (Block.Successors.Count=1) and not assigned(Block.Phi) then begin
     DeleteBlock(Block);
     BlockPointer^:=Block.Link;
    end else begin
@@ -8189,8 +8243,9 @@ begin
    break;
   end;
  until false;
+ 
 {$ifdef IRDebug}
- writeln('> After empty block elimination:');
+ writeln('> After dead code elimination:');
  DumpToConsole;
 {$endif}
 end;
@@ -8227,8 +8282,7 @@ begin
   DefinitionUseAnalysis;
   SSACheck;
   ConstantFolding;
-  NoOperationElimination;
-  EmptyBlockElimination;
+  DeadCodeElimination;
 
   ReversePostOrderConstruction;
   FindControlFlowGraphPredecessors;
