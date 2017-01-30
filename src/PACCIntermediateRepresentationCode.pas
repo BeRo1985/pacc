@@ -8003,7 +8003,6 @@ type PInstructionHashItem=^TInstructionHashItem;
 var InstructionIndex,InstructionOperandIndex,InstructionHashItemIndex,HashBucketIndex,BlockIndex:TPACCInt32;
     Hash:TPACCUInt32;
     Block,Successor:TPACCIntermediateRepresentationCodeBlock;
-    BlockStack:TPACCIntermediateRepresentationCodeBlockList;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
     InstructionHashItems:TInstructionHashItems;
     InstructionHashItem,NextInstructionHashItem:PInstructionHashItem;
@@ -8026,126 +8025,95 @@ var InstructionIndex,InstructionOperandIndex,InstructionHashItemIndex,HashBucket
  end;
 begin
 
- // 1. Mark active blocks
- Block:=StartBlock;
- while assigned(Block) do begin
-  Block.Visit:=0;
-  Block:=Block.Link;
- end;
- BlockStack:=TPACCIntermediateRepresentationCodeBlockList.Create;
- try
-  BlockStack.Add(StartBlock);
-  while BlockStack.Count>0 do begin
-   Block:=BlockStack[BlockStack.Count-1];
-   BlockStack.Delete(BlockStack.Count-1);
-   if assigned(Block) and (Block.Visit=0) then begin
-    inc(Block.Visit);
-    Successor:=Block.Dominance;
-    while assigned(Successor) do begin
-     BlockStack.Add(Successor);
-     Successor:=Successor.DominanceLink;
-    end;
-   end;
-  end;
- finally
-  BlockStack.Free;
- end;
-
  InstructionHashItems:=nil;
  try
 
-  // 2. Collect all available expressions into a hash table
+  // 1. Collect all available expressions into a hash table
   SetLength(InstructionHashItems,HashSize);
   for InstructionHashItemIndex:=0 to HashSize-1 do begin
    InstructionHashItems[InstructionHashItemIndex]:=nil;
   end;
   Block:=StartBlock;
   while assigned(Block) do begin
-   if Block.Visit<>0 then begin
-    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
-     Instruction:=Block.Instructions[InstructionIndex];
-     if Instruction.To_.Kind=pircokTEMPORARY then begin
-      Hash:=HashInstruction(Instruction);
-      HashBucketIndex:=Hash and HashMask;
-      GetMem(InstructionHashItem,SizeOf(TInstructionHashItem));
-      Initialize(InstructionHashItem^);
-      InstructionHashItem^.Next:=InstructionHashItems[HashBucketIndex];
-      InstructionHashItems[HashBucketIndex]:=InstructionHashItem;
-      InstructionHashItem^.Hash:=Hash;
-      InstructionHashItem^.Block:=Block;
-      InstructionHashItem^.Instruction:=Instruction;
-     end;
+   for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+    Instruction:=Block.Instructions[InstructionIndex];
+    if Instruction.To_.Kind=pircokTEMPORARY then begin
+     Hash:=HashInstruction(Instruction);
+     HashBucketIndex:=Hash and HashMask;
+     GetMem(InstructionHashItem,SizeOf(TInstructionHashItem));
+     Initialize(InstructionHashItem^);
+     InstructionHashItem^.Next:=InstructionHashItems[HashBucketIndex];
+     InstructionHashItems[HashBucketIndex]:=InstructionHashItem;
+     InstructionHashItem^.Hash:=Hash;
+     InstructionHashItem^.Block:=Block;
+     InstructionHashItem^.Instruction:=Instruction;
     end;
    end;
    Block:=Block.Link;
   end;
 
-  // 3. Substitute expressions
+  // 2. Substitute expressions
   Block:=StartBlock;
   while assigned(Block) do begin
-   if Block.Visit<>0 then begin
-    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
-     Instruction:=Block.Instructions[InstructionIndex];
-     if Instruction.To_.Kind=pircokTEMPORARY then begin
-      Hash:=HashInstruction(Instruction);
-      HashBucketIndex:=Hash and HashMask;
-      InstructionHashItem:=InstructionHashItems[HashBucketIndex];
-      while assigned(InstructionHashItem) do begin
-       // Check if the opcode, the code type and the count of operands are the same
-       if (InstructionHashItem^.Hash=Hash) and
-          (InstructionHashItem^.Instruction.Opcode=Instruction.Opcode) and
-          (InstructionHashItem^.Instruction.Type_=Instruction.Type_) and
-          (length(InstructionHashItem^.Instruction.Operands)=length(Instruction.Operands)) then begin
-        // Check if the operands are the same
-        OK:=true;
-        for InstructionOperandIndex:=0 to length(Instruction.Operands)-1 do begin
-         if (InstructionHashItem^.Instruction.Operands[InstructionOperandIndex].Kind<>Instruction.Operands[InstructionOperandIndex].Kind) or
-            (InstructionHashItem^.Instruction.Operands[InstructionOperandIndex].Data<>Instruction.Operands[InstructionOperandIndex].Data) then begin
-          OK:=false;
-          break;
-         end;
-        end;
-        if OK then begin
-         // If all comparsions were successful, then check if this hash-table-instruction dominates the current instruction
-         if (((InstructionHashItem^.Block=Block) and (Block.Instructions.IndexOf(InstructionHashItem^.Instruction)<InstructionIndex)) or
-             (CompareSDominance(InstructionHashItem^.Block,Block) and (InstructionHashItem^.Block.ID<Block.ID))) then begin
-          // If yes, replace it
-          Instruction.Opcode:=pircoCOPY;
-          SetLength(Instruction.Operands,1);
-          Instruction.Operands[0]:=InstructionHashItem^.Instruction.To_;
-          CodeOptimized:=true;
-          break;
-         end;
+   for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+    Instruction:=Block.Instructions[InstructionIndex];
+    if Instruction.To_.Kind=pircokTEMPORARY then begin
+     Hash:=HashInstruction(Instruction);
+     HashBucketIndex:=Hash and HashMask;
+     InstructionHashItem:=InstructionHashItems[HashBucketIndex];
+     while assigned(InstructionHashItem) do begin
+      // Check if the opcode, the code type and the count of operands are the same
+      if (InstructionHashItem^.Hash=Hash) and
+         (InstructionHashItem^.Instruction.Opcode=Instruction.Opcode) and
+         (InstructionHashItem^.Instruction.Type_=Instruction.Type_) and
+         (length(InstructionHashItem^.Instruction.Operands)=length(Instruction.Operands)) then begin
+       // Check if the operands are the same
+       OK:=true;
+       for InstructionOperandIndex:=0 to length(Instruction.Operands)-1 do begin
+        if (InstructionHashItem^.Instruction.Operands[InstructionOperandIndex].Kind<>Instruction.Operands[InstructionOperandIndex].Kind) or
+           (InstructionHashItem^.Instruction.Operands[InstructionOperandIndex].Data<>Instruction.Operands[InstructionOperandIndex].Data) then begin
+         OK:=false;
+         break;
         end;
        end;
-       InstructionHashItem:=InstructionHashItem.Next;
+       if OK then begin
+        // If all comparsions were successful, then check if this hash-table-instruction dominates the current instruction
+        if (((InstructionHashItem^.Block=Block) and (Block.Instructions.IndexOf(InstructionHashItem^.Instruction)<InstructionIndex)) or
+            (CompareSDominance(InstructionHashItem^.Block,Block) and (InstructionHashItem^.Block.ID<Block.ID))) then begin
+         // If yes, replace it
+         Instruction.Opcode:=pircoCOPY;
+         SetLength(Instruction.Operands,1);
+         Instruction.Operands[0]:=InstructionHashItem^.Instruction.To_;
+         CodeOptimized:=true;
+         break;
+        end;
+       end;
       end;
+      InstructionHashItem:=InstructionHashItem.Next;
      end;
     end;
    end;
    Block:=Block.Link;
   end;
 
-  // 5. Processing Phis
+  // 3. Processing Phis
   Block:=StartBlock;
   while assigned(Block) do begin
-   if Block.Visit<>0 then begin
-    PhiPointer:=@Block.Phi;
-    repeat
-     Phi:=PhiPointer^;
-     if assigned(Phi) then begin
-      PhiPointer:=@Phi.Link;
-     end else begin
-      break;
-     end;
-    until false;
-   end;
+   PhiPointer:=@Block.Phi;
+   repeat
+    Phi:=PhiPointer^;
+    if assigned(Phi) then begin
+     PhiPointer:=@Phi.Link;
+    end else begin
+     break;
+    end;
+   until false;
    Block:=Block.Link;
   end;
 
  finally
 
-  // 5. Free hash table
+  // 4. Free hash table
   for InstructionHashItemIndex:=0 to HashSize-1 do begin
    InstructionHashItem:=InstructionHashItems[InstructionHashItemIndex];
    while assigned(InstructionHashItem) do begin
