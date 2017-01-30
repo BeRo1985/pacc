@@ -6795,7 +6795,6 @@ var Values:array of TPACCInt32;
     FlowWork:PEdge;
     Edges:array of array of TEdge;
     UseWork:TPACCIntermediateRepresentationCodeUseList;
-    CountUse:TPACCInt32;
  function IsZero(const Constant:TPACCIntermediateRepresentationCodeConstant;const Wide:boolean):boolean;
  begin
   if Constant.Kind<>pircckDATA then begin
@@ -7689,8 +7688,6 @@ begin
 
     FlowWork:=@Start;
 
-    CountUse:=0;
-
     repeat
      Edge:=FlowWork;
      if assigned(Edge) then begin
@@ -7716,9 +7713,9 @@ begin
         TPACCInstance(fInstance).AddError('Internal error 2017-01-30-02-33-0000',nil,true);
        end;
       end;
-     end else if CountUse<>0 then begin
-      dec(CountUse);
-      Use:=UseWork[CountUse];
+     end else if UseWork.Count>0 then begin
+      Use:=UseWork[UseWork.Count-1];
+      UseWork.Delete(UseWork.Count-1);
       BlockID:=Use.BlockID;
       Block:=RPO[BlockID];
       if Block.Visit<>0 then begin
