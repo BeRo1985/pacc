@@ -705,7 +705,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        function Escapes(const Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
        procedure LoadElimination;
        procedure CopyElimination;
-       procedure ConstantFolding;
+       procedure SparseConditionalConstantPropagation;
        procedure GlobalCommonSubexpressionElimination;
        procedure DeadCodeElimination;
        procedure PostProcess;
@@ -6797,7 +6797,7 @@ begin
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.ConstantFolding;
+procedure TPACCIntermediateRepresentationCodeFunction.SparseConditionalConstantPropagation;
 const Bottom=-2;
       Top=-1;
 type PEdge=^TEdge;
@@ -7772,7 +7772,7 @@ begin
     until false;
 
 {$ifdef IRDebug}
-    writeln('> Findings:');
+    writeln('> Sparse conditional constant propagation findings:');
     for Index:=0 to Temporaries.Count-1 do begin
      write('    temporary(',Index,') ');
      case Values[Index] of
@@ -7888,7 +7888,7 @@ begin
   Edges:=nil;
  end;
 {$ifdef IRDebug}
- writeln('> After constant folding:');
+ writeln('> After sparse conditional constant propagation:');
  DumpToConsole;
 {$endif}
 end;
@@ -8259,7 +8259,7 @@ begin
 
     DefinitionUseAnalysis;
     SSACheck;
-    ConstantFolding;
+    SparseConditionalConstantPropagation;
 
     ReversePostOrderConstruction;
     FindControlFlowGraphPredecessors;
