@@ -7965,7 +7965,9 @@ begin
   while assigned(Block) do begin
    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
     Instruction:=Block.Instructions[InstructionIndex];
-    if (Instruction.To_.Kind=pircokTEMPORARY) and (length(Instruction.Operands)>0) then begin
+    if (Instruction.Opcode<>pircoCALL) and
+       (Instruction.To_.Kind=pircokTEMPORARY) and
+       (length(Instruction.Operands)>0) then begin
      Hash:=HashInstruction(Instruction);
      HashBucketIndex:=Hash and HashMask;
      GetMem(InstructionHashItem,SizeOf(TInstructionHashItem));
@@ -7992,7 +7994,9 @@ begin
   while assigned(Block) do begin
    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
     Instruction:=Block.Instructions[InstructionIndex];
-    if (Instruction.To_.Kind=pircokTEMPORARY) and (length(Instruction.Operands)>0) then begin
+    if (Instruction.Opcode<>pircoCALL) and
+       (Instruction.To_.Kind=pircokTEMPORARY) and
+       (length(Instruction.Operands)>0) then begin
      Hash:=HashInstruction(Instruction);
      HashBucketIndex:=Hash and HashMask;
      InstructionHashItem:=InstructionHashItems[HashBucketIndex];
