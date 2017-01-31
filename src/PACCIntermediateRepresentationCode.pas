@@ -7903,6 +7903,7 @@ type PInstructionHashItem=^TInstructionHashItem;
       Hash:TPACCUInt32;
       Block:TPACCIntermediateRepresentationCodeBlock;
       Instruction:TPACCIntermediateRepresentationCodeInstruction;
+      InstructionIndex:TPACCInt32;
      end;
      TInstructionHashItems=array of PInstructionHashItem;
 var InstructionIndex,InstructionOperandIndex,InstructionHashItemIndex,
@@ -7974,6 +7975,7 @@ begin
      InstructionHashItem^.Hash:=Hash;
      InstructionHashItem^.Block:=Block;
      InstructionHashItem^.Instruction:=Instruction;
+     InstructionHashItem^.InstructionIndex:=InstructionIndex;
      TemporaryIndex:=Instruction.To_.Temporary;
      if assigned(TemporaryToInstructionHashItemMap[TemporaryIndex]) then begin
       TPACCInstance(fInstance).AddError('Internal error 2017-01-31-00-28-0000',@Instruction.SourceLocation,true);
@@ -7999,7 +8001,7 @@ begin
       if (InstructionHashItem^.Hash=Hash) and
          CompareInstructions(InstructionHashItem^.Instruction,Instruction) and
          // If both instructions are equal, then check if this hash-table-instruction dominates the current instruction
-         (((InstructionHashItem^.Block=Block) and (Block.Instructions.IndexOf(InstructionHashItem^.Instruction)<InstructionIndex)) or
+         (((InstructionHashItem^.Block=Block) and (InstructionHashItem^.InstructionIndex<InstructionIndex)) or
           (CompareSDominance(InstructionHashItem^.Block,Block) and (InstructionHashItem^.Block.ID<Block.ID))) then begin
        // If yes, replace it
        Instruction.Opcode:=pircoCOPY;
