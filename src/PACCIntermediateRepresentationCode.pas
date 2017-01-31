@@ -8280,7 +8280,7 @@ begin
 
   end;
 
- end else begin
+ end else if TPACCInstance(Instance).Options.OptimizationLevel>0 then begin
 
   DefinitionUseAnalysis;
   SSACheck;

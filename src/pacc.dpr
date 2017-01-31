@@ -419,6 +419,8 @@ begin
       OutputFiles.Add(ParamStr(ParameterIndex));
       inc(ParameterIndex);
      end;
+    end else if (length(Parameter)>2) and (Parameter[1]='-') and (Parameter[2]='O') then begin
+     Options.OptimizationLevel:=StrToInt(copy(Parameter,3,length(Parameter)-2));
     end else if Parameter='-shared' then begin
      Options.CreateSharedLibrary:=true;
     end else if Parameter='-S' then begin
@@ -610,6 +612,7 @@ begin
    writeln('         -I <direcrtory>            Add directory to include search path');
    writeln('         -o <output file>           With -c, -E or -S: The n-th output file name of n-th input file name in same order');
    writeln('                                            Otherwise: The single output file name of the linked binary file');
+   writeln('         -O<optimization level>     Set optimization level (0 = nearly none, 1 = only debug-friendly, 2 = more, 3 = all)');
    writeln('         -shared                    Create shared library');
    writeln('         -S                         Only run preprocess and compilation steps');
    writeln('         -t <target>                Select target');
