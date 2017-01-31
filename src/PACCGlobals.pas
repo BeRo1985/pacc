@@ -25,12 +25,13 @@ type PPACCEncoding=^TPACCEncoding;
       HandleUTF8:boolean;
       CreateSharedLibrary:boolean;
       StaticLinking:boolean;
+      OptimizationLevel:TPACCInt32;
      end;
 
      PPACCTokenSymbol=^TPACCTokenSymbol;
      TPACCTokenSymbol=record
       Name:TPUCUUTF8String;
-      Index:integer;
+      Index:TPACCInt32;
      end;
 
      TPACCTokenSymbols=array of TPACCTokenSymbol;
@@ -162,6 +163,7 @@ const PACCDefaultOptions:TPACCOptions=
         HandleUTF8:false;
         CreateSharedLibrary:false;
         StaticLinking:false;
+        OptimizationLevel:3;
        );
 
        PACCEmptyAttribute:TPACCAttribute=(

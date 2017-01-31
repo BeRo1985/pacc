@@ -8239,41 +8239,55 @@ begin
  PromoteUniformMemoryStackSlotsToTemporaries;
  SSA;
 
- DefinitionUseAnalysis;
- SSACheck;
- LoopAnalysis;
- AliasingAnalysis;
- LoadElimination;
-
- repeat
-
-  CodeOptimized:=false;
+ if TPACCInstance(Instance).Options.OptimizationLevel>1 then begin
 
   DefinitionUseAnalysis;
   SSACheck;
-  CopyElimination;
+  LoopAnalysis;
+  AliasingAnalysis;
+  LoadElimination;
 
-  DefinitionUseAnalysis;
-  SSACheck;
-  ConstantFolding;
+  if TPACCInstance(Instance).Options.OptimizationLevel>2 then begin
 
-  ReversePostOrderConstruction;
-  FindControlFlowGraphPredecessors;
-  DefinitionUseAnalysis;
-  SSACheck;
-  GlobalCommonSubexpressionElimination;
+   repeat
+
+    CodeOptimized:=false;
+
+    DefinitionUseAnalysis;
+    SSACheck;
+    CopyElimination;
+
+    DefinitionUseAnalysis;
+    SSACheck;
+    ConstantFolding;
+
+    ReversePostOrderConstruction;
+    FindControlFlowGraphPredecessors;
+    DefinitionUseAnalysis;
+    SSACheck;
+    GlobalCommonSubexpressionElimination;
+
+    ReversePostOrderConstruction;
+    FindControlFlowGraphPredecessors;
+    DefinitionUseAnalysis;
+    SSACheck;
+    DeadCodeElimination;
+
+    ReversePostOrderConstruction;
+    FindControlFlowGraphPredecessors;
+
+   until not CodeOptimized;
+
+  end;
+
+ end else begin
 
   DefinitionUseAnalysis;
   SSACheck;
   DeadCodeElimination;
 
-  ReversePostOrderConstruction;
-  FindControlFlowGraphPredecessors;
-  DefinitionUseAnalysis;
-  SSACheck;
-
- until not CodeOptimized;
-
+ end;
+  
  DefinitionUseAnalysis;
  SSACheck;
 
