@@ -706,7 +706,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure LoadElimination;
        procedure CopyElimination;
        procedure ConstantFolding;
-       procedure LocalCommonSubexpressionElimination;
        procedure GlobalCommonSubexpressionElimination;
        procedure DeadCodeElimination;
        procedure PostProcess;
@@ -7882,111 +7881,6 @@ begin
 {$endif}
 end;
 
-procedure TPACCIntermediateRepresentationCodeFunction.LocalCommonSubexpressionElimination;
-const HashBits=12;
-      HashSize=1 shl HashBits;
-      HashMask=HashSize-1;
-type PInstructionHashItem=^TInstructionHashItem;
-     TInstructionHashItem=record
-      Next:PInstructionHashItem;
-      Hash:TPACCUInt32;
-      Instruction:TPACCIntermediateRepresentationCodeInstruction;
-     end;
-     TInstructionHashItems=array of PInstructionHashItem;
-var InstructionIndex,InstructionOperandIndex,InstructionHashItemIndex,HashBucketIndex:TPACCInt32;
-    Hash:TPACCUInt32;
-    Block:TPACCIntermediateRepresentationCodeBlock;
-    Instruction:TPACCIntermediateRepresentationCodeInstruction;
-    Operand:PPACCIntermediateRepresentationCodeOperand;
-    InstructionHashItems:TInstructionHashItems;
-    InstructionHashItem,NextInstructionHashItem:PInstructionHashItem;
-    OK:boolean;
-begin
- InstructionHashItems:=nil;
- try
-
-  SetLength(InstructionHashItems,HashSize);
-  for InstructionHashItemIndex:=0 to HashSize-1 do begin
-   InstructionHashItems[InstructionHashItemIndex]:=nil;
-  end;
-
-  Block:=StartBlock;
-  while assigned(Block) do begin
-
-   for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
-    Instruction:=Block.Instructions[InstructionIndex];
-    if Instruction.To_.Kind=pircokTEMPORARY then begin
-
-     Hash:=(TPACCUInt32(Instruction.Opcode)*402653189) xor
-           (TPACCUInt32(Instruction.Type_)*50331653) xor
-           (TPACCUInt32(length(Instruction.Operands))*25165843);
-     for InstructionOperandIndex:=0 to length(Instruction.Operands)-1 do begin
-      Operand:=@Instruction.Operands[InstructionOperandIndex];
-      Hash:=((Hash shl 13) or (Hash shr 19))+
-            ((TPACCUInt32(Operand^.Kind)*201326611) xor
-             (TPACCUInt32(Operand^.Data)*100663319));
-     end;
-     HashBucketIndex:=Hash and HashMask;
-
-     InstructionHashItem:=InstructionHashItems[HashBucketIndex];
-     while assigned(InstructionHashItem) do begin
-      if (InstructionHashItem^.Hash=Hash) and
-         (InstructionHashItem^.Instruction.Opcode=Instruction.Opcode) and
-         (InstructionHashItem^.Instruction.Type_=Instruction.Type_) and
-         (length(InstructionHashItem^.Instruction.Operands)=length(Instruction.Operands)) then begin
-       OK:=true;
-       for InstructionOperandIndex:=0 to length(Instruction.Operands)-1 do begin
-        if (InstructionHashItem^.Instruction.Operands[InstructionOperandIndex].Kind<>Instruction.Operands[InstructionOperandIndex].Kind) or
-           (InstructionHashItem^.Instruction.Operands[InstructionOperandIndex].Data<>Instruction.Operands[InstructionOperandIndex].Data) then begin
-         OK:=false;
-         break;
-        end;
-       end;
-       if OK then begin
-        break;
-       end;
-      end;
-      InstructionHashItem:=InstructionHashItem.Next;
-     end;
-     if assigned(InstructionHashItem) then begin
-      Instruction.Opcode:=pircoCOPY;
-      SetLength(Instruction.Operands,1);
-      Instruction.Operands[0]:=InstructionHashItem^.Instruction.To_;
-      CodeOptimized:=true;
-     end else begin
-      GetMem(InstructionHashItem,SizeOf(TInstructionHashItem));
-      InstructionHashItem^.Next:=InstructionHashItems[HashBucketIndex];
-      InstructionHashItems[HashBucketIndex]:=InstructionHashItem;
-      InstructionHashItem^.Hash:=Hash;
-      InstructionHashItem^.Instruction:=Instruction;
-     end;
-
-    end;
-   end;
-
-   for InstructionHashItemIndex:=0 to HashSize-1 do begin
-    InstructionHashItem:=InstructionHashItems[InstructionHashItemIndex];
-    while assigned(InstructionHashItem) do begin
-     NextInstructionHashItem:=InstructionHashItem^.Next;
-     FreeMem(InstructionHashItem);
-     InstructionHashItem:=NextInstructionHashItem;
-    end;
-    InstructionHashItems[InstructionHashItemIndex]:=nil;
-   end;
-
-   Block:=Block.Link;
-  end;
-
- finally
-  InstructionHashItems:=nil;
- end;
-
-{$ifdef IRDebug}
- writeln('> After local common subexpression elimination:');
- DumpToConsole;
-{$endif}
-end;
-
 procedure TPACCIntermediateRepresentationCodeFunction.GlobalCommonSubexpressionElimination;
 const HashBits=12;
       HashSize=1 shl HashBits;
@@ -8354,7 +8248,6 @@ begin
   FindControlFlowGraphPredecessors;
   DefinitionUseAnalysis;
   SSACheck;
-  LocalCommonSubexpressionElimination;
   GlobalCommonSubexpressionElimination;
 
  until not CodeOptimized;
