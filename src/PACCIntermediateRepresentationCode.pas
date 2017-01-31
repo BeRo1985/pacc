@@ -4676,8 +4676,10 @@ var InstructionIndex,TemporaryIndex,UseIndex,Size:TPACCInt32;
 begin
  Block:=StartBlock;
  if assigned(Block) then begin
-  for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+  InstructionIndex:=0;
+  while InstructionIndex<Block.Instructions.Count do begin
    Instruction:=Block.Instructions[InstructionIndex];
+   inc(InstructionIndex);
    if Instruction.Opcode=pircoALLOC then begin
     if Instruction.To_.Kind=pircokTEMPORARY then begin
      Skip:=false;
@@ -4913,6 +4915,8 @@ begin
          end;
         end;
        end;
+       dec(InstructionIndex);
+       Block.Instructions.Delete(InstructionIndex);
       end;
      end;
     end else begin
@@ -6738,8 +6742,10 @@ begin
       break;
      end;
     until false;
-    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+    InstructionIndex:=0;
+    while InstructionIndex<Block.Instructions.Count do begin
      Instruction:=Block.Instructions[InstructionIndex];
+     inc(InstructionIndex);
      Operand:=CopyOf(Instruction.To_);
      if AreOperandsEqual(Operand,Instruction.To_) then begin
       for OperandIndex:=0 to length(Instruction.Operands)-1 do begin
@@ -6755,6 +6761,8 @@ begin
       Instruction.Type_:=pirctNONE;
       Instruction.To_:=EmptyOperand;
       Instruction.Operands:=nil;
+      dec(InstructionIndex);
+      Block.Instructions.Delete(InstructionIndex);
      end;
     end;
     Substitution(Block.Jump.Operand);
@@ -7820,12 +7828,16 @@ begin
          break;
         end;
        until false;
-       for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
+       InstructionIndex:=0;
+       while InstructionIndex<Block.Instructions.Count do begin
         Instruction:=Block.Instructions[InstructionIndex];
+        inc(InstructionIndex);
         if RenameOperand(Instruction.To_) then begin
          Instruction.Opcode:=pircoNOP;
          Instruction.To_:=EmptyOperand;
          Instruction.Operands:=nil;
+         dec(InstructionIndex);
+         Block.Instructions.Delete(InstructionIndex);
          CodeOptimized:=true;
         end else begin
          for OperandIndex:=0 to length(Instruction.Operands)-1 do begin
@@ -8244,13 +8256,21 @@ begin
   DefinitionUseAnalysis;
   SSACheck;
   ConstantFolding;
-  DeadCodeElimination;
 
   ReversePostOrderConstruction;
   FindControlFlowGraphPredecessors;
   DefinitionUseAnalysis;
   SSACheck;
   GlobalCommonSubexpressionElimination;
+
+  DefinitionUseAnalysis;
+  SSACheck;
+  DeadCodeElimination;
+
+  ReversePostOrderConstruction;
+  FindControlFlowGraphPredecessors;
+  DefinitionUseAnalysis;
+  SSACheck;
 
  until not CodeOptimized;
 
