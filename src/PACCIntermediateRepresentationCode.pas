@@ -7965,7 +7965,7 @@ begin
   while assigned(Block) do begin
    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
     Instruction:=Block.Instructions[InstructionIndex];
-    if (Instruction.Opcode<>pircoCALL) and
+    if (not (Instruction.Opcode in [pircoCALL,pircoLDUCI..pircoLDD])) and
        (Instruction.To_.Kind=pircokTEMPORARY) and
        (length(Instruction.Operands)>0) then begin
      Hash:=HashInstruction(Instruction);
@@ -7994,7 +7994,7 @@ begin
   while assigned(Block) do begin
    for InstructionIndex:=0 to Block.Instructions.Count-1 do begin
     Instruction:=Block.Instructions[InstructionIndex];
-    if (Instruction.Opcode<>pircoCALL) and
+    if (not (Instruction.Opcode in [pircoCALL,pircoLDUCI..pircoLDD])) and
        (Instruction.To_.Kind=pircokTEMPORARY) and
        (length(Instruction.Operands)>0) then begin
      Hash:=HashInstruction(Instruction);
