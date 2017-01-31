@@ -8158,7 +8158,7 @@ begin
    end;
   until false;
 
-  // 4. Update all jumps
+  // 4. Optimize all jumps
   BlockPointer:=@StartBlock;
   repeat
    Block:=BlockPointer^;
@@ -8186,7 +8186,7 @@ begin
    end;
   until false;
 
-  // 5. Combine blocks
+  // 5. Try to combine blocks
   BlockPointer:=@StartBlock;
   repeat
    Block:=BlockPointer^;
