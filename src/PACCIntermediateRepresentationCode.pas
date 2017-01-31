@@ -8038,13 +8038,6 @@ begin
       Instruction.SourceLocation:=FromInstruction.SourceLocation;
       Block.Instructions.Insert(InstructionIndex,Instruction);
       inc(InstructionIndex);
-{     for PhiOperandIndex:=0 to Phi.CountOperands-1 do begin
-       Instruction:=TemporaryToInstructionHashItemMap[Phi.Operands[PhiOperandIndex].Temporary].Instruction;
-       Instruction.Opcode:=pircoNOP;
-       Instruction.To_:=EmptyOperand;
-       Instruction.Operands:=nil;
-       dec(Temporaries[Phi.Operands[PhiOperandIndex].Temporary].CountDefinitions);
-      end;}
       CodeOptimized:=true;
       PhiPointer^:=Phi.Link;
      end else begin
@@ -8087,7 +8080,7 @@ var InstructionIndex,PredecessorIndex,SuccessorIndex:TPACCInt32;
     Block,Predecessor,Successor:TPACCIntermediateRepresentationCodeBlock;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
     Temporary:TPACCIntermediateRepresentationCodeTemporary;
-    OK:boolean;
+    OK,DoAgain:boolean;
 begin
 
  // 1. Eliminate all expressions without future-use
@@ -8121,88 +8114,97 @@ begin
   Block:=Block.Link;
  end;
 
- // 3. Eliminate all empty blocks
- BlockPointer:=@StartBlock;
  repeat
-  Block:=BlockPointer^;
-  if assigned(Block) then begin
-   if (Block.Instructions.Count=0) and
-      (Block.Jump.Kind=pircjkJMP) and
-      (Block.Successors.Count=1) and not assigned(Block.Phi) then begin
-    for PredecessorIndex:=0 to Block.Predecessors.Count-1 do begin
-     Predecessor:=Block.Predecessors[PredecessorIndex];
-     for SuccessorIndex:=0 to Predecessor.Successors.Count-1 do begin
-      Successor:=Predecessor.Successors[SuccessorIndex];
-      if Successor=Block then begin
-       Predecessor.Successors[SuccessorIndex]:=Block.Successors[0];
+
+  DoAgain:=false;
+
+  // 3. Eliminate all empty blocks
+  BlockPointer:=@StartBlock;
+  repeat
+   Block:=BlockPointer^;
+   if assigned(Block) then begin
+    if (Block.Instructions.Count=0) and
+       (Block.Jump.Kind=pircjkJMP) and
+       (Block.Successors.Count=1) and not assigned(Block.Phi) then begin
+     for PredecessorIndex:=0 to Block.Predecessors.Count-1 do begin
+      Predecessor:=Block.Predecessors[PredecessorIndex];
+      for SuccessorIndex:=0 to Predecessor.Successors.Count-1 do begin
+       Successor:=Predecessor.Successors[SuccessorIndex];
+       if Successor=Block then begin
+        Predecessor.Successors[SuccessorIndex]:=Block.Successors[0];
+       end;
       end;
      end;
+     CodeOptimized:=true;
+     DeleteBlock(Block);
+     BlockPointer^:=Block.Link;
+    end else begin
+     BlockPointer:=@Block.Link;
     end;
-    CodeOptimized:=true;
-    DeleteBlock(Block);
-    BlockPointer^:=Block.Link;
    end else begin
-    BlockPointer:=@Block.Link;
+    break;
    end;
-  end else begin
-   break;
-  end;
- until false;
+  until false;
 
- // 4. Update all jumps
- BlockPointer:=@StartBlock;
- repeat
-  Block:=BlockPointer^;
-  if assigned(Block) then begin
-   if (Block.Jump.Kind in [pircjkJNZ,pircjkJMPT]) and
-      (Block.Successors.Count>1) then begin
-    OK:=true;
-    Successor:=Block.Successors[0];
-    for SuccessorIndex:=1 to Block.Successors.Count-1 do begin
-     if Successor<>Block.Successors[SuccessorIndex] then begin
-      OK:=false;
-      break;
+  // 4. Update all jumps
+  BlockPointer:=@StartBlock;
+  repeat
+   Block:=BlockPointer^;
+   if assigned(Block) then begin
+    if (Block.Jump.Kind in [pircjkJNZ,pircjkJMPT]) and
+       (Block.Successors.Count>1) then begin
+     OK:=true;
+     Successor:=Block.Successors[0];
+     for SuccessorIndex:=1 to Block.Successors.Count-1 do begin
+      if Successor<>Block.Successors[SuccessorIndex] then begin
+       OK:=false;
+       break;
+      end;
+     end;
+     if OK then begin
+      Block.Jump.Kind:=pircjkJMP;
+      Block.Jump.Operand:=EmptyOperand;
+      Block.Successors.Count:=1;
+      CodeOptimized:=true;
      end;
     end;
-    if OK then begin
-     Block.Jump.Kind:=pircjkJMP;
-     Block.Jump.Operand:=EmptyOperand;
-     Block.Successors.Count:=1;
-     CodeOptimized:=true;
-    end;
+    BlockPointer:=@Block.Link;
+   end else begin
+    break;
    end;
-   BlockPointer:=@Block.Link;
-  end else begin
-   break;
-  end;
- until false;
+  until false;
 
-{// 5. Combine blocks
- BlockPointer:=@StartBlock;
- repeat
-  Block:=BlockPointer^;
-  if assigned(Block) then begin
-   if (Block.Jump.Kind=pircjkJMP) and
-      (Block.Successors.Count=1) and not assigned(Block.Phi) then begin
-    Successor:=Block.Successors[0];
-    for InstructionIndex:=0 to Successor.Instructions.Count-1 do begin
-     Instruction:=Successor.Instructions[InstructionIndex];
-     Block.Instructions.Add(Instruction);
+  // 5. Combine blocks
+  BlockPointer:=@StartBlock;
+  repeat
+   Block:=BlockPointer^;
+   if assigned(Block) then begin
+    if (Block.Jump.Kind=pircjkJMP) and
+       (Block.Successors.Count=1) and not assigned(Block.Phi) then begin
+     Successor:=Block.Successors[0];
+     if Successor.Predecessors.Count=1 then begin
+      for InstructionIndex:=0 to Successor.Instructions.Count-1 do begin
+       Instruction:=Successor.Instructions[InstructionIndex];
+       Block.Instructions.Add(Instruction);
+      end;
+      Successor.Instructions.Clear;
+      Block.Jump:=Successor.Jump;
+      Block.Successors.Clear;
+      for SuccessorIndex:=0 to Successor.Successors.Count-1 do begin
+       Block.Successors.Add(Successor.Successors[SuccessorIndex]);
+      end;
+      Successor.Successors.Clear;
+      DeleteBlock(Successor);
+      DoAgain:=true;
+     end;
     end;
-    Successor.Instructions.Clear;
-    Block.Jump:=Successor.Jump;
-    Block.Successors.Clear;
-    for SuccessorIndex:=0 to Successor.Successors.Count-1 do begin
-     Block.Successors.Add(Successor.Successors[SuccessorIndex]);
-    end;
-    Successor.Successors.Clear;
-    DeleteBlock(Successor);
+    BlockPointer:=@Block.Link;
+   end else begin
+    break;
    end;
-   BlockPointer:=@Block.Link;
-  end else begin
-   break;
-  end;
- until false;}
+  until false;
+
+ until not DoAgain;
 
 {$ifdef IRDebug}
  writeln('> After dead code elimination:');
