@@ -1,6 +1,8 @@
 # PACC
 
-PACC (PAscal C Compiler) is an work-in-progress C11-specification-aiming C compiler, which is implemented in Delphi-7-compatible Object Pascal
+PACC (PAscal C Compiler) is an work-in-progress C11-specification-aiming C compiler, which is implemented in Delphi-7-compatible Object Pascal.
+
+The intermediate representation code architecture design is strongly inspired by [QBE](http://c9x.me/compile/) 
 
 # Requirements
 
