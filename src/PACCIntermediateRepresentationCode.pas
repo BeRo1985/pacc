@@ -676,6 +676,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitStatement(const Node:TPACCAbstractSyntaxTreeNode);
        procedure EmitStatements(const Node:TPACCAbstractSyntaxTreeNodeStatements);
        function AreOperandsEqual(const Operand,OtherOperand:TPACCIntermediateRepresentationCodeOperand):boolean;
+       procedure DeleteBlockSuccessorEdge(const Block:TPACCIntermediateRepresentationCodeBlock;const SuccessorIndex:TPACCInt32);
        procedure DeleteBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
        procedure ReversePostOrderConstruction;
        procedure FindControlFlowGraphPredecessors;
@@ -4389,6 +4390,46 @@ begin
  end;
 end;
 
+procedure TPACCIntermediateRepresentationCodeFunction.DeleteBlockSuccessorEdge(const Block:TPACCIntermediateRepresentationCodeBlock;const SuccessorIndex:TPACCInt32);
+var Index,SubIndex,SubSubIndex:TPACCInt32;
+    Successor:TPACCIntermediateRepresentationCodeBlock;
+    Phi:TPACCIntermediateRepresentationCodePhi;
+begin
+ if (SuccessorIndex>=0) and (SuccessorIndex<Block.Successors.Count) then begin
+  Successor:=Block.Successors[SuccessorIndex];
+  if assigned(Successor) then begin
+   Block.Successors.Delete(SuccessorIndex);
+   for Index:=0 to Block.Successors.Count-1 do begin
+    if Block.Successors[Index]=Successor then begin
+     exit;
+    end;
+   end;
+   Phi:=Successor.Phi;
+   while assigned(Phi) do begin
+    for SubIndex:=Phi.CountOperands-1 downto 0 do begin
+     if Phi.Blocks[SubIndex]=Block then begin
+      for SubSubIndex:=SubIndex+1 to Phi.CountOperands-1 do begin
+       Phi.Operands[SubSubIndex-1]:=Phi.Operands[SubSubIndex];
+       Phi.Blocks[SubSubIndex-1]:=Phi.Blocks[SubSubIndex];
+      end;
+      dec(Phi.CountOperands);
+      SetLength(Phi.Operands,Phi.CountOperands);
+      SetLength(Phi.Blocks,Phi.CountOperands);
+     end;
+    end;
+    Phi:=Phi.Link;
+   end;
+   if Successor.Predecessors.Count>0 then begin
+    for SubIndex:=Successor.Predecessors.Count-1 downto 0 do begin
+     if Successor.Predecessors[SubIndex]=Block then begin
+      Successor.Predecessors.Delete(SubIndex);
+     end;
+    end;
+   end;
+  end;
+ end;
+end;
+
 procedure TPACCIntermediateRepresentationCodeFunction.DeleteBlock(const Block:TPACCIntermediateRepresentationCodeBlock);
 var Index,SubIndex,SubSubIndex:TPACCInt32;
     Successor:TPACCIntermediateRepresentationCodeBlock;
@@ -5278,6 +5319,11 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
  var Index:TPACCInt32;
      Block,OtherBlock,Successor:TPACCIntermediateRepresentationCodeBlock;
  begin
+  Block:=StartBlock;
+  while assigned(Block) do begin
+   Block.Frontiers.Clear;
+   Block:=Block.Link;
+  end;
   Block:=StartBlock;
   while assigned(Block) do begin
    for Index:=0 to Block.Successors.Count-1 do begin
@@ -7855,9 +7901,9 @@ begin
          if Block.Jump.Operand.Kind=pircokCONSTANT then begin
           Block.Jump.Kind:=pircjkJMP;
           if IsZero(Constants[Block.Jump.Operand.Constant],false) then begin
-           Block.Successors.Delete(0);
+           DeleteBlockSuccessorEdge(Block,0);
           end else begin
-           Block.Successors.Delete(1);
+           DeleteBlockSuccessorEdge(Block,1);
           end;
           Block.Jump.Operand:=EmptyOperand;
           CodeOptimized:=true;
