@@ -344,6 +344,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Base:TPACCIntermediateRepresentationCodeOperand;
        Address:TPACCIntermediateRepresentationCodeAddress;
        Offset:TPACCInt64;
+       Slot:TPACCIntermediateRepresentationCodeAlias;
        constructor Create;
        destructor Destroy; override;
        procedure Assign(const From:TPACCIntermediateRepresentationCodeAlias);
@@ -413,6 +414,20 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        pirctkCOUNT
       );
 
+     PPACCIntermediateRepresentationCodeTemporaryWidth=^TPACCIntermediateRepresentationCodeTemporaryWidth;
+     TPACCIntermediateRepresentationCodeTemporaryWidth=
+      (
+       pirctwFULL,
+       pirctwSC,
+       pirctwUC,
+       pirctwSS,
+       pirctwUS,
+       pirctwSI,
+       pirctwUI,
+       pirctwSL,
+       pirctwUL
+      );
+
      PPACCIntermediateRepresentationCodeTemporary=^TPACCIntermediateRepresentationCodeTemporary;
      TPACCIntermediateRepresentationCodeTemporary=class
       public
@@ -429,6 +444,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        Phi:TPACCInt32;
        Visit:TPACCInt32;
        Alias:TPACCIntermediateRepresentationCodeAlias;
+       Width:TPACCIntermediateRepresentationCodeTemporaryWidth;
        MappedTo:array[0..1] of TPACCInt32;
        constructor Create;
        destructor Destroy; override;
@@ -946,6 +962,7 @@ begin
  Base.Kind:=pircokNONE;
  Address.Kind:=pircakNONE;
  Offset:=0;
+ Slot:=nil;
 end;
 
 destructor TPACCIntermediateRepresentationCodeAlias.Destroy;
@@ -959,6 +976,7 @@ begin
  Base:=From.Base;
  Address:=From.Address;
  Offset:=From.Offset;
+ Slot:=From.Slot;
 end;
 
 constructor TPACCIntermediateRepresentationCodeConstant.Create;
@@ -1021,9 +1039,10 @@ begin
  Slot:=-1;
  Phi:=0;
  Visit:=0;
+ Alias:=TPACCIntermediateRepresentationCodeAlias.Create;
+ Width:=pirctwFULL;
  MappedTo[0]:=-1;
  MappedTo[1]:=-1;
- Alias:=TPACCIntermediateRepresentationCodeAlias.Create;
 end;
 
 destructor TPACCIntermediateRepresentationCodeTemporary.Destroy;
@@ -1619,6 +1638,8 @@ begin
    Constant.Kind:=pircckADDRESS;
    Constant.Address.Kind:=pircakVARIABLE;
    Constant.Address.Variable:=Variable;
+   Constant.Data.Kind:=pirccdkINTEGER;
+   Constant.Data.IntegerValue:=0;
    VariableConstantHashMap[Variable]:=Constant;
   end;
   result.Kind:=pircokCONSTANT;
@@ -1637,6 +1658,8 @@ begin
   Constant.Kind:=pircckADDRESS;
   Constant.Address.Kind:=pircakLABEL;
   Constant.Address.Label_:=Label_;
+  Constant.Data.Kind:=pirccdkINTEGER;
+  Constant.Data.IntegerValue:=0;
   LabelConstantHashMap[Label_]:=Constant;
  end;
  result.Kind:=pircokCONSTANT;
@@ -1654,6 +1677,8 @@ begin
   Constant.Kind:=pircckADDRESS;
   Constant.Address.Kind:=pircakFUNCTION;
   Constant.Address.Function_:=TheFunction;
+  Constant.Data.Kind:=pirccdkINTEGER;
+  Constant.Data.IntegerValue:=0;
   FunctionConstantHashMap[TheFunction]:=Constant;
  end;
  result.Kind:=pircokCONSTANT;
@@ -4622,6 +4647,7 @@ var Index,SubIndex:TPACCInt32;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
     Temporary:TPACCIntermediateRepresentationCodeTemporary;
     Use:TPACCIntermediateRepresentationCodeUse;
+    Width:TPACCIntermediateRepresentationCodeTemporaryWidth;
 begin
 
  for Index:=0 to Temporaries.Count-1 do begin
@@ -4630,6 +4656,7 @@ begin
   Temporary.Uses_.Clear;
   Temporary.Phi:=0;
   Temporary.Type_:=pirctNONE;
+  Temporary.Width:=pirctwFULL;
  end;
 
  Block:=StartBlock;
@@ -4671,6 +4698,75 @@ begin
      if Instruction.Type_<>pirctNONE then begin
       Temporary.Type_:=Instruction.Type_;
      end;
+     case Instruction.Opcode of
+      pircoZEC:begin
+       Width:=pirctwUC;
+      end;
+      pircoZES:begin
+       Width:=pirctwUS;
+      end;
+      pircoZEI:begin
+       Width:=pirctwUI;
+      end;            
+      pircoSEC:begin
+       Width:=pirctwSC;
+      end;
+      pircoSES:begin
+       Width:=pirctwSS;
+      end;
+      pircoSEI:begin
+       Width:=pirctwSI;
+      end;
+      pircoLDUCI:begin
+       Width:=pirctwUC;
+      end;
+      pircoLDUSI:begin
+       Width:=pirctwUS;
+      end;
+      pircoLDUII:begin
+       Width:=pirctwUI;
+      end;
+      pircoLDSCI:begin
+       Width:=pirctwSC;
+      end;
+      pircoLDSSI:begin
+       Width:=pirctwSS;
+      end;
+      pircoLDSII:begin
+       Width:=pirctwSI;
+      end;
+      pircoLDUCL:begin
+       Width:=pirctwUC;
+      end;
+      pircoLDUSL:begin
+       Width:=pirctwUS;
+      end;
+      pircoLDUIL:begin
+       Width:=pirctwUI;
+      end;
+      pircoLDULL:begin
+       Width:=pirctwUL;
+      end;
+      pircoLDSCL:begin
+       Width:=pirctwSC;
+      end;
+      pircoLDSSL:begin
+       Width:=pirctwSS;
+      end;
+      pircoLDSIL:begin
+       Width:=pirctwSI;
+      end;
+      pircoLDSLL:begin
+       Width:=pirctwSL;
+      end;
+      else begin
+       Width:=pirctwFULL;
+      end;
+     end;
+     if (Width in [pirctwSI,pirctwUI]) and (Instruction.Type_=pirctINT) then begin
+      Width:=pirctwFULL;
+     end;
+     Temporary.Width:=Width;
      inc(Temporary.CountDefinitions);
 //   writeln(Temporary.CountDefinitions,' ',Instruction.To_.Temporary,' ',TPACCPtrUInt(Temporary.Variable));
     end else begin
@@ -5806,6 +5902,7 @@ begin
  case Operand.Kind of
   pircokTEMPORARY:begin
    Alias.Assign(Temporaries[Operand.Temporary].Alias);
+   Alias.Kind:=Alias.Slot.Kind;
   end;
   pircokCONSTANT:begin
    Constant:=Constants[Operand.Constant];
@@ -5836,12 +5933,8 @@ procedure TPACCIntermediateRepresentationCodeFunction.AliasingAnalysis;
    end;
    pircokTEMPORARY:begin
     Alias:=Temporaries[Operand.Temporary].Alias;
-    if Alias.Kind<>pircakBOTTOM then begin
-     if Alias.Kind=pircakSTACKLOCAL then begin
-      Alias.Kind:=pircakSTACKESCAPE;
-     end;
-    end else begin
-     TPACCInstance(fInstance).AddError('Internal error 2017-01-28-23-02-0000',nil,true);
+    if Alias.Slot.Kind=pircakSTACKLOCAL then begin
+     Alias.Slot.Kind:=pircakSTACKESCAPE;
     end;
    end;
    pircokCONSTANT:begin
@@ -5873,6 +5966,7 @@ begin
      Alias.Kind:=pircakUNKNOWN;
      Alias.Base:=Phi.To_;
      Alias.Offset:=0;
+     Alias.Slot:=Alias;
     end else begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-28-22-22-0000',nil,true);
     end;
@@ -5896,6 +5990,7 @@ begin
       end;
       Alias.Base:=Instruction.To_;
       Alias.Offset:=0;
+      Alias.Slot:=Alias;
      end else begin
       TPACCInstance(fInstance).AddError('Internal error 2017-01-28-22-24-0000',@Instruction.SourceLocation,true);
      end;
@@ -5903,25 +5998,39 @@ begin
      TPACCInstance(fInstance).AddError('Internal error 2017-01-28-22-23-0000',@Instruction.SourceLocation,true);
     end;
    end;
-   if Instruction.Opcode=pircoADD then begin
-    Alias0:=TPACCIntermediateRepresentationCodeAlias.Create;
-    try
-     Alias1:=TPACCIntermediateRepresentationCodeAlias.Create;
+   case Instruction.Opcode of
+    pircoCOPY:begin
+     if assigned(Alias) then begin
+      Alias0:=TPACCIntermediateRepresentationCodeAlias.Create;
+      try   
+       GetAlias(Alias0,Instruction.Operands[0]);
+      finally
+       Alias0.Free;
+      end;
+     end else begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-02-26-02-36-0000',@Instruction.SourceLocation,true);
+     end;
+    end;
+    pircoADD:begin
+     Alias0:=TPACCIntermediateRepresentationCodeAlias.Create;
      try
-      GetAlias(Alias0,Instruction.Operands[0]);
-      GetAlias(Alias1,Instruction.Operands[1]);
-      if Alias0.Kind=pircakCONSTANT then begin
-       Alias.Assign(Alias1);
-       inc(Alias.Offset,Alias0.Offset);
-      end else if Alias1.Kind=pircakCONSTANT then begin
-       Alias.Assign(Alias0);
-       inc(Alias.Offset,Alias1.Offset);
+      Alias1:=TPACCIntermediateRepresentationCodeAlias.Create;
+      try
+       GetAlias(Alias0,Instruction.Operands[0]);
+       GetAlias(Alias1,Instruction.Operands[1]);
+       if Alias0.Kind=pircakCONSTANT then begin
+        Alias.Assign(Alias1);
+        inc(Alias.Offset,Alias0.Offset);
+       end else if Alias1.Kind=pircakCONSTANT then begin
+        Alias.Assign(Alias0);
+        inc(Alias.Offset,Alias1.Offset);
+       end;
+      finally
+       Alias1.Free;
       end;
      finally
-      Alias1.Free;
+      Alias0.Free;
      end;
-    finally
-     Alias0.Free;
     end;
    end;
    if (Instruction.To_.Kind=pircokNONE) or ((not assigned(Alias)) or (Alias.Kind=pircakUNKNOWN)) then begin
@@ -6001,9 +6110,12 @@ begin
 end;
 
 function TPACCIntermediateRepresentationCodeFunction.Escapes(const Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
+var Alias:TPACCIntermediateRepresentationCodeAlias;
 begin
  if Operand.Kind=pircokTEMPORARY then begin
-  result:=Temporaries[Operand.Temporary].Alias.Kind<>pircakSTACKLOCAL;
+  Alias:=Temporaries[Operand.Temporary].Alias;
+  result:=(not (Alias.Kind in [pircakSTACKLOCAL,pircakSTACKESCAPE])) or
+          (Alias.Slot.Kind=pircakSTACKESCAPE);
  end else begin
   result:=true;
  end;
@@ -6216,11 +6328,14 @@ var CountInserts,InsertNumber:TPACCInt32;
  var Opcode:TPACCIntermediateRepresentationCodeOpcode;
      All:boolean;
      CodeType:TPACCIntermediateRepresentationCodeType;
+     Operand:TPACCIntermediateRepresentationCodeOperand;
+     Alias:TPACCIntermediateRepresentationCodeAlias;
+     Constant,FromConstant:TPACCIntermediateRepresentationCodeConstant;
  begin
   if Slice.Size=TPACCInstance(fInstance).Target.SizeOfChar then begin
    Opcode:=pircoLDUCI;
   end else if Slice.Size=TPACCInstance(fInstance).Target.SizeOfShort then begin
-    Opcode:=pircoLDUSI;
+   Opcode:=pircoLDUSI;
   end else if Slice.Size=TPACCInstance(fInstance).Target.SizeOfInt then begin
    Opcode:=pircoLDUII;
   end else if Slice.Size=TPACCInstance(fInstance).Target.SizeOfLong then begin
@@ -6239,9 +6354,75 @@ var CountInserts,InsertNumber:TPACCInt32;
     CodeType:=pirctINT;
    end;
   end;
-  result:=InsertInstruction(CodeType,Opcode,[Slice.Operand],Location);
+  Operand:=Slice.Operand;
+  if Operand.Kind=pircokTEMPORARY then begin
+   Alias:=Temporaries[Operand.Temporary].Alias;
+   if assigned(Alias) then begin
+    case Alias.Kind of
+     pircakSTACKLOCAL,
+     pircakSTACKESCAPE,
+     pircakUNKNOWN:begin
+      Operand:=Alias.Base;
+      if Alias.Offset<>0 then begin
+       Operand:=InsertInstruction(CodeType,pircoADD,[Operand,CreateIntegerValueOperand(Alias.Offset)],Location);
+      end;
+     end;
+     pircakCONSTANT,   
+     pircakADDRESS:begin
+      FromConstant:=Constants[Operand.Constant];
+      if FromConstant.Kind=pircckADDRESS then begin
+       Constant:=TPACCIntermediateRepresentationCodeConstant.Create;
+       TPACCInstance(fInstance).AllocatedObjects.Add(Constant);
+       Constant.Index:=Constants.Add(Constant);
+       Constant.Assign(FromConstant);
+       Constant.Data.Kind:=pirccdkINTEGER;
+       inc(Constant.Data.IntegerValue,Alias.Offset);
+       Constant.Local:=false;
+       Operand.Kind:=pircokCONSTANT;
+       Operand.Constant:=Constant.Index;
+      end;
+     end;
+     else {pircakBOTTOM:}begin
+      TPACCInstance(fInstance).AddError('Internal error 2017-02-26-02-45-0001',nil,true);
+     end;
+    end;
+   end else begin
+    TPACCInstance(fInstance).AddError('Internal error 2017-02-26-02-45-0000',nil,true);
+   end;
+  end;
+  result:=InsertInstruction(CodeType,Opcode,[Operand],Location);
   if not All then begin
    DoMask(CodeType,result,Mask,Location);
+  end;
+ end;
+ function KillSlice(const Operand:TPACCIntermediateRepresentationCodeOperand;
+                    const Slice:TPACCIntermediateRepresentationCodeFunctionLoadEliminationSlice):boolean;
+ var Alias:TPACCIntermediateRepresentationCodeAlias;
+ begin
+  if Slice.Operand.Kind=pircokTEMPORARY then begin
+   Alias:=Temporaries[Slice.Operand.Temporary].Alias;
+   if assigned(Alias) then begin
+    case Alias.Kind of
+     pircakSTACKLOCAL,
+     pircakSTACKESCAPE,
+     pircakUNKNOWN:begin
+      result:=AreOperandsEqual(Alias.Base,Operand);
+     end;
+     pircakCONSTANT,
+     pircakADDRESS:begin
+      result:=false;
+     end;
+     else begin
+      result:=false;
+      TPACCInstance(fInstance).AddError('Internal error 2017-02-26-03-05-0000',nil,true);
+     end;
+    end;
+   end else begin
+    result:=false;
+    TPACCInstance(fInstance).AddError('Internal error 2017-02-26-03-04-0000',nil,true);
+   end;
+  end else begin
+   result:=false;
   end;
  end;
  function Def(const Slice:TPACCIntermediateRepresentationCodeFunctionLoadEliminationSlice;
@@ -6292,7 +6473,7 @@ var CountInserts,InsertNumber:TPACCInt32;
 
    for InstructionIndex:=StartInstructionIndex-1 downto 0 do begin
     Instruction:=Block.Instructions[InstructionIndex];
-    if AreOperandsEqual(Instruction.To_,Slice.Operand) or Escapes(Slice.Operand) then begin
+    if KillSlice(Instruction.To_,Slice) or Escapes(Slice.Operand) then begin
      result:=DoLoad;
      exit;
     end;
@@ -6388,7 +6569,7 @@ var CountInserts,InsertNumber:TPACCInt32;
 
    Phi:=Block.Phi;
    while assigned(Phi) do begin
-    if AreOperandsEqual(Phi.To_,Slice.Operand) then begin
+    if KillSlice(Phi.To_,Slice) then begin
      // scanning predecessors in that case would be unsafe
      result:=DoLoad;
      exit;
@@ -6666,11 +6847,82 @@ var Operands:TPACCIntermediateRepresentationCodeOperands;
   end;
   Update(Phi.To_,Operand0,ParentOperandListItem);
  end;
+ function IsCopy(const Instruction:TPACCIntermediateRepresentationCodeInstruction;const Operand:TPACCIntermediateRepresentationCodeOperand):boolean;
+ var Width:TPACCIntermediateRepresentationCodeTemporaryWidth;
+     CodeType:TPACCIntermediateRepresentationCodeType;
+     Temporary:TPACCIntermediateRepresentationCodeTemporary;
+ begin
+  case Instruction.Opcode of
+   pircoCOPY:begin
+    result:=true;
+   end;
+   pircoZEC,
+   pircoZES,
+   pircoZEI,
+   pircoSEC,
+   pircoSES,
+   pircoSEI:begin
+    if (Instruction.Opcode in [pircoZEI,pircoSEI]) and (Instruction.Type_=pirctINT) then begin
+     result:=true;
+    end else begin
+     case Operand.Kind of
+      pircokTEMPORARY:begin
+       Temporary:=Temporaries[Operand.Temporary];
+       Width:=Temporary.Width;
+       CodeType:=Temporary.Type_;
+       if not (CodeType in [pirctINT,pirctLONG]) then begin
+        TPACCInstance(fInstance).AddError('Internal error 2017-02-26-02-03-0000',@Instruction.SourceLocation,true);
+       end;
+      end;
+      pircokCONSTANT:begin
+       Width:=pirctwFULL;
+       CodeType:=pirctLONG;
+      end;
+      else begin
+       Width:=pirctwFULL;
+       CodeType:=pirctLONG;
+       TPACCInstance(fInstance).AddError('Internal error 2017-02-26-02-00-0000',@Instruction.SourceLocation,true);
+      end;
+     end;
+     if (Instruction.Type_=pirctLONG) and (CodeType=pirctINT) then begin
+      result:=false;
+     end else begin
+      case Width of
+       pirctwSC:begin
+        result:=Instruction.Opcode in [pircoSEC,pircoSES,pircoSEI];
+       end;
+       pirctwUC:begin
+        result:=Instruction.Opcode in [pircoZEC,pircoZES,pircoZEI];
+       end;
+       pirctwSS:begin
+        result:=Instruction.Opcode in [pircoSES,pircoSEI];
+       end;
+       pirctwUS:begin
+        result:=Instruction.Opcode in [pircoZES,pircoZEI];
+       end;
+       pirctwSI:begin
+        result:=Instruction.Opcode in [pircoSEI];
+       end;
+       pirctwUI:begin
+        result:=Instruction.Opcode in [pircoZEI];
+       end;
+       else {pirctwFULL,pirctwSL,pirctwUL:}begin
+        result:=false;
+       end;
+      end;
+     end;
+    end;
+   end;
+   else begin
+    result:=false;
+   end;
+  end;
+ end;
  procedure VisitInstruction(const Instruction:TPACCIntermediateRepresentationCodeInstruction;const ParentOperandListItem:PPPOperandListItem);
  var Operand:TPACCIntermediateRepresentationCodeOperand;
  begin
-  if Instruction.Opcode=pircoCOPY then begin
-   Operand:=CopyOf(Instruction.Operands[0]);
+  Operand:=CopyOf(Instruction.Operands[0]);
+  if IsCopy(Instruction,Operand) then begin
    Update(Instruction.To_,Operand,ParentOperandListItem);
   end else if Instruction.To_.Kind<>pircokNONE then begin
    if Instruction.To_.Kind=pircokTEMPORARY then begin
@@ -6937,6 +7189,7 @@ var Values:array of TPACCInt32;
      OutputValue:TPACCUInt64;
      OutputFloatValue:TPACCFloat;
      OutputDoubleValue:TPACCDouble;
+     Skip:boolean;
  begin
   if Instruction.To_.Kind=pircokTEMPORARY then begin
    case Instruction.Opcode of
@@ -7185,6 +7438,7 @@ var Values:array of TPACCInt32;
       end;
       case Instruction.Type_ of
        pirctINT,pirctLONG:begin
+        Skip:=false;
         case Instruction.Opcode of
          pircoADD:begin
           if ConstantLeft.Kind=pircckADDRESS then begin
@@ -7221,327 +7475,357 @@ var Values:array of TPACCInt32;
          else begin
           Address.Kind:=pircakNONE;
           if (ConstantLeft.Kind=pircckADDRESS) or (ConstantRight.Kind=pircckADDRESS) then begin
-           TPACCInstance(fInstance).AddError('Invalid address operand',@Instruction.SourceLocation,true);
+           case Instruction.Opcode of
+            pircoCMPSLEI,
+            pircoCMPSLTI,
+            pircoCMPSGEI,
+            pircoCMPSGTI,
+            pircoCMPULEI,
+            pircoCMPULTI,
+            pircoCMPUGEI,
+            pircoCMPUGTI,
+            pircoCMPEQI,
+            pircoCMPNEI,
+            pircoCMPSLEL,
+            pircoCMPSLTL,
+            pircoCMPSGEL,
+            pircoCMPSGTL,
+            pircoCMPULEL,
+            pircoCMPULTL,
+            pircoCMPUGEL,
+            pircoCMPUGTL,
+            pircoCMPEQL,
+            pircoCMPNEL:begin
+             Skip:=true;
+            end;
+            else begin
+             TPACCInstance(fInstance).AddError('Invalid address operand',@Instruction.SourceLocation,true);
+            end;
+           end;
           end;
          end;
         end;
-        case Instruction.Opcode of
-         pircoADD:begin
-          OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue)+TPACCUInt64(ConstantRight.Data.IntegerValue));
-         end;
-         pircoSUB:begin
-          OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue)-TPACCUInt64(ConstantRight.Data.IntegerValue));
-         end;
-         pircoSMUL:begin
-          OutputValue:=TPACCUInt64(TPACCInt64(TPACCInt64(ConstantLeft.Data.IntegerValue)*TPACCInt64(ConstantRight.Data.IntegerValue)));
-         end;
-         pircoSDIV:begin
-          OutputValue:=TPACCUInt64(TPACCInt64(TPACCInt64(ConstantLeft.Data.IntegerValue) div TPACCInt64(ConstantRight.Data.IntegerValue)));
-         end;
-         pircoSMOD:begin
-          OutputValue:=TPACCUInt64(TPACCInt64(TPACCInt64(ConstantLeft.Data.IntegerValue) mod TPACCInt64(ConstantRight.Data.IntegerValue)));
-         end;
-         pircoUMUL:begin
-          OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue)*TPACCUInt64(ConstantRight.Data.IntegerValue));
-         end;
-         pircoUDIV:begin
-          OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) div TPACCUInt64(ConstantRight.Data.IntegerValue));
-         end;
-         pircoUMOD:begin
-          OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) mod TPACCUInt64(ConstantRight.Data.IntegerValue));
-         end;
-         pircoAND:begin
-          OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) and TPACCUInt64(ConstantRight.Data.IntegerValue));
-         end;
-         pircoOR:begin
-          OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) or TPACCUInt64(ConstantRight.Data.IntegerValue));
-         end;
-         pircoXOR:begin
-          OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) xor TPACCUInt64(ConstantRight.Data.IntegerValue));
-         end;
-         pircoSHL:begin
-          OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) shl TPACCUInt64(ConstantRight.Data.IntegerValue));
-         end;
-         pircoSHR:begin
-          OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) shr TPACCUInt64(ConstantRight.Data.IntegerValue));
-         end;
-         pircoSAR:begin
-          OutputValue:=SARcint64(TPACCInt64(ConstantLeft.Data.IntegerValue),TPACCInt64(ConstantRight.Data.IntegerValue));
-         end;
-         pircoCMPSLEI:begin
-          if TPACCInt32(ConstantLeft.Data.IntegerValue)<=TPACCInt32(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPSLTI:begin
-          if TPACCInt32(ConstantLeft.Data.IntegerValue)<TPACCInt32(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPSGEI:begin
-          if TPACCInt32(ConstantLeft.Data.IntegerValue)>=TPACCInt32(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPSGTI:begin
-          if TPACCInt32(ConstantLeft.Data.IntegerValue)>TPACCInt32(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPULEI:begin
-          if TPACCUInt32(ConstantLeft.Data.IntegerValue)<=TPACCUInt32(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPULTI:begin
-          if TPACCUInt32(ConstantLeft.Data.IntegerValue)<TPACCUInt32(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPUGEI:begin
-          if TPACCUInt32(ConstantLeft.Data.IntegerValue)>=TPACCUInt32(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPUGTI:begin
-          if TPACCUInt32(ConstantLeft.Data.IntegerValue)>TPACCUInt32(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPEQI:begin
-          if TPACCUInt32(ConstantLeft.Data.IntegerValue)=TPACCUInt32(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPNEI:begin
-          if TPACCUInt32(ConstantLeft.Data.IntegerValue)<>TPACCUInt32(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPSLEL:begin
-          if TPACCInt64(ConstantLeft.Data.IntegerValue)<=TPACCInt64(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPSLTL:begin
-          if TPACCInt64(ConstantLeft.Data.IntegerValue)<TPACCInt64(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPSGEL:begin
-          if TPACCInt64(ConstantLeft.Data.IntegerValue)>=TPACCInt64(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPSGTL:begin
-          if TPACCInt64(ConstantLeft.Data.IntegerValue)>TPACCInt64(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPULEL:begin
-          if TPACCUInt64(ConstantLeft.Data.IntegerValue)<=TPACCUInt64(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPULTL:begin
-          if TPACCUInt64(ConstantLeft.Data.IntegerValue)<TPACCUInt64(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPUGEL:begin
-          if TPACCUInt64(ConstantLeft.Data.IntegerValue)>=TPACCUInt64(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPUGTL:begin
-          if TPACCUInt64(ConstantLeft.Data.IntegerValue)>TPACCUInt64(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPEQL:begin
-          if TPACCUInt64(ConstantLeft.Data.IntegerValue)=TPACCUInt64(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPNEL:begin
-          if TPACCUInt64(ConstantLeft.Data.IntegerValue)<>TPACCUInt64(ConstantRight.Data.IntegerValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPLEF:begin
-          if ConstantLeft.Data.FloatValue<=ConstantRight.Data.FloatValue then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPLTF:begin
-          if ConstantLeft.Data.FloatValue<ConstantRight.Data.FloatValue then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPGEF:begin
-          if ConstantLeft.Data.FloatValue>=ConstantRight.Data.FloatValue then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPGTF:begin
-          if ConstantLeft.Data.FloatValue>ConstantRight.Data.FloatValue then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPEQF:begin
-          if ConstantLeft.Data.FloatValue=ConstantRight.Data.FloatValue then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPNEF:begin
-          if ConstantLeft.Data.FloatValue<>ConstantRight.Data.FloatValue then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPOF:begin
-          if (ConstantLeft.Data.FloatValue<ConstantRight.Data.FloatValue) or
-             (ConstantLeft.Data.FloatValue>=ConstantRight.Data.FloatValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPNOF:begin
-          if (ConstantLeft.Data.FloatValue<ConstantRight.Data.FloatValue) or
-             (ConstantLeft.Data.FloatValue>=ConstantRight.Data.FloatValue) then begin
-           OutputValue:=0;
-          end else begin
-           OutputValue:=1;
-          end;
-         end;
-         pircoCMPLED:begin
-          if ConstantLeft.Data.DoubleValue<=ConstantRight.Data.DoubleValue then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPLTD:begin
-          if ConstantLeft.Data.DoubleValue<ConstantRight.Data.DoubleValue then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPGED:begin
-          if ConstantLeft.Data.DoubleValue>=ConstantRight.Data.DoubleValue then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPGTD:begin
-          if ConstantLeft.Data.DoubleValue>ConstantRight.Data.DoubleValue then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPEQD:begin
-          if ConstantLeft.Data.DoubleValue=ConstantRight.Data.DoubleValue then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPNED:begin
-          if ConstantLeft.Data.DoubleValue<>ConstantRight.Data.DoubleValue then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPOD:begin
-          if (ConstantLeft.Data.DoubleValue<ConstantRight.Data.DoubleValue) or
-             (ConstantLeft.Data.DoubleValue>=ConstantRight.Data.DoubleValue) then begin
-           OutputValue:=1;
-          end else begin
-           OutputValue:=0;
-          end;
-         end;
-         pircoCMPNOD:begin
-          if (ConstantLeft.Data.DoubleValue<ConstantRight.Data.DoubleValue) or
-             (ConstantLeft.Data.DoubleValue>=ConstantRight.Data.DoubleValue) then begin
-           OutputValue:=0;
-          end else begin
-           OutputValue:=1;
-          end;
-         end;
-         else begin
-          OutputValue:=0;
-         end;
-        end;
-        if Address.Kind=pircakNONE then begin
-         Value:=CreateIntegerValueOperand(OutputValue).Constant;
-         Constant:=Constants[Value];
+        if Skip then begin
+         Value:=Bottom;
         end else begin
-         Constant:=TPACCIntermediateRepresentationCodeConstant.Create;
-         TPACCInstance(fInstance).AllocatedObjects.Add(Constant);
-         Constant.Index:=Constants.Add(Constant);
-         Constant.Kind:=pircckADDRESS;
-         Constant.Address:=Address;
-         Constant.Data.Kind:=pirccdkINTEGER;
-         Constant.Data.IntegerValue:=OutputValue;
-         Value:=Constants.Add(Constant);
-         Constant.Local:=false;
-         Value:=Constant.Index;
+         case Instruction.Opcode of
+          pircoADD:begin
+           OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue)+TPACCUInt64(ConstantRight.Data.IntegerValue));
+          end;
+          pircoSUB:begin
+           OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue)-TPACCUInt64(ConstantRight.Data.IntegerValue));
+          end;
+          pircoSMUL:begin
+           OutputValue:=TPACCUInt64(TPACCInt64(TPACCInt64(ConstantLeft.Data.IntegerValue)*TPACCInt64(ConstantRight.Data.IntegerValue)));
+          end;
+          pircoSDIV:begin
+           OutputValue:=TPACCUInt64(TPACCInt64(TPACCInt64(ConstantLeft.Data.IntegerValue) div TPACCInt64(ConstantRight.Data.IntegerValue)));
+          end;
+          pircoSMOD:begin
+           OutputValue:=TPACCUInt64(TPACCInt64(TPACCInt64(ConstantLeft.Data.IntegerValue) mod TPACCInt64(ConstantRight.Data.IntegerValue)));
+          end;
+          pircoUMUL:begin
+           OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue)*TPACCUInt64(ConstantRight.Data.IntegerValue));
+          end;
+          pircoUDIV:begin
+           OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) div TPACCUInt64(ConstantRight.Data.IntegerValue));
+          end;
+          pircoUMOD:begin
+           OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) mod TPACCUInt64(ConstantRight.Data.IntegerValue));
+          end;
+          pircoAND:begin
+           OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) and TPACCUInt64(ConstantRight.Data.IntegerValue));
+          end;
+          pircoOR:begin
+           OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) or TPACCUInt64(ConstantRight.Data.IntegerValue));
+          end;
+          pircoXOR:begin
+           OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) xor TPACCUInt64(ConstantRight.Data.IntegerValue));
+          end;
+          pircoSHL:begin
+           OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) shl TPACCUInt64(ConstantRight.Data.IntegerValue));
+          end;
+          pircoSHR:begin
+           OutputValue:=TPACCUInt64(TPACCUInt64(ConstantLeft.Data.IntegerValue) shr TPACCUInt64(ConstantRight.Data.IntegerValue));
+          end;
+          pircoSAR:begin
+           OutputValue:=SARcint64(TPACCInt64(ConstantLeft.Data.IntegerValue),TPACCInt64(ConstantRight.Data.IntegerValue));
+          end;
+          pircoCMPSLEI:begin
+           if TPACCInt32(ConstantLeft.Data.IntegerValue)<=TPACCInt32(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPSLTI:begin
+           if TPACCInt32(ConstantLeft.Data.IntegerValue)<TPACCInt32(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPSGEI:begin
+           if TPACCInt32(ConstantLeft.Data.IntegerValue)>=TPACCInt32(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPSGTI:begin
+           if TPACCInt32(ConstantLeft.Data.IntegerValue)>TPACCInt32(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPULEI:begin
+           if TPACCUInt32(ConstantLeft.Data.IntegerValue)<=TPACCUInt32(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPULTI:begin
+           if TPACCUInt32(ConstantLeft.Data.IntegerValue)<TPACCUInt32(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPUGEI:begin
+           if TPACCUInt32(ConstantLeft.Data.IntegerValue)>=TPACCUInt32(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPUGTI:begin
+           if TPACCUInt32(ConstantLeft.Data.IntegerValue)>TPACCUInt32(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPEQI:begin
+           if TPACCUInt32(ConstantLeft.Data.IntegerValue)=TPACCUInt32(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPNEI:begin
+           if TPACCUInt32(ConstantLeft.Data.IntegerValue)<>TPACCUInt32(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPSLEL:begin
+           if TPACCInt64(ConstantLeft.Data.IntegerValue)<=TPACCInt64(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPSLTL:begin
+           if TPACCInt64(ConstantLeft.Data.IntegerValue)<TPACCInt64(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPSGEL:begin
+           if TPACCInt64(ConstantLeft.Data.IntegerValue)>=TPACCInt64(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPSGTL:begin
+           if TPACCInt64(ConstantLeft.Data.IntegerValue)>TPACCInt64(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPULEL:begin
+           if TPACCUInt64(ConstantLeft.Data.IntegerValue)<=TPACCUInt64(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPULTL:begin
+           if TPACCUInt64(ConstantLeft.Data.IntegerValue)<TPACCUInt64(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPUGEL:begin
+           if TPACCUInt64(ConstantLeft.Data.IntegerValue)>=TPACCUInt64(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPUGTL:begin
+           if TPACCUInt64(ConstantLeft.Data.IntegerValue)>TPACCUInt64(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPEQL:begin
+           if TPACCUInt64(ConstantLeft.Data.IntegerValue)=TPACCUInt64(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPNEL:begin
+           if TPACCUInt64(ConstantLeft.Data.IntegerValue)<>TPACCUInt64(ConstantRight.Data.IntegerValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPLEF:begin
+           if ConstantLeft.Data.FloatValue<=ConstantRight.Data.FloatValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPLTF:begin
+           if ConstantLeft.Data.FloatValue<ConstantRight.Data.FloatValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPGEF:begin
+           if ConstantLeft.Data.FloatValue>=ConstantRight.Data.FloatValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPGTF:begin
+           if ConstantLeft.Data.FloatValue>ConstantRight.Data.FloatValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPEQF:begin
+           if ConstantLeft.Data.FloatValue=ConstantRight.Data.FloatValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPNEF:begin
+           if ConstantLeft.Data.FloatValue<>ConstantRight.Data.FloatValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPOF:begin
+           if (ConstantLeft.Data.FloatValue<ConstantRight.Data.FloatValue) or
+              (ConstantLeft.Data.FloatValue>=ConstantRight.Data.FloatValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPNOF:begin
+           if (ConstantLeft.Data.FloatValue<ConstantRight.Data.FloatValue) or
+              (ConstantLeft.Data.FloatValue>=ConstantRight.Data.FloatValue) then begin
+            OutputValue:=0;
+           end else begin
+            OutputValue:=1;
+           end;
+          end;
+          pircoCMPLED:begin
+           if ConstantLeft.Data.DoubleValue<=ConstantRight.Data.DoubleValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPLTD:begin
+           if ConstantLeft.Data.DoubleValue<ConstantRight.Data.DoubleValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPGED:begin
+           if ConstantLeft.Data.DoubleValue>=ConstantRight.Data.DoubleValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPGTD:begin
+           if ConstantLeft.Data.DoubleValue>ConstantRight.Data.DoubleValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPEQD:begin
+           if ConstantLeft.Data.DoubleValue=ConstantRight.Data.DoubleValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPNED:begin
+           if ConstantLeft.Data.DoubleValue<>ConstantRight.Data.DoubleValue then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPOD:begin
+           if (ConstantLeft.Data.DoubleValue<ConstantRight.Data.DoubleValue) or
+              (ConstantLeft.Data.DoubleValue>=ConstantRight.Data.DoubleValue) then begin
+            OutputValue:=1;
+           end else begin
+            OutputValue:=0;
+           end;
+          end;
+          pircoCMPNOD:begin
+           if (ConstantLeft.Data.DoubleValue<ConstantRight.Data.DoubleValue) or
+              (ConstantLeft.Data.DoubleValue>=ConstantRight.Data.DoubleValue) then begin
+            OutputValue:=0;
+           end else begin
+            OutputValue:=1;
+           end;
+          end;
+          else begin
+           OutputValue:=0;
+          end;
+         end;
+         if Address.Kind=pircakNONE then begin
+          Value:=CreateIntegerValueOperand(OutputValue).Constant;
+          Constant:=Constants[Value];
+         end else begin
+          Constant:=TPACCIntermediateRepresentationCodeConstant.Create;
+          TPACCInstance(fInstance).AllocatedObjects.Add(Constant);
+          Constant.Index:=Constants.Add(Constant);
+          Constant.Kind:=pircckADDRESS;
+          Constant.Address:=Address;
+          Constant.Data.Kind:=pirccdkINTEGER;
+          Constant.Data.IntegerValue:=OutputValue;
+          Value:=Constants.Add(Constant);
+          Constant.Local:=false;
+          Value:=Constant.Index;
+         end;
         end;
        end;
        pirctFLOAT:begin
