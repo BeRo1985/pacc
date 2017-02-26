@@ -9317,15 +9317,9 @@ begin
    end;
   end;
  end;
- if assigned(fVariable) then begin
-  if CountDataItems=0 then begin
-   fSize:=fVariable.Type_^.Size;
-  end else begin
-   if fSize<fVariable.Type_^.Size then begin
-    EmitUI8(0,nil,Variable.Type_^.Size-fSize);
-    fSize:=Variable.Type_^.Size;
-   end;
-  end;
+ if assigned(fVariable) and (fSize<fVariable.Type_^.Size) then begin
+  EmitUI8(0,nil,Variable.Type_^.Size-fSize);
+  fSize:=Variable.Type_^.Size;
  end;
  SetLength(DataItems,CountDataItems);
 end;
