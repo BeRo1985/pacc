@@ -333,31 +333,63 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
       if assigned(DataItem.ValueOffsetBase) then begin
        case DataItem.Kind of
         pircdikUI8:begin
-         if DataItem.Count=1 then begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('db '+IntToStr(DataItem.ValueUI8)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase));
+         if DataItem.ValueUI8=0 then begin
+          if DataItem.Count=1 then begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('db offset '+GetNodeLabelName(DataItem.ValueOffsetBase));
+          end else begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('db '+IntToStr(DataItem.Count)+' dup(offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+')');
+          end;
          end else begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('db '+IntToStr(DataItem.Count)+' dup('+IntToStr(DataItem.ValueUI8)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+')');
+          if DataItem.Count=1 then begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('db offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+' + '+IntToStr(DataItem.ValueUI8));
+          end else begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('db '+IntToStr(DataItem.Count)+' dup(offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+' + '+IntToStr(DataItem.ValueUI8)+')');
+          end;
          end;
         end;
         pircdikUI16:begin
-         if DataItem.Count=1 then begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('dw '+IntToStr(DataItem.ValueUI16)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase));
+         if DataItem.ValueUI16=0 then begin
+          if DataItem.Count=1 then begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('dw offset '+GetNodeLabelName(DataItem.ValueOffsetBase));
+          end else begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('dw '+IntToStr(DataItem.Count)+' dup(offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+')');
+          end;
          end else begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('dw '+IntToStr(DataItem.Count)+' dup('+IntToStr(DataItem.ValueUI16)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+')');
+          if DataItem.Count=1 then begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('dw offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+' + '+IntToStr(DataItem.ValueUI16));
+          end else begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('dw '+IntToStr(DataItem.Count)+' dup(offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+' + '+IntToStr(DataItem.ValueUI16)+')');
+          end;
          end;
         end;
         pircdikUI32:begin
-         if DataItem.Count=1 then begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('dd '+IntToStr(DataItem.ValueUI32)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase));
+         if DataItem.ValueUI32=0 then begin
+          if DataItem.Count=1 then begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(DataItem.ValueOffsetBase));
+          end else begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('dd '+IntToStr(DataItem.Count)+' dup(offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+')');
+          end;
          end else begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('dd '+IntToStr(DataItem.Count)+' dup('+IntToStr(DataItem.ValueUI32)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+')');
+          if DataItem.Count=1 then begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+' + '+IntToStr(DataItem.ValueUI32));
+          end else begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('dd '+IntToStr(DataItem.Count)+' dup(offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+' + '+IntToStr(DataItem.ValueUI32)+')');
+          end;
          end;
         end;
         pircdikUI64:begin
-         if DataItem.Count=1 then begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('dq '+IntToStr(DataItem.ValueUI64)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase));
+         if DataItem.ValueUI64=0 then begin
+          if DataItem.Count=1 then begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('dq offset '+GetNodeLabelName(DataItem.ValueOffsetBase));
+          end else begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('dq '+IntToStr(DataItem.Count)+' dup(offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+')');
+          end;
          end else begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('dq '+IntToStr(DataItem.Count)+' dup('+IntToStr(DataItem.ValueUI64)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+')');
+          if DataItem.Count=1 then begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('dq offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+' + '+IntToStr(DataItem.ValueUI64));
+          end else begin
+           GetCodeLevel(0)^.DataSectionStringList.Add('dq '+IntToStr(DataItem.Count)+' dup(offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+' + '+IntToStr(DataItem.ValueUI64)+')');
+          end;
          end;
         end;
         else begin
