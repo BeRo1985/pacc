@@ -317,15 +317,30 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
      Declaration:TPACCIntermediateRepresentationCodeDeclaration;
      DataItem:TPACCIntermediateRepresentationCodeDeclarationDataItem;
      Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+     NeedData:boolean;
  begin
   for Index:=0 to TPACCInstance(Instance).IntermediateRepresentationCode.Declarations.Count-1 do begin
    Declaration:=TPACCInstance(Instance).IntermediateRepresentationCode.Declarations[Index];
    if assigned(Declaration.Variable) then begin
     Variable:=Declaration.Variable;
+    NeedData:=false;
     if Variable.Kind=astnkGVAR then begin
+     for DataItemIndex:=0 to Declaration.CountDataItems-1 do begin
+      DataItem:=Declaration.DataItems[DataItemIndex];
+      if assigned(DataItem.ValueOffsetBase) or
+         ((DataItem.Kind=pircdikUI8) and (DataItem.ValueUI8<>0)) or
+         ((DataItem.Kind=pircdikUI16) and (DataItem.ValueUI16<>0)) or
+         ((DataItem.Kind=pircdikUI32) and (DataItem.ValueUI32<>0)) or
+         ((DataItem.Kind=pircdikUI64) and (DataItem.ValueUI64<>0)) then begin
+       NeedData:=true;
+       break;
+      end;
+     end;
+    end;
+    if NeedData then begin
      GetCodeLevel(0)^.DataSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
      GetCodeLevel(0)^.DataSectionStringList.Add(GetNodeLabelName(Variable)+':');
-     if not ((tfStatic in Variable.Type_^.Flags) or assigned(CurrentFunction)) then begin
+     if (Variable.Kind=astnkGVAR) and not ((tfStatic in Variable.Type_^.Flags) or assigned(CurrentFunction)) then begin
       GetCodeLevel(0)^.DataSectionStringList.Add('.public('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
      end;
      for DataItemIndex:=0 to Declaration.CountDataItems-1 do begin
@@ -436,7 +451,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
     end else begin
      GetCodeLevel(0)^.BSSSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
      GetCodeLevel(0)^.BSSSectionStringList.Add(GetNodeLabelName(Variable)+':');
-     if not ((tfStatic in Variable.Type_^.Flags) or assigned(CurrentFunction)) then begin
+     if (Variable.Kind=astnkGVAR) and not ((tfStatic in Variable.Type_^.Flags) or assigned(CurrentFunction)) then begin
       GetCodeLevel(0)^.BSSSectionStringList.Add('.public('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
      end;
      GetCodeLevel(0)^.BSSSectionStringList.Add('resb '+IntToStr(Declaration.Size));
