@@ -844,7 +844,7 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        procedure EmitUI64(const Value:TPACCUInt64;const ValueOffsetBase:TPACCAbstractSyntaxTreeNode;const Count:TPACCInt32);
        procedure EmitStringData(const Node:TPACCAbstractSyntaxTreeNodeStringValue);
        procedure EmitPrimitiveTypeData(const Type_:PPACCType;const Node:TPACCAbstractSyntaxTreeNode);
-       procedure EmitInitializerList(const Nodes:TPACCAbstractSyntaxTreeNodeList;Size,Offset:TPACCInt64);
+       procedure EmitInitializerList(const Nodes:TPACCAbstractSyntaxTreeNodeList;SubSize,Offset:TPACCInt64);
        procedure Finish;
 
       public
@@ -9172,7 +9172,7 @@ begin
  end;
 end;
 
-procedure TPACCIntermediateRepresentationCodeDeclaration.EmitInitializerList(const Nodes:TPACCAbstractSyntaxTreeNodeList;Size,Offset:TPACCInt64);
+procedure TPACCIntermediateRepresentationCodeDeclaration.EmitInitializerList(const Nodes:TPACCAbstractSyntaxTreeNodeList;SubSize,Offset:TPACCInt64);
 var Index:TPACCInt32;
     Node:TPACCAbstractSyntaxTreeNodeInitializer;
     Value:TPACCAbstractSyntaxTreeNode;
@@ -9225,7 +9225,7 @@ begin
      end;
     end;
     inc(Offset,ToType^.Size);
-    dec(Size,ToType^.Size);
+    dec(SubSize,ToType^.Size);
     if Index=Nodes.Count then begin
      break;
     end;
@@ -9234,7 +9234,7 @@ begin
    end;
   end else begin
    inc(Offset,Node.ToType^.Size);
-   dec(Size,Node.ToType^.Size);
+   dec(SubSize,Node.ToType^.Size);
   end;
   if Value.Kind=astnkADDR then begin
    case TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand.Kind of
@@ -9280,8 +9280,8 @@ begin
   end;
   inc(Index);
  end;
- if Size>0 then begin
-  EmitUI8(0,nil,Size);
+ if SubSize>0 then begin
+  EmitUI8(0,nil,SubSize);
  end;
 end;
 
@@ -9296,7 +9296,37 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeDeclaration.Finish;
+var Index:TPACCInt32;
+    DataItem:PPACCIntermediateRepresentationCodeDeclarationDataItem;
 begin
+ fSize:=0;
+ for Index:=0 to CountDataItems-1 do begin
+  DataItem:=@DataItems[Index];
+  case DataItem^.Kind of
+   pircdikUI8:begin
+    inc(fSize,DataItem^.Count*SizeOf(TPACCUInt8));
+   end;
+   pircdikUI16:begin
+    inc(fSize,DataItem^.Count*SizeOf(TPACCUInt16));
+   end;
+   pircdikUI32:begin
+    inc(fSize,DataItem^.Count*SizeOf(TPACCUInt32));
+   end;
+   pircdikUI64:begin
+    inc(fSize,DataItem^.Count*SizeOf(TPACCUInt64));
+   end;
+  end;
+ end;
+ if assigned(fVariable) then begin
+  if CountDataItems=0 then begin
+   fSize:=fVariable.Type_^.Size;
+  end else begin
+   if fSize<fVariable.Type_^.Size then begin
+    EmitUI8(0,nil,Variable.Type_^.Size-fSize);
+    fSize:=Variable.Type_^.Size;
+   end;
+  end;
+ end;
  SetLength(DataItems,CountDataItems);
 end;
 
