@@ -58,7 +58,7 @@ type TPACCTarget_x86_32=class(TPACCTarget)
 
 implementation
 
-uses PACCInstance,PACCPreprocessor,SASMCore,PACCLinker_COFF_PE,PACCLinker_ELF_ELF;
+uses PACCInstance,PACCPreprocessor,SASMCore,PACCLinker_COFF_PE,PACCLinker_ELF_ELF,PACCIntermediateRepresentationCode;
 
 constructor TPACCTarget_x86_32.Create(const AInstance:TObject);
 begin
@@ -200,191 +200,6 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
    result:=result+'_'+TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).VariableName;
   end;
  end;
- procedure EmitPrimitiveTypeData(const Type_:PPACCType;const Node:TPACCAbstractSyntaxTreeNode;const Depth:TPACCInt32);
- var f:TPACCFloat;
-     d:TPACCDouble;
-     i32:TPACCInt32;
-     i64:TPACCInt64;
-     BaseNode:TPACCAbstractSyntaxTreeNode;
-     BaseType:PPACCType;
- begin
-  case Type_^.Kind of
-   tkFLOAT:begin
-    f:=TPACCInstance(Instance).EvaluateFloatExpression(Node,tkFLOAT);
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('dd 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCUInt32(pointer(@f)^),8))));
-   end;
-   tkDOUBLE:begin
-    d:=TPACCInstance(Instance).EvaluateFloatExpression(Node,tkDOUBLE);
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('dq 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCUInt64(pointer(@d)^),16))));
-   end;
-   tkBOOL:begin
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('db 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),2))));
-   end;
-   tkCHAR:begin
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('db 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),2))));
-   end;
-   tkSHORT:begin
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('dw 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),4))));
-   end;
-   tkINT:begin
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('dd 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),8))));
-   end;
-   tkLONG,tkLLONG:begin
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('dq 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCInstance(Instance).EvaluateIntegerExpression(Node,nil),16))));
-   end;
-   tkPOINTER:begin
-    if Node.Kind=astnkOP_LABEL_ADDR then begin
-     GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLabel(TPACCAbstractSyntaxTreeNodeGOTOStatementOrLabelAddress(Node).Label_)));
-    end else if (Node is TPACCAbstractSyntaxTreeNodeUnaryOperator) and
-                (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Kind=astnkSTRING) and
-                (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.Kind=tkARRAY) and
-                (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.ChildType^.Kind=tkCHAR) then begin
-     GetCodeLevel(Depth+1)^.DataSectionStringList.Add('');
-     GetCodeLevel(Depth+1)^.DataSectionStringList.Add('.align('+IntToStr(Max(4,TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.ChildType^.Alignment))+')');
-     GetCodeLevel(Depth+1)^.DataSectionStringList.Add(GetNodeLabelName(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand)+':');
-     for i32:=1 to length(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Value) do begin
-      GetCodeLevel(Depth+1)^.DataSectionStringList.Add('db 0x'+TPACCRawByteString(LowerCase(IntToHex(TPACCUInt8(AnsiChar(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand).Value[i32])),2))));
-     end;
-     case TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.ChildType^.Size of
-      2:begin
-       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('dw 0x0000');
-      end;
-      4:begin
-       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('dd 0x00000000');
-      end;
-      8:begin
-       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('dq 0x0000000000000000');
-      end;
-      else begin
-       GetCodeLevel(Depth+1)^.DataSectionStringList.Add('db 0x00');
-      end;
-     end;
-     GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand));
-    end else if Node.Kind=astnkGVAR then begin
-     GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node)));
-    end else begin
-     BaseNode:=nil;
-     i64:=TPACCInstance(Instance).EvaluateIntegerExpression(Node,@BaseNode);
-     if assigned(BaseNode) then begin
-      BaseType:=BaseNode.Type_;
-      if BaseNode.Kind in [astnkCONV,astnkADDR] then begin
-       BaseNode:=TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand;
-      end;
-      if BaseNode.Kind=astnkGVAR then begin
-       Assert(assigned(BaseType.ChildType));
-       GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node))+' + '+IntToStr(i64*BaseType.ChildType^.Size));
-      end else begin
-       TPACCInstance(Instance).AddError('Global variable expected',@BaseNode.SourceLocation,true);
-      end;
-     end else begin
-      GetCodeLevel(Depth)^.DataSectionStringList.Add('dd '+IntToStr(TPACCUInt32(i64) and $ffffffff));
-     end;
-    end;
-   end;
-   else begin
-    TPACCInstance(Instance).AddError('Internal error 2017-01-17-10-45-0000',@Node.SourceLocation,true);
-   end;
-  end;
- end;
- procedure EmitInitializerList(const Nodes:TPACCAbstractSyntaxTreeNodeList;Size,Offset:TPACCInt64;const Depth:TPACCInt32);
- var Index:TPACCInt32;
-     Node:TPACCAbstractSyntaxTreeNodeInitializer;
-     Value:TPACCAbstractSyntaxTreeNode;
-     Delta,Data:TPACCInt64;
-     ToType:PPACCType;
- begin
-  Index:=0;
-  while Index<Nodes.Count do begin
-   Node:=TPACCAbstractSyntaxTreeNodeInitializer(Nodes[Index]);
-   Value:=Node.InitializionValue;
-   Delta:=Node.InitializionOffset-Offset;
-   if Delta>0 then begin
-    GetCodeLevel(Depth)^.DataSectionStringList.Add('db '+IntToStr(Delta)+' dup(0)');
-   end;
-   if Node.ToType^.BitSize>0 then begin
-    if Node.ToType^.BitOffset=0 then begin
-     Data:=TPACCInstance(Instance).EvaluateIntegerExpression(Value,nil);
-     ToType:=Node.ToType;
-     inc(Index);
-     while Index<Nodes.Count do begin
-      Node:=TPACCAbstractSyntaxTreeNodeInitializer(Nodes[Index]);
-      if Node.Type_.BitSize<=0 then begin
-       break;
-      end else begin
-       Value:=Node.InitializionValue;
-       ToType:=Node.ToType;
-       Data:=Data or ((TPACCInstance(Instance).EvaluateIntegerExpression(Value,nil) and ((TPACCInt64(1) shl ToType^.BitSize)-1)) shl ToType^.BitOffset);
-       inc(Index);
-      end;
-     end;
-     case ToType^.Kind of
-      tkBOOL:begin
-       GetCodeLevel(Depth)^.DataSectionStringList.Add('db '+IntToStr(Data));
-      end;
-      tkCHAR:begin
-       GetCodeLevel(Depth)^.DataSectionStringList.Add('db '+IntToStr(Data));
-      end;
-      tkSHORT:begin
-       GetCodeLevel(Depth)^.DataSectionStringList.Add('dw '+IntToStr(Data));
-      end;
-      tkINT:begin
-       GetCodeLevel(Depth)^.DataSectionStringList.Add('dd '+IntToStr(Data));
-      end;
-      tkLONG,tkLLONG:begin
-       GetCodeLevel(Depth)^.DataSectionStringList.Add('dq '+IntToStr(Data));
-      end;
-      else begin
-       TPACCInstance(Instance).AddError('Internal error 2017-01-17-11-27-0000',@Node.SourceLocation,true);
-      end;
-     end;
-     inc(Offset,ToType^.Size);
-     dec(Size,ToType^.Size);
-     if Index=Nodes.Count then begin
-      break;
-     end;
-    end else begin
-     TPACCInstance(Instance).AddError('Internal error 2017-01-17-11-21-0000',@Node.SourceLocation,true);
-    end;
-   end else begin
-    inc(Offset,Node.ToType^.Size);
-    dec(Size,Node.ToType^.Size);
-   end;
-   if Value.Kind=astnkADDR then begin
-    case TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand.Kind of
-     astnkLVAR:begin
-      GetCodeLevel(Depth+1)^.DataSectionStringList.Add('');
-      GetCodeLevel(Depth+1)^.DataSectionStringList.Add('.align('+IntToStr(Max(4,TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).Type_.Alignment))+')');
-      GetCodeLevel(Depth+1)^.DataSectionStringList.Add(GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand))+':');
-      EmitInitializerList(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).LocalVariableInitialization,
-                          TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).Type_.Size,
-                           0,
-                           Depth+1);
-      GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand)));
-     end;
-     astnkGVAR:begin
-      GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand)));
-     end;
-     astnkFUNCDESG:begin
-      GetCodeLevel(Depth)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(TPACCAbstractSyntaxTreeNodeUnaryOperator(Value).Operand).Variable));
-     end;
-     else begin
-      TPACCInstance(Instance).AddError('Internal error 2017-01-17-11-06-0000',@Node.SourceLocation,true);
-     end;
-    end;
-   end else if (Value.Kind=astnkLVAR) and assigned(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Value).LocalVariableInitialization) then begin
-    EmitInitializerList(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Value).LocalVariableInitialization,
-                        TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Value).Type_.Size,
-                        0,
-                        Depth);
-   end else begin
-    EmitPrimitiveTypeData(Node.ToType,Node.InitializionValue,Depth);
-   end;
-   inc(Index);
-  end;
-  if Size>0 then begin
-   GetCodeLevel(Depth)^.DataSectionStringList.Add('db '+IntToStr(Size)+' dup(0)');
-  end;
- end;
  procedure EmitExternalDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
  const Depth=0;
  var Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
@@ -398,41 +213,6 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
    end;
   end else begin
    TPACCInstance(Instance).AddError('Internal error 2017-01-18-04-39-0000',@Node.SourceLocation,true);
-  end;
- end;
- procedure EmitDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
- const Depth=0;
- var Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
- begin
-  if assigned(Node.DeclarationVariable) then begin
-   if Node.DeclarationVariable.Kind=astnkGVAR then begin
-    Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable);
-    if assigned(Node.DeclarationInitialization) then begin
-     GetCodeLevel(Depth)^.DataSectionStringList.Add('');
-     GetCodeLevel(Depth)^.DataSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
-     if not ((tfStatic in Variable.Type_^.Flags) or assigned(CurrentFunction)) then begin
-      GetCodeLevel(Depth)^.DataSectionStringList.Add('.public('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
-     end;
-     GetCodeLevel(Depth)^.DataSectionStringList.Add(GetNodeLabelName(Variable)+':');
-     EmitInitializerList(Node.DeclarationInitialization,0,0,0);
-    end else begin
-     GetCodeLevel(Depth)^.BSSSectionStringList.Add('');
-     GetCodeLevel(Depth)^.BSSSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
-     if not ((tfStatic in Variable.Type_^.Flags) or assigned(CurrentFunction)) then begin
-      GetCodeLevel(Depth)^.BSSSectionStringList.Add('.public('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
-     end;
-     GetCodeLevel(Depth)^.BSSSectionStringList.Add(GetNodeLabelName(Variable)+':');
-     GetCodeLevel(Depth)^.BSSSectionStringList.Add('resb '+IntToStr(Variable.Type_^.Size));
-    end;
-   end else begin
-    if assigned(CurrentFunction) and (Node.DeclarationVariable.Kind=astnkLVAR) then begin
-     
-    end else begin
-     TPACCInstance(Instance).AddError('Internal error 2017-01-17-09-08-0000',@Node.SourceLocation,true);
-    end;
-   end;
-  end else begin
-   TPACCInstance(Instance).AddError('Internal error 2017-01-17-09-07-0000',@Node.SourceLocation,true);
   end;
  end;
  procedure EmitFunction(const Node:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
@@ -526,13 +306,115 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
     EmitExternalDeclaration(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
    end;
    astnkDECL:begin
-    EmitDeclaration(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
    end;
    astnkFUNC:begin
     EmitFunction(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node));
    end;
    else begin
     TPACCInstance(Instance).AddError('Internal error 2017-01-17-09-01-0000',@Node.SourceLocation,true);
+   end;
+  end;
+ end;
+ procedure EmitDeclarations;
+ var Index,DataItemIndex:TPACCInt32;
+     Declaration:TPACCIntermediateRepresentationCodeDeclaration;
+     DataItem:TPACCIntermediateRepresentationCodeDeclarationDataItem;
+     Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+ begin
+  for Index:=0 to TPACCInstance(Instance).IntermediateRepresentationCode.Declarations.Count-1 do begin
+   Declaration:=TPACCInstance(Instance).IntermediateRepresentationCode.Declarations[Index];
+   if assigned(Declaration.Variable) then begin
+    Variable:=Declaration.Variable;
+    if Variable.Kind=astnkGVAR then begin
+     GetCodeLevel(0)^.DataSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
+     GetCodeLevel(0)^.DataSectionStringList.Add(GetNodeLabelName(Variable)+':');
+     if not ((tfStatic in Variable.Type_^.Flags) or assigned(CurrentFunction)) then begin
+      GetCodeLevel(0)^.DataSectionStringList.Add('.public('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
+     end;
+     for DataItemIndex:=0 to Declaration.CountDataItems-1 do begin
+      DataItem:=Declaration.DataItems[DataItemIndex];
+      if assigned(DataItem.ValueOffsetBase) then begin
+       case DataItem.Kind of
+        pircdikUI8:begin
+         if DataItem.Count=1 then begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('db '+IntToStr(DataItem.ValueUI8)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase));
+         end else begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('db '+IntToStr(DataItem.Count)+' dup('+IntToStr(DataItem.ValueUI8)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+')');
+         end;
+        end;
+        pircdikUI16:begin
+         if DataItem.Count=1 then begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('dw '+IntToStr(DataItem.ValueUI16)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase));
+         end else begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('dw '+IntToStr(DataItem.Count)+' dup('+IntToStr(DataItem.ValueUI16)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+')');
+         end;
+        end;
+        pircdikUI32:begin
+         if DataItem.Count=1 then begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('dd '+IntToStr(DataItem.ValueUI32)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase));
+         end else begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('dd '+IntToStr(DataItem.Count)+' dup('+IntToStr(DataItem.ValueUI32)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+')');
+         end;
+        end;
+        pircdikUI64:begin
+         if DataItem.Count=1 then begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('dq '+IntToStr(DataItem.ValueUI64)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase));
+         end else begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('dq '+IntToStr(DataItem.Count)+' dup('+IntToStr(DataItem.ValueUI64)+' + offset '+GetNodeLabelName(DataItem.ValueOffsetBase)+')');
+         end;
+        end;
+        else begin
+         TPACCInstance(Instance).AddError('Internal error 2017-02-26-03-36-0000',nil,true);
+        end;
+       end;
+      end else begin
+       case DataItem.Kind of
+        pircdikUI8:begin
+         if DataItem.Count=1 then begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('db '+IntToStr(DataItem.ValueUI8));
+         end else begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('db '+IntToStr(DataItem.Count)+' dup('+IntToStr(DataItem.ValueUI8)+')');
+         end;
+        end;
+        pircdikUI16:begin
+         if DataItem.Count=1 then begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('dw '+IntToStr(DataItem.ValueUI16));
+         end else begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('dw '+IntToStr(DataItem.Count)+' dup('+IntToStr(DataItem.ValueUI16)+')');
+         end;
+        end;
+        pircdikUI32:begin
+         if DataItem.Count=1 then begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('dd '+IntToStr(DataItem.ValueUI32));
+         end else begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('dd '+IntToStr(DataItem.Count)+' dup('+IntToStr(DataItem.ValueUI32)+')');
+         end;
+        end;
+        pircdikUI64:begin
+         if DataItem.Count=1 then begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('dq '+IntToStr(DataItem.ValueUI64));
+         end else begin
+          GetCodeLevel(0)^.DataSectionStringList.Add('dq '+IntToStr(DataItem.Count)+' dup('+IntToStr(DataItem.ValueUI64)+')');
+         end;
+        end;
+        else begin
+         TPACCInstance(Instance).AddError('Internal error 2017-02-26-03-36-0000',nil,true);
+        end;
+       end;
+      end;
+     end;
+     GetCodeLevel(0)^.DataSectionStringList.Add('');
+    end else begin
+     GetCodeLevel(0)^.BSSSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
+     GetCodeLevel(0)^.BSSSectionStringList.Add(GetNodeLabelName(Variable)+':');
+     if not ((tfStatic in Variable.Type_^.Flags) or assigned(CurrentFunction)) then begin
+      GetCodeLevel(0)^.BSSSectionStringList.Add('.public('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
+     end;
+     GetCodeLevel(0)^.BSSSectionStringList.Add('resb '+IntToStr(Declaration.Size));
+     GetCodeLevel(0)^.BSSSectionStringList.Add('');
+    end;
+   end else begin
+    TPACCInstance(Instance).AddError('Internal error 2017-02-26-03-58-0000',nil,true);
    end;
   end;
  end;
@@ -552,6 +434,7 @@ begin
   SectionCounter:=1;
   InitializeCodeLevels;
   try
+   EmitDeclarations;
    for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(ARoot).Children.Count-1 do begin
     ProcessRootNode(TPACCAbstractSyntaxTreeNodeStatements(ARoot).Children[Index]);
    end;

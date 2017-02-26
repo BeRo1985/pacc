@@ -830,8 +830,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
 
        fDeclaration:TPACCAbstractSyntaxTreeNodeDeclaration;
 
-       fLabel:TPACCAbstractSyntaxTreeNodeLabel;
-
        fVariable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
 
        fSize:TPACCInt64;
@@ -864,8 +862,6 @@ type PPACCIntermediateRepresentationCodeOpcode=^TPACCIntermediateRepresentationC
        property Instance:TObject read fInstance;
 
        property Declaration:TPACCAbstractSyntaxTreeNodeDeclaration read fDeclaration;
-
-       property Label_:TPACCAbstractSyntaxTreeNodeLabel read fLabel write fLabel;
 
        property Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable read fVariable write fVariable;
 
@@ -8969,8 +8965,6 @@ begin
 
  fDeclaration:=nil;
 
- fLabel:=nil;
-
  fVariable:=nil;
 
  fSize:=0;
@@ -9129,7 +9123,8 @@ begin
                (TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.ChildType^.Kind=tkCHAR) then begin
     StringDeclaration:=TPACCIntermediateRepresentationCodeDeclaration.Create(fInstance);
     TPACCInstance(fInstance).IntermediateRepresentationCode.Declarations.Add(StringDeclaration);
-    StringDeclaration.Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkLVAR,TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_,Node.SourceLocation,'_$TEMPSTRING$'+IntToStr(TPACCPtrUInt(StringDeclaration)),0);
+    StringDeclaration.Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable.Create(TPACCInstance(Instance),astnkGVAR,TPACCInstance(Instance).CopyType(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_),Node.SourceLocation,'_$TEMPSTRING$'+IntToStr(TPACCPtrUInt(StringDeclaration)),0);
+    Include(StringDeclaration.Variable.Type_^.Flags,tfStatic);
     StringDeclaration.Alignment:=Max(4,TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand.Type_.Alignment);
     StringDeclaration.EmitStringData(TPACCAbstractSyntaxTreeNodeStringValue(TPACCAbstractSyntaxTreeNodeUnaryOperator(Node).Operand));
     StringDeclaration.Finish;
