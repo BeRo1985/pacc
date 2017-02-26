@@ -200,21 +200,6 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
    result:=result+'_'+TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).VariableName;
   end;
  end;
- procedure EmitExternalDeclaration(const Node:TPACCAbstractSyntaxTreeNodeDeclaration);
- const Depth=0;
- var Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
- begin
-  if assigned(Node.DeclarationVariable) then begin
-   if Node.DeclarationVariable.Kind=astnkGVAR then begin
-    Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.DeclarationVariable);
-    GetCodeLevel(Depth)^.ExternalStringList.Add('.external('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
-   end else begin
-    TPACCInstance(Instance).AddError('Internal error 2017-01-18-04-39-0001',@Node.SourceLocation,true);
-   end;
-  end else begin
-   TPACCInstance(Instance).AddError('Internal error 2017-01-18-04-39-0000',@Node.SourceLocation,true);
-  end;
- end;
  procedure EmitFunction(const Node:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
  var Index,ReturnSize,RemainingRegisterSize,Size:TPACCInt32;
      Parameter:TPACCAbstractSyntaxTreeNode;
@@ -303,7 +288,6 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
  begin
   case Node.Kind of
    astnkEXTERN_DECL:begin
-    EmitExternalDeclaration(TPACCAbstractSyntaxTreeNodeDeclaration(Node));
    end;
    astnkDECL:begin
    end;
@@ -312,6 +296,19 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
    end;
    else begin
     TPACCInstance(Instance).AddError('Internal error 2017-01-17-09-01-0000',@Node.SourceLocation,true);
+   end;
+  end;
+ end;
+ procedure EmitExternalDeclarations;
+ var Index:TPACCInt32;
+     Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
+ begin
+  for Index:=0 to TPACCInstance(Instance).IntermediateRepresentationCode.ExternalDeclarations.Count-1 do begin
+   Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCInstance(Instance).IntermediateRepresentationCode.ExternalDeclarations[Index]);
+   if Variable.Kind=astnkGVAR then begin
+    GetCodeLevel(0)^.ExternalStringList.Add('.external('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
+   end else begin
+    TPACCInstance(Instance).AddError('Internal error 2017-01-18-04-39-0001',@Variable.SourceLocation,true);
    end;
   end;
  end;
@@ -434,6 +431,7 @@ begin
   SectionCounter:=1;
   InitializeCodeLevels;
   try
+   EmitExternalDeclarations;
    EmitDeclarations;
    for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(ARoot).Children.Count-1 do begin
     ProcessRootNode(TPACCAbstractSyntaxTreeNodeStatements(ARoot).Children[Index]);
