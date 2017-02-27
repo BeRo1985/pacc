@@ -8862,7 +8862,7 @@ const AlignmentOpcode=4;
      pircokNONE:begin
      end;
      pircokTEMPORARY:begin
-      Line:=Line+'temporary('+IntToStr(Instruction.To_.Temporary)+') ='+CodeTypeChars[Instruction.Type_]+' ';
+      Line:=Line+DumpOperand(Instruction.To_)+' ='+CodeTypeChars[Instruction.Type_]+' ';
      end;
      else begin
       TPACCInstance(fInstance).AddError('Internal error 2017-01-28-00-38-0000',@Instruction.SourceLocation,true);
