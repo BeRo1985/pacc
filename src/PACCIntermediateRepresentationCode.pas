@@ -5600,9 +5600,6 @@ procedure TPACCIntermediateRepresentationCodeFunction.SSA;
      LinkTemporaryIndex:=CreateLinkTemporary(TemporaryIndex);
      Temporaries[LinkTemporaryIndex].Visit:=TemporaryIndex+1;
      Operand:=CreateTemporaryOperand(LinkTemporaryIndex);
-     if length(StackItems)<=TemporaryIndex then begin
-      StackItems[TemporaryIndex]:=NewStackItem(Operand,StackItems[TemporaryIndex]);
-     end;
      StackItems[TemporaryIndex]:=NewStackItem(Operand,StackItems[TemporaryIndex]);
     end;
    end;
@@ -8756,7 +8753,14 @@ begin
    result:='';
   end;
   pircokTEMPORARY:begin
-   result:='temporary('+IntToStr(Operand.Temporary)+')';
+   case Temporaries[Operand.Temporary].Kind of
+    pirctkLINK:begin
+     result:='linktemporary('+IntToStr(Operand.Temporary)+'->'+IntToStr(Temporaries[Operand.Temporary].Link.Index)+')';
+    end;
+    else begin
+     result:='temporary('+IntToStr(Operand.Temporary)+')';
+    end;
+   end;
   end;
   pircokCALL:begin
    result:='';
@@ -8830,7 +8834,7 @@ const AlignmentOpcode=4;
      pircokNONE:begin
      end;
      pircokTEMPORARY:begin
-      Line:=Line+'temporary('+IntToStr(Phi.To_.Temporary)+') ='+CodeTypeChars[Phi.Type_]+' ';
+      Line:=Line+DumpOperand(Phi.To_)+' ='+CodeTypeChars[Phi.Type_]+' ';
      end;
      else begin
       TPACCInstance(fInstance).AddError('Internal error 2017-01-28-01-01-0000',nil,true);
