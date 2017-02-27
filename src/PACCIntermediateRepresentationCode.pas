@@ -8621,10 +8621,6 @@ begin
 
     DefinitionUseAnalysis;
     SSACheck;
-    DeadCodeElimination;
-
-    DefinitionUseAnalysis;
-    SSACheck;
     SparseConditionalConstantPropagation;
 
     ReversePostOrderConstruction;
