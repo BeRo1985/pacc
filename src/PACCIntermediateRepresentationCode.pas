@@ -4067,11 +4067,10 @@ end;
 procedure TPACCIntermediateRepresentationCodeFunction.EmitFORStatement(const Node:TPACCAbstractSyntaxTreeNodeFORStatement);
 var ConditionLabel,BodyLabel,ContinueLabel,BreakLabel:TPACCAbstractSyntaxTreeNodeLabel;
     ConditionBlock,BodyBlock,ContinueBlock,BreakBlock:TPACCIntermediateRepresentationCodeBlock;
-    IgnoredTemporary,ConditionTemporary:TPACCInt32;
+    ConditionTemporary:TPACCInt32;
 begin
 
- IgnoredTemporary:=-1;
- EmitExpression(Node.Initialization_,IgnoredTemporary);
+ EmitStatement(Node.Initialization_);
 
  ConditionLabel:=NewHiddenLabel;
  BodyLabel:=NewHiddenLabel;
@@ -4097,7 +4096,7 @@ begin
  EmitJump(ContinueLabel);
 
  EmitLabel(ContinueLabel);
- EmitExpression(Node.Step,IgnoredTemporary);
+ EmitStatement(Node.Step);
  EmitJump(ConditionLabel);
 
  EmitLabel(BreakLabel);
@@ -6833,7 +6832,7 @@ var Operands:TPACCIntermediateRepresentationCodeOperands;
   Operand0:=EmptyOperand;
   for OperandIndex:=0 to Phi.CountOperands-1 do begin
    Operand1:=CopyOf(Phi.Operands[OperandIndex]);
-   if (Operand1.Kind<>pircokNONE) and not AreOperandsEqual(Operand1,Phi.To_) then begin
+   if not ((Operand1.Kind=pircokNONE) or AreOperandsEqual(Operand1,Phi.To_)) then begin
     if (Operand0.Kind=pircokNONE) or AreOperandsEqual(Operand0,Operand1) then begin
      Operand0:=Operand1;
     end else begin
@@ -8067,7 +8066,7 @@ begin
         VisitJump(Block,BlockID);
        end;
        inc(Block.Visit);
-       if not ((Block.Jump.Kind<>pircjkJMP) or Edges[BlockID,0].Dead or (FlowWork=@Edges[BlockID,0])) then begin
+       if not ((Block.Jump.Kind<>pircjkJMP) or (not Edges[BlockID,0].Dead) or (FlowWork=@Edges[BlockID,0])) then begin
         TPACCInstance(fInstance).AddError('Internal error 2017-01-30-02-33-0000',nil,true);
        end;
       end;
@@ -8419,11 +8418,12 @@ begin
 end;
 
 procedure TPACCIntermediateRepresentationCodeFunction.DeadCodeElimination;
-var InstructionIndex,PredecessorIndex,SuccessorIndex:TPACCInt32;
+var InstructionIndex,PredecessorIndex,SuccessorIndex,OperandIndex:TPACCInt32;
     BlockPointer:PPACCIntermediateRepresentationCodeBlock;
     Block,Predecessor,Successor:TPACCIntermediateRepresentationCodeBlock;
     Instruction:TPACCIntermediateRepresentationCodeInstruction;
     Temporary:TPACCIntermediateRepresentationCodeTemporary;
+    Phi:TPACCIntermediateRepresentationCodePhi;
     OK,DoAgain:boolean;
 begin
 
@@ -8470,18 +8470,33 @@ begin
     if (Block.Instructions.Count=0) and
        (Block.Jump.Kind=pircjkJMP) and
        (Block.Successors.Count=1) and not assigned(Block.Phi) then begin
-     for PredecessorIndex:=0 to Block.Predecessors.Count-1 do begin
-      Predecessor:=Block.Predecessors[PredecessorIndex];
-      for SuccessorIndex:=0 to Predecessor.Successors.Count-1 do begin
-       Successor:=Predecessor.Successors[SuccessorIndex];
-       if Successor=Block then begin
-        Predecessor.Successors[SuccessorIndex]:=Block.Successors[0];
+     OK:=true;
+     Phi:=Block.Successors[0].Phi;
+     while assigned(Phi) do begin
+      for OperandIndex:=0 to Phi.CountOperands-1 do begin
+       if Phi.Blocks[OperandIndex]=Block then begin
+        OK:=false;
+        break;
        end;
       end;
+      Phi:=Phi.Link;
      end;
-     CodeOptimized:=true;
-     DeleteBlock(Block);
-     BlockPointer^:=Block.Link;
+     if OK then begin
+      for PredecessorIndex:=0 to Block.Predecessors.Count-1 do begin
+       Predecessor:=Block.Predecessors[PredecessorIndex];
+       for SuccessorIndex:=0 to Predecessor.Successors.Count-1 do begin
+        Successor:=Predecessor.Successors[SuccessorIndex];
+        if Successor=Block then begin
+         Predecessor.Successors[SuccessorIndex]:=Block.Successors[0];
+        end;
+       end;
+      end;
+      CodeOptimized:=true;
+      DeleteBlock(Block);
+      BlockPointer^:=Block.Link;
+     end else begin
+      BlockPointer:=@Block.Link;
+     end;
     end else begin
      BlockPointer:=@Block.Link;
     end;
@@ -8526,20 +8541,35 @@ begin
     if (Block.Jump.Kind=pircjkJMP) and
        (Block.Successors.Count=1) and not assigned(Block.Phi) then begin
      Successor:=Block.Successors[0];
-     if Successor.Predecessors.Count=1 then begin
-      for InstructionIndex:=0 to Successor.Instructions.Count-1 do begin
-       Instruction:=Successor.Instructions[InstructionIndex];
-       Block.Instructions.Add(Instruction);
+     if (Successor.Predecessors.Count=1) and
+        (Successor.Predecessors[0].Successors.Count=1) and
+        (Successor.Predecessors[0].Successors[0]=Block) then begin
+      OK:=true;
+      Phi:=Successor.Phi;
+      while assigned(Phi) do begin
+       for OperandIndex:=0 to Phi.CountOperands-1 do begin
+        if Phi.Blocks[OperandIndex]=Block then begin
+         OK:=false;
+         break;
+        end;
+       end;
+       Phi:=Phi.Link;
       end;
-      Successor.Instructions.Clear;
-      Block.Jump:=Successor.Jump;
-      Block.Successors.Clear;
-      for SuccessorIndex:=0 to Successor.Successors.Count-1 do begin
-       Block.Successors.Add(Successor.Successors[SuccessorIndex]);
+      if OK then begin
+       for InstructionIndex:=0 to Successor.Instructions.Count-1 do begin
+        Instruction:=Successor.Instructions[InstructionIndex];
+        Block.Instructions.Add(Instruction);
+       end;
+       Successor.Instructions.Clear;
+       Block.Jump:=Successor.Jump;
+       Block.Successors.Clear;
+       for SuccessorIndex:=0 to Successor.Successors.Count-1 do begin
+        Block.Successors.Add(Successor.Successors[SuccessorIndex]);
+       end;
+       Successor.Successors.Clear;
+       DeleteBlock(Successor);
+       DoAgain:=true;
       end;
-      Successor.Successors.Clear;
-      DeleteBlock(Successor);
-      DoAgain:=true;
      end;
     end;
     BlockPointer:=@Block.Link;
@@ -8588,6 +8618,10 @@ begin
     DefinitionUseAnalysis;
     SSACheck;
     CopyElimination;
+
+    DefinitionUseAnalysis;
+    SSACheck;
+    DeadCodeElimination;
 
     DefinitionUseAnalysis;
     SSACheck;
