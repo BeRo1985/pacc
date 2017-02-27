@@ -129,58 +129,11 @@ begin
 end;
 
 procedure TPACCTarget_x86_32.GenerateCode(const ARoot:TPACCAbstractSyntaxTreeNode;const AOutputStream:TStream);
-type PCodeLevel=^TCodeLevel;
-     TCodeLevel=record
-      TextSectionStringList:TStringList;
-      DataSectionStringList:TStringList;
-      BSSSectionStringList:TStringList;
-      ExternalStringList:TStringList;
-     end;
-     TCodeLevels=array of TCodeLevel;
-var CountCodeLevels,SectionCounter:TPACCInt32;
-    CodeStringList:TStringList;
+var SectionCounter:TPACCInt32;
+    CodeStringList,TextSectionStringList,DataSectionStringList,BSSSectionStringList,ExternalStringList:TStringList;
     CurrentFunction:TPACCAbstractSyntaxTreeNode;
-    CodeLevels:TCodeLevels;
     NodeLabelHashMap:TPACCPointerHashMap;
     NodeLabelCounter:TPACCPtrUInt;
- procedure InitializeCodeLevels;
- begin
-  CodeLevels:=nil;
- end;
- procedure FinalizeCodeLevels;
- var Index:TPACCInt32;
-     CodeLevel:PCodeLevel;
- begin
-  for Index:=0 to CountCodeLevels-1 do begin
-   CodeLevel:=@CodeLevels[Index];
-   FreeAndNil(CodeLevel^.TextSectionStringList);
-   FreeAndNil(CodeLevel^.DataSectionStringList);
-   FreeAndNil(CodeLevel^.BSSSectionStringList);
-   FreeAndNil(CodeLevel^.ExternalStringList);
-  end;
-  SetLength(CodeLevels,0);
- end;
- function GetCodeLevel(const Depth:TPACCInt32):PCodeLevel;
- var Index,OldCountCodeLevels:TPACCInt32;
- begin
-  if CountCodeLevels<=Depth then begin
-   if length(CodeLevels)<=Depth then begin
-    OldCountCodeLevels:=length(CodeLevels);
-    SetLength(CodeLevels,(Depth+1)*2);
-    FillChar(CodeLevels[OldCountCodeLevels],(length(CodeLevels)-OldCountCodeLevels)*SizeOf(TCodeLevel),#0);
-   end;
-   OldCountCodeLevels:=CountCodeLevels;
-   CountCodeLevels:=Depth+1;
-   for Index:=OldCountCodeLevels to CountCodeLevels-1 do begin
-    result:=@CodeLevels[Depth];
-    result^.TextSectionStringList:=TStringList.Create;
-    result^.DataSectionStringList:=TStringList.Create;
-    result^.BSSSectionStringList:=TStringList.Create;
-    result^.ExternalStringList:=TStringList.Create;
-   end;
-  end;
-  result:=@CodeLevels[Depth];
- end;
  function GetNodeLabelName(const Node:TPACCAbstractSyntaxTreeNode):TPACCRawByteString;
  var Entity:PPACCPointerHashMapEntity;
      Index:TPACCPtrUInt;
@@ -200,105 +153,6 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
    result:=result+'_'+TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node).VariableName;
   end;
  end;
- procedure EmitFunction(const Node:TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration);
- var Index,ReturnSize,RemainingRegisterSize,Size:TPACCInt32;
-     Parameter:TPACCAbstractSyntaxTreeNode;
- begin
-  for Index:=0 to Node.Parameters.Count-1 do begin
-   Parameter:=Node.Parameters[Index];
-   if assigned(Parameter) then begin
-   end;
-  end;
-  GetCodeLevel(0)^.TextSectionStringList.Add('');
-  GetCodeLevel(0)^.TextSectionStringList.Add('.align(16)');
-  if not ((tfStatic in Node.Type_^.Flags) or (afInline in Node.Type_^.Attribute.Flags)) then begin
-   GetCodeLevel(0)^.TextSectionStringList.Add('.public('+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Variable))+' = "'+Node.FunctionName+'")');
-  end;
-  GetCodeLevel(0)^.TextSectionStringList.Add(GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(Node.Variable))+':');
-  GetCodeLevel(0)^.TextSectionStringList.Add('push ebp');
-  GetCodeLevel(0)^.TextSectionStringList.Add('mov ebp, esp');
-  // ..
-  GetCodeLevel(0)^.TextSectionStringList.Add('mov esp, ebp');
-  GetCodeLevel(0)^.TextSectionStringList.Add('pop ebp');
-  if (Node.FunctionName='main') and (Node.Type_^.ReturnType^.Kind=tkVOID) then begin
-   GetCodeLevel(0)^.TextSectionStringList.Add('xor eax, eax');
-  end;
-  case Node.Type_^.Attribute.CallingConvention of
-   ccSTDCALL:begin
-    ReturnSize:=0;
-    for Index:=0 to Node.Parameters.Count-1 do begin
-     Parameter:=Node.Parameters[Index];
-     case Parameter.Type_^.Size of
-      1,2,4:begin
-       inc(ReturnSize,4);
-      end;
-      8:begin
-       inc(ReturnSize,8);
-      end;
-      else begin
-       inc(ReturnSize,(Parameter.Type_^.Size+3) and not TPACCInt32(3));
-      end;
-     end;
-    end;
-   end;
-   ccFASTCALL:begin
-    // Microsoft or GCC __fastcall convention passes the first two arguments (evaluated left to right)
-    // that fit into ECX and EDX. Remaining arguments are pushed onto the stack from right to left.
-    RemainingRegisterSize:=8;
-    ReturnSize:=0;
-    for Index:=0 to Node.Parameters.Count-1 do begin
-     Parameter:=Node.Parameters[Index];
-     case Parameter.Type_^.Size of
-      1,2,4:begin
-       if RemainingRegisterSize>=4 then begin
-        dec(ReturnSize,4);
-       end else begin
-        inc(ReturnSize,4);
-       end;
-      end;
-      8:begin
-       if RemainingRegisterSize>=8 then begin
-        dec(ReturnSize,8);
-       end else begin
-        inc(ReturnSize,8);
-       end;
-      end;
-      else begin
-       Size:=(Parameter.Type_^.Size+3) and not TPACCInt32(3);
-       if RemainingRegisterSize>=Size then begin
-        dec(ReturnSize,Size);
-       end else begin
-        inc(ReturnSize,Size);
-       end;
-      end;
-     end;
-    end;
-   end;
-   else {ccCDECL:}begin
-    ReturnSize:=0; // Because it is the callee task in this case
-   end;
-  end;
-  if ReturnSize>0 then begin
-   GetCodeLevel(0)^.TextSectionStringList.Add('ret '+IntToStr(ReturnSize));
-  end else begin
-   GetCodeLevel(0)^.TextSectionStringList.Add('ret');
-  end;
- end;
- procedure ProcessRootNode(const Node:TPACCAbstractSyntaxTreeNode);
- begin
-  case Node.Kind of
-   astnkEXTERN_DECL:begin
-   end;
-   astnkDECL:begin
-   end;
-   astnkFUNC:begin
-    EmitFunction(TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration(Node));
-   end;
-   else begin
-    TPACCInstance(Instance).AddError('Internal error 2017-01-17-09-01-0000',@Node.SourceLocation,true);
-   end;
-  end;
- end;
  procedure EmitExternalDeclarations;
  var Index:TPACCInt32;
      Variable:TPACCAbstractSyntaxTreeNodeLocalGlobalVariable;
@@ -306,7 +160,7 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
   for Index:=0 to TPACCInstance(Instance).IntermediateRepresentationCode.ExternalDeclarations.Count-1 do begin
    Variable:=TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(TPACCInstance(Instance).IntermediateRepresentationCode.ExternalDeclarations[Index]);
    if Variable.Kind=astnkGVAR then begin
-    GetCodeLevel(0)^.ExternalStringList.Add('.external('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
+    ExternalStringList.Add('.external('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
    end else begin
     TPACCInstance(Instance).AddError('Internal error 2017-01-18-04-39-0001',@Variable.SourceLocation,true);
    end;
@@ -338,10 +192,10 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
      end;
     end;
     if NeedData then begin
-     GetCodeLevel(0)^.DataSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
-     GetCodeLevel(0)^.DataSectionStringList.Add(GetNodeLabelName(Variable)+':');
+     DataSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
+     DataSectionStringList.Add(GetNodeLabelName(Variable)+':');
      if (Variable.Kind=astnkGVAR) and not ((tfStatic in Variable.Type_^.Flags) or assigned(CurrentFunction)) then begin
-      GetCodeLevel(0)^.DataSectionStringList.Add('.public('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
+      DataSectionStringList.Add('.public('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
      end;
      for DataItemIndex:=0 to Declaration.CountDataItems-1 do begin
       DataItem:=@Declaration.DataItems[DataItemIndex];
@@ -350,60 +204,60 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
         pircdikUI8:begin
          if DataItem^.ValueUI8=0 then begin
           if DataItem^.Count=1 then begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('db offset '+GetNodeLabelName(DataItem^.ValueOffsetBase));
+           DataSectionStringList.Add('db offset '+GetNodeLabelName(DataItem^.ValueOffsetBase));
           end else begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('db '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+')');
+           DataSectionStringList.Add('db '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+')');
           end;
          end else begin
           if DataItem^.Count=1 then begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('db offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI8));
+           DataSectionStringList.Add('db offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI8));
           end else begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('db '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI8)+')');
+           DataSectionStringList.Add('db '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI8)+')');
           end;
          end;
         end;
         pircdikUI16:begin
          if DataItem^.ValueUI16=0 then begin
           if DataItem^.Count=1 then begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('dw offset '+GetNodeLabelName(DataItem^.ValueOffsetBase));
+           DataSectionStringList.Add('dw offset '+GetNodeLabelName(DataItem^.ValueOffsetBase));
           end else begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('dw '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+')');
+           DataSectionStringList.Add('dw '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+')');
           end;
          end else begin
           if DataItem^.Count=1 then begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('dw offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI16));
+           DataSectionStringList.Add('dw offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI16));
           end else begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('dw '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI16)+')');
+           DataSectionStringList.Add('dw '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI16)+')');
           end;
          end;
         end;
         pircdikUI32:begin
          if DataItem^.ValueUI32=0 then begin
           if DataItem^.Count=1 then begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(DataItem^.ValueOffsetBase));
+           DataSectionStringList.Add('dd offset '+GetNodeLabelName(DataItem^.ValueOffsetBase));
           end else begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('dd '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+')');
+           DataSectionStringList.Add('dd '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+')');
           end;
          end else begin
           if DataItem^.Count=1 then begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('dd offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI32));
+           DataSectionStringList.Add('dd offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI32));
           end else begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('dd '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI32)+')');
+           DataSectionStringList.Add('dd '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI32)+')');
           end;
          end;
         end;
         pircdikUI64:begin
          if DataItem^.ValueUI64=0 then begin
           if DataItem^.Count=1 then begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('dq offset '+GetNodeLabelName(DataItem^.ValueOffsetBase));
+           DataSectionStringList.Add('dq offset '+GetNodeLabelName(DataItem^.ValueOffsetBase));
           end else begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('dq '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+')');
+           DataSectionStringList.Add('dq '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+')');
           end;
          end else begin
           if DataItem^.Count=1 then begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('dq offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI64));
+           DataSectionStringList.Add('dq offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI64));
           end else begin
-           GetCodeLevel(0)^.DataSectionStringList.Add('dq '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI64)+')');
+           DataSectionStringList.Add('dq '+IntToStr(DataItem^.Count)+' dup(offset '+GetNodeLabelName(DataItem^.ValueOffsetBase)+' + '+IntToStr(DataItem^.ValueUI64)+')');
           end;
          end;
         end;
@@ -415,30 +269,30 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
        case DataItem^.Kind of
         pircdikUI8:begin
          if DataItem^.Count=1 then begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('db '+IntToStr(DataItem^.ValueUI8));
+          DataSectionStringList.Add('db '+IntToStr(DataItem^.ValueUI8));
          end else begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('db '+IntToStr(DataItem^.Count)+' dup('+IntToStr(DataItem^.ValueUI8)+')');
+          DataSectionStringList.Add('db '+IntToStr(DataItem^.Count)+' dup('+IntToStr(DataItem^.ValueUI8)+')');
          end;
         end;
         pircdikUI16:begin
          if DataItem^.Count=1 then begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('dw '+IntToStr(DataItem^.ValueUI16));
+          DataSectionStringList.Add('dw '+IntToStr(DataItem^.ValueUI16));
          end else begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('dw '+IntToStr(DataItem^.Count)+' dup('+IntToStr(DataItem^.ValueUI16)+')');
+          DataSectionStringList.Add('dw '+IntToStr(DataItem^.Count)+' dup('+IntToStr(DataItem^.ValueUI16)+')');
          end;
         end;
         pircdikUI32:begin
          if DataItem^.Count=1 then begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('dd '+IntToStr(DataItem^.ValueUI32));
+          DataSectionStringList.Add('dd '+IntToStr(DataItem^.ValueUI32));
          end else begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('dd '+IntToStr(DataItem^.Count)+' dup('+IntToStr(DataItem^.ValueUI32)+')');
+          DataSectionStringList.Add('dd '+IntToStr(DataItem^.Count)+' dup('+IntToStr(DataItem^.ValueUI32)+')');
          end;
         end;
         pircdikUI64:begin
          if DataItem^.Count=1 then begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('dq '+IntToStr(DataItem^.ValueUI64));
+          DataSectionStringList.Add('dq '+IntToStr(DataItem^.ValueUI64));
          end else begin
-          GetCodeLevel(0)^.DataSectionStringList.Add('dq '+IntToStr(DataItem^.Count)+' dup('+IntToStr(DataItem^.ValueUI64)+')');
+          DataSectionStringList.Add('dq '+IntToStr(DataItem^.Count)+' dup('+IntToStr(DataItem^.ValueUI64)+')');
          end;
         end;
         else begin
@@ -447,24 +301,114 @@ var CountCodeLevels,SectionCounter:TPACCInt32;
        end;
       end;
      end;
-     GetCodeLevel(0)^.DataSectionStringList.Add('');
+     DataSectionStringList.Add('');
     end else begin
-     GetCodeLevel(0)^.BSSSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
-     GetCodeLevel(0)^.BSSSectionStringList.Add(GetNodeLabelName(Variable)+':');
+     BSSSectionStringList.Add('.align('+IntToStr(Max(1,Variable.Type_^.Alignment))+')');
+     BSSSectionStringList.Add(GetNodeLabelName(Variable)+':');
      if (Variable.Kind=astnkGVAR) and not ((tfStatic in Variable.Type_^.Flags) or assigned(CurrentFunction)) then begin
-      GetCodeLevel(0)^.BSSSectionStringList.Add('.public('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
+      BSSSectionStringList.Add('.public('+GetNodeLabelName(Variable)+' = "'+Variable.VariableName+'")');
      end;
-     GetCodeLevel(0)^.BSSSectionStringList.Add('resb '+IntToStr(Declaration.Size));
-     GetCodeLevel(0)^.BSSSectionStringList.Add('');
+     BSSSectionStringList.Add('resb '+IntToStr(Declaration.Size));
+     BSSSectionStringList.Add('');
     end;
    end else begin
     TPACCInstance(Instance).AddError('Internal error 2017-02-26-03-58-0000',nil,true);
    end;
   end;
  end;
+ procedure EmitFunctions;
+ var Index,SubIndex,ReturnSize,RemainingRegisterSize,Size:TPACCInt32;
+     CodeFunction:TPACCIntermediateRepresentationCodeFunction;
+     Parameter:TPACCAbstractSyntaxTreeNode;
+ begin
+  for Index:=0 to TPACCInstance(Instance).IntermediateRepresentationCode.Functions.Count-1 do begin
+   CodeFunction:=TPACCInstance(Instance).IntermediateRepresentationCode.Functions[Index];
+   if assigned(CodeFunction) and
+      assigned(CodeFunction.FunctionDeclaration) and
+      (CodeFunction.FunctionDeclaration is TPACCAbstractSyntaxTreeNodeFunctionCallOrFunctionDeclaration) then begin
+    for SubIndex:=0 to CodeFunction.FunctionDeclaration.Parameters.Count-1 do begin
+     Parameter:=CodeFunction.FunctionDeclaration.Parameters[SubIndex];
+     if assigned(Parameter) then begin
+     end;
+    end;
+    TextSectionStringList.Add('');
+    TextSectionStringList.Add('.align(16)');
+    if not ((tfStatic in CodeFunction.FunctionDeclaration.Type_^.Flags) or (afInline in CodeFunction.FunctionDeclaration.Type_^.Attribute.Flags)) then begin
+     TextSectionStringList.Add('.public('+GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(CodeFunction.FunctionDeclaration.Variable))+' = "'+CodeFunction.FunctionDeclaration.FunctionName+'")');
+    end;
+    TextSectionStringList.Add(GetNodeLabelName(TPACCAbstractSyntaxTreeNodeLocalGlobalVariable(CodeFunction.FunctionDeclaration.Variable))+':');
+    TextSectionStringList.Add('push ebp');
+    TextSectionStringList.Add('mov ebp, esp');
+    // ..
+    TextSectionStringList.Add('mov esp, ebp');
+    TextSectionStringList.Add('pop ebp');
+    if (CodeFunction.FunctionDeclaration.FunctionName='main') and (CodeFunction.FunctionDeclaration.Type_^.ReturnType^.Kind=tkVOID) then begin
+     TextSectionStringList.Add('xor eax, eax');
+    end;
+    case CodeFunction.FunctionDeclaration.Type_^.Attribute.CallingConvention of
+     ccSTDCALL:begin
+      ReturnSize:=0;
+      for SubIndex:=0 to CodeFunction.FunctionDeclaration.Parameters.Count-1 do begin
+       Parameter:=CodeFunction.FunctionDeclaration.Parameters[SubIndex];
+       case Parameter.Type_^.Size of
+        1,2,4:begin
+         inc(ReturnSize,4);
+        end;
+        8:begin
+         inc(ReturnSize,8);
+        end;
+        else begin
+         inc(ReturnSize,(Parameter.Type_^.Size+3) and not TPACCInt32(3));
+        end;
+       end;
+      end;
+     end;
+     ccFASTCALL:begin
+      // Microsoft or GCC __fastcall convention passes the first two arguments (evaluated left to right)
+      // that fit into ECX and EDX. Remaining arguments are pushed onto the stack from right to left.
+      RemainingRegisterSize:=8;
+      ReturnSize:=0;
+      for SubIndex:=0 to CodeFunction.FunctionDeclaration.Parameters.Count-1 do begin
+       Parameter:=CodeFunction.FunctionDeclaration.Parameters[SubIndex];
+       case Parameter.Type_^.Size of
+        1,2,4:begin
+         if RemainingRegisterSize>=4 then begin
+          dec(ReturnSize,4);
+         end else begin
+          inc(ReturnSize,4);
+         end;
+        end;
+        8:begin
+         if RemainingRegisterSize>=8 then begin
+          dec(ReturnSize,8);
+         end else begin
+          inc(ReturnSize,8);
+         end;
+        end;
+        else begin
+         Size:=(Parameter.Type_^.Size+3) and not TPACCInt32(3);
+         if RemainingRegisterSize>=Size then begin
+          dec(ReturnSize,Size);
+         end else begin
+          inc(ReturnSize,Size);
+         end;
+        end;
+       end;
+      end;
+     end;
+     else {ccCDECL:}begin
+      ReturnSize:=0; // Because it is the callee task in this case
+     end;
+    end;
+    if ReturnSize>0 then begin
+     TextSectionStringList.Add('ret '+IntToStr(ReturnSize));
+    end else begin
+     TextSectionStringList.Add('ret');
+    end;
+   end;
+  end;
+ end;
 var Index,LineIndex:TPACCInt32;
-    TextSectionStringList,DataSectionStringList,BSSSectionStringList,ExternalStringList:TStringList;
-    CodeLevel:PCodeLevel;
 begin
  CodeStringList:=TStringList.Create;
  TextSectionStringList:=TStringList.Create;
@@ -476,31 +420,9 @@ begin
  try
   CurrentFunction:=nil;
   SectionCounter:=1;
-  InitializeCodeLevels;
-  try
-   EmitExternalDeclarations;
-   EmitDeclarations;
-   for Index:=0 to TPACCAbstractSyntaxTreeNodeStatements(ARoot).Children.Count-1 do begin
-    ProcessRootNode(TPACCAbstractSyntaxTreeNodeStatements(ARoot).Children[Index]);
-   end;
-   for Index:=0 to CountCodeLevels-1 do begin
-    CodeLevel:=@CodeLevels[Index];
-    for LineIndex:=0 to CodeLevel^.TextSectionStringList.Count-1 do begin
-     TextSectionStringList.Add('  '+CodeLevel^.TextSectionStringList[LineIndex]);
-    end;
-    for LineIndex:=0 to CodeLevel^.DataSectionStringList.Count-1 do begin
-     DataSectionStringList.Add('  '+CodeLevel^.DataSectionStringList[LineIndex]);
-    end;
-    for LineIndex:=0 to CodeLevel^.BSSSectionStringList.Count-1 do begin
-     BSSSectionStringList.Add('  '+CodeLevel^.BSSSectionStringList[LineIndex]);
-    end;
-    for LineIndex:=0 to CodeLevel^.ExternalStringList.Count-1 do begin
-     ExternalStringList.Add('  '+CodeLevel^.ExternalStringList[LineIndex]);
-    end;
-   end;
-  finally
-   FinalizeCodeLevels;
-  end;
+  EmitExternalDeclarations;
+  EmitDeclarations;
+  EmitFunctions;
   if self is TPACCTarget_x86_32_COFF_PE then begin
    CodeStringList.Add('.cpu(all)');
    CodeStringList.Add('');
