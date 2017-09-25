@@ -361,39 +361,39 @@ begin
   end;
   tkBOOL:begin
    result^.Size:=Target.SizeOfBool;
-   result^.Alignment:=Target.SizeOfBool;
+   result^.Alignment:=Target.AlignmentOfBool;
   end;
   tkCHAR:begin
    result^.Size:=Target.SizeOfChar;
-   result^.Alignment:=Target.SizeOfChar;
+   result^.Alignment:=Target.AlignmentOfChar;
   end;
   tkSHORT:begin
    result^.Size:=Target.SizeOfShort;
-   result^.Alignment:=Target.SizeOfShort;
+   result^.Alignment:=Target.AlignmentOfShort;
   end;
   tkINT:begin
    result^.Size:=Target.SizeOfInt;
-   result^.Alignment:=Target.SizeOfInt;
+   result^.Alignment:=Target.AlignmentOfInt;
   end;
   tkLONG:begin
    result^.Size:=Target.SizeOfLong;
-   result^.Alignment:=Target.SizeOfLong;
+   result^.Alignment:=Target.AlignmentOfLong;
   end;
   tkLLONG:begin
    result^.Size:=Target.SizeOfLongLong;
-   result^.Alignment:=Target.SizeOfLongLong;
-  end;
+   result^.Alignment:=Target.AlignmentOfLongLong;
+  end;                                  
   tkFLOAT:begin
    result^.Size:=Target.SizeOfFloat;
-   result^.Alignment:=Target.SizeOfFloat;
+   result^.Alignment:=Target.AlignmentOfFloat;
   end;
   tkDOUBLE:begin
    result^.Size:=Target.SizeOfDouble;
-   result^.Alignment:=Target.SizeOfDouble;
+   result^.Alignment:=Target.AlignmentOfDouble;
   end;
   tkLDOUBLE:begin
    result^.Size:=Target.SizeOfLongDouble;
-   result^.Alignment:=Target.SizeOfLongDouble;
+   result^.Alignment:=Target.AlignmentOfLongDouble;
   end;
   else begin
    AddError('Internal error 2016-12-30-23-11-0000');

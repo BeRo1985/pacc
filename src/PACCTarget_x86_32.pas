@@ -541,7 +541,23 @@ end;
 constructor TPACCTarget_x86_32_ELF_ELF.Create(const AInstance:TObject);
 begin
  inherited Create(AInstance);
+
+ AlignmentOfPointer:=4;
+ AlignmentOf_PTRDIFF_T:=4;
+ AlignmentOf_SIZE_T:=4;
+ AlignmentOfBool:=1;
+ AlignmentOfChar:=1;
+ AlignmentOfShort:=2;
+ AlignmentOfInt:=4;
+ AlignmentOfLong:=4;
+ AlignmentOfLongLong:=4;
+ AlignmentOfFloat:=4;
+ AlignmentOfDouble:=4;
+ AlignmentOfLongDouble:=4;
+ AlignmentOfEnum:=4;
+
  LinkerClass:=TPACCLinker_ELF_ELF;
+
 end;
 
 class function TPACCTarget_x86_32_ELF_ELF.GetName:TPACCRawByteString;
