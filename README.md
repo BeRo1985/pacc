@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> The primary repository has moved to [git.rosseaux.net/BeRo1985/pacc](https://git.rosseaux.net/BeRo1985/pacc).
+> This GitHub repository is kept up-to-date via push mirroring.
+
 # PACC
 
 PACC (PAscal C Compiler) is an work-in-progress C11-specification-aiming C compiler, which is implemented in Delphi-7-compatible Object Pascal.
